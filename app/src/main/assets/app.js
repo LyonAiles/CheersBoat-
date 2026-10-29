@@ -114,7 +114,7 @@ $('dialog').addEventListener('close',()=>{cameraStream?.getTracks().forEach(t=>t
 
 // Fullscreen with safe fallback: browser controls may remain on some mobile browsers.
 const fullBtn=document.getElementById('fullscreenToggle');
-fullBtn.addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen()}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen()}else{fullBtn.title='Plein écran indisponible sur ce navigateur'}}catch(e){fullBtn.title='Plein écran refusé par le navigateur'}});
-document.addEventListener('fullscreenchange',()=>{fullBtn.textContent=document.fullscreenElement?'⤢':'⛶';setTimeout(()=>{if(map)map.invalidateSize()},120)});
+fullBtn?.addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen()}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen()}else{fullBtn.title='Plein écran indisponible sur ce navigateur'}}catch(e){fullBtn.title='Plein écran refusé par le navigateur'}});
+document.addEventListener('fullscreenchange',()=>{if(fullBtn)fullBtn.textContent=document.fullscreenElement?'⤢':'⛶';setTimeout(()=>{if(map)map.invalidateSize()},120)});
 window.addEventListener('resize',()=>{if(map)requestAnimationFrame(()=>map.invalidateSize())});
 window.addEventListener('orientationchange',()=>setTimeout(()=>{if(map)map.invalidateSize()},300));
