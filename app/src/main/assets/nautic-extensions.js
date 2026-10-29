@@ -60,7 +60,38 @@ const contactDefaults=[
  {label:'Mécanicien local',phone:'',mode:'call',type:'Panne mécanique'},
  {label:'Contact personnel',phone:'',mode:'sms',type:'Demande d’assistance'}];
 const testNumber='0607615420';
-function messageFor(c){let p=latest;let pos=p?`${p.lat.toFixed(6)}, ${p.lon.toFixed(6)} (±${Math.round(p.acc)} m)`:'GPS indisponible';return `Nautic — ${c.type}. Bateau : ${state.boatName||'Kotter'}. Position : ${pos}. Date : ${new Date().toLocaleString('fr-FR')}. Merci de me contacter.`}
+function contactPhone(){let n=(state.contactPhone||testNumber).replace(/[^+0-9]/g,'');return n.startsWith('0')?'+33'+n.slice(1):n}
+function messageFor(c,address){const p=latest,now=new Date(),lines=[
+ 'URGENCE — Demande d’assistance',
+ '',
+ 'Motif : '+c.type,
+ 'Bateau : '+(state.boatName||'Kotter'),
+ '',
+ 'Latitude : '+(p?p.lat.toFixed(6):'GPS indisponible'),
+ 'Longitude : '+(p?p.lon.toFixed(6):'GPS indisponible'),
+ 'Précision GPS : '+(p?'± '+Math.round(p.acc)+' m':'inconnue'),
+ '',
+ 'Adresse approximative : '+(address||'Non disponible'),
+ 'Localisation sur la carte :',
+ p?'https://www.google.com/maps?q='+p.lat.toFixed(6)+','+p.lon.toFixed(6):'Position indisponible',
+ '',
+ 'Téléphone : '+contactPhone(),
+ 'Date : '+now.toLocaleDateString('fr-FR'),
+ 'Heure : '+now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
+ '',
+ 'Merci de me contacter.'
+ ];return lines.join('\\n')}
+async function resolveEmergencyAddress(){
+ const p=latest;if(!p)return 'GPS indisponible';
+ try{
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),4500);
+  const u='https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat='+encodeURIComponent(p.lat)+'&lon='+encodeURIComponent(p.lon);
+  const response=await fetch(u,{signal:controller.signal,headers:{'Accept':'application/json'}});
+  clearTimeout(timer);if(!response.ok)throw Error('Adresse indisponible');
+  const data=await response.json();const a=data.address||{};
+  return [a.house_number,a.road||a.pedestrian||a.path,a.postcode,a.city||a.town||a.village||a.municipality].filter(Boolean).join(' ')||data.display_name||'Non disponible';
+ }catch(e){return 'Non disponible (GPS indiqué ci-dessus)'}
+}
 window.nauticSelectedContact=number=>{let input=get('emPhone');if(input)input.value=number};
 function emergencyDialog(){const contacts=[...contactDefaults,...state.contacts];
  openModal('Urgences — téléphone ou SMS',`<p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'MODE TEST : tous les destinataires sont remplacés par ton numéro':'MODE RÉEL : vérifie le destinataire avant de contacter les secours'}</p>
@@ -69,8 +100,9 @@ function emergencyDialog(){const contacts=[...contactDefaults,...state.contacts]
  <div id="smsFields"><label class="formLabel">Message modifiable<textarea id="emText"></textarea></label></div>
  <div class="dialogActions"><button id="emAction">Appeler</button><button id="emContacts">Choisir un contact</button></div>
  <p class="muted">En mode réel, 15/17/18/112 : appel uniquement. Le 114 reçoit les urgences par SMS, selon les conditions du service. Aucun SMS n'est envoyé sans confirmation.</p>`);
- function refresh(){let c=contacts[Number(get('emTarget').value)];get('emPhone').value=state.testMode?testNumber:c.phone;let isSms=c.mode==='sms';get('smsFields').hidden=!isSms;get('emAction').textContent=isSms?'✉ Préparer le SMS':'📞 Appeler';get('emText').value=messageFor(c)}
+ function refresh(){let c=contacts[Number(get('emTarget').value)];get('emPhone').value=state.testMode?testNumber:c.phone;let isSms=c.mode==='sms';get('smsFields').hidden=!isSms;get('emAction').textContent=isSms?'✉ Préparer le SMS':'📞 Appeler';get('emText').value=messageFor(c,get('emText').dataset.address)}
  get('emTarget').onchange=refresh;refresh();
+ resolveEmergencyAddress().then(address=>{const target=get('emTarget'),text=get('emText');if(target&&text&&document.activeElement!==text){const c=contacts[Number(target.value)];text.value=messageFor(c,address);text.dataset.address=address}});
  get('emAction').onclick=()=>{let n=get('emPhone').value.trim();if(!n){alert('Numéro manquant : renseigne-le dans les paramètres ou choisis un contact');return}let c=contacts[Number(get('emTarget').value)];if(c.mode==='sms')smsNumber(n,get('emText').value);else callNumber(n)};
  get('emContacts').onclick=()=>{if(!nativeCall('pickContact'))alert('Sélection native des contacts disponible dans la version Android')};
 }
@@ -96,7 +128,7 @@ function applyVisibility(){Object.entries(state.buttons).forEach(([id,yes])=>{le
 function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
  openModal('Paramètres',`<h3>Tableau de bord</h3>${buttons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <h3>Navigation</h3>${field('Seuil de déplacement confirmé (m)','settingMove',state.moveThreshold,'number')}${field('Arrêt prolongé (minutes)','settingStop',state.stopMinutes,'number')}
- <h3>Bateau</h3>${field('Nom du bateau','settingBoat',state.boatName)}
+ <h3>Bateau</h3>${field('Nom du bateau','settingBoat',state.boatName)}${field('Téléphone de rappel (inclus dans les SMS)','settingContactPhone',state.contactPhone||testNumber,'tel')}
  <p>Carburant estimé consommé : <b>${(typeof fuelUsed==='number'?fuelUsed:0).toFixed(2)} L</b>. La consommation d'un arrêt de moins de ${state.stopMinutes} minutes est ajoutée à la reprise ; après ce délai elle est annulée.</p>
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
@@ -107,7 +139,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  get('toggleEmergency').onclick=()=>{let pass=prompt('Code pour changer de mode :');if(pass==='xxx'){state.testMode=!state.testMode;persist();settingsDialog()}else if(pass!==null)alert('Code incorrect')};
  get('settingsSave').onclick=()=>{dialog.querySelectorAll('[data-button]').forEach(e=>state.buttons[e.dataset.button]=e.checked);
   state.moveThreshold=Math.max(3,Number(get('settingMove').value)||8);state.stopMinutes=Math.max(1,Number(get('settingStop').value)||20);
-  state.boatName=get('settingBoat').value.trim();
+  state.boatName=get('settingBoat').value.trim();state.contactPhone=get('settingContactPhone').value.trim();
   state.contacts=get('contactList').value.split('\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:a[3]?.toLowerCase()==='appel'?'call':'sms'}));
   persist();applyVisibility();dialog.close();};
  get('settingsMaps').onclick=mapDialog;get('settingsReset').onclick=()=>{state.buttons={};persist();applyVisibility();settingsDialog()};
