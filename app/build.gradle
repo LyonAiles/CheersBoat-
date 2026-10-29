@@ -16,6 +16,12 @@ android {
         versionName = (project.findProperty("nauticVersionName") ?: "0.4.2").toString()
     }
 
+    // Distribution directe hors Google Play : conserver le comportement Android existant.
+    // À revoir lors de la migration vers un targetSdk récent.
+    lint {
+        disable "ExpiredTargetSdkVersion"
+    }
+
     signingConfigs {
         nauticRelease {
             if (signedBuild) {
