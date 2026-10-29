@@ -80,7 +80,7 @@ function messageFor(c,address){const p=latest,now=new Date(),lines=[
  'Heure : '+now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
  '',
  'Merci de me contacter.'
- ];return lines.join('\\n')}
+ ];return lines.join('\n')}
 async function resolveEmergencyAddress(){
  const p=latest;if(!p)return 'GPS indisponible';
  try{
