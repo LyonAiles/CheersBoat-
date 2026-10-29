@@ -32,3 +32,6 @@ dialog .dialogTop button{flex:0 0 auto}
  dialog.nautic-full #dialogContent{overflow-y:auto;overflow-x:hidden}
  dialog .choiceGrid{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
 }
+
+/* Nautic : boutons Paramètres et Quitter sur écran étroit */
+header{gap:clamp(4px,1vw,12px)!important}#nauticExitButton{padding:7px 9px;font-size:clamp(11px,2.8vw,14px);white-space:nowrap}#nauticSettingsButton{min-width:36px;padding:6px 8px}header #connection{min-width:0;overflow:hidden;text-overflow:ellipsis}@media(max-width:410px){header .brand{font-size:clamp(14px,4vw,19px)}header time{display:none}header #connection{font-size:9px;max-width:37%}}
