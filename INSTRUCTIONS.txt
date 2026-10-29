@@ -1,0 +1,4 @@
+NAUTIC ANDROID 0.2 — projet complet.
+Dans GitHub VS Code, remplacer MainActivity.java et AndroidManifest.xml, remplacer app/build.gradle, ajouter index.html, style.css, app.js dans app/src/main/assets/. Conserver le workflow deja corrige du depot.
+Attention: la carte Leaflet et les donnees meteo exigent Internet. L interface et les reglages locaux sont embarques. Le GPS en WebView sur origine file:// peut necessiter une evolution vers WebViewAssetLoader; pas de promesse de fonctionnement GPS a ce stade.
+Ne pas utiliser cette version comme instrument de navigation principal.

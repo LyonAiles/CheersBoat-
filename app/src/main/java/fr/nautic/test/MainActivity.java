@@ -1,15 +1,47 @@
 package fr.nautic.test;
+
+import android.Manifest;
 import android.app.Activity;
 import android.os.Bundle;
-import android.graphics.Color;
-import android.view.Gravity;
-import android.widget.LinearLayout;
-import android.widget.TextView;
+import android.webkit.GeolocationPermissions;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.content.pm.PackageManager;
+import android.view.WindowManager;
+
 public class MainActivity extends Activity {
- @Override public void onCreate(Bundle b) { super.onCreate(b);
-  LinearLayout root = new LinearLayout(this); root.setOrientation(1); root.setGravity(Gravity.CENTER); root.setPadding(24,24,24,24); root.setBackgroundColor(Color.rgb(5,33,53));
-  TextView title = new TextView(this); title.setText("⚓ Nautic"); title.setTextSize(36); title.setTextColor(Color.WHITE); title.setGravity(Gravity.CENTER); root.addView(title);
-  TextView msg = new TextView(this); msg.setText("Application Android — test réussi\nVersion 0.1 · Hors ligne"); msg.setTextSize(18); msg.setTextColor(Color.rgb(138,220,238)); msg.setGravity(Gravity.CENTER); msg.setPadding(0,32,0,0); root.addView(msg);
-  setContentView(root);
- }
+    private WebView web;
+    @Override public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        web = new WebView(this);
+        WebSettings settings = web.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setGeolocationEnabled(true);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        web.setWebViewClient(new WebViewClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                boolean allowed = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                callback.invoke(origin, allowed, false);
+            }
+        });
+        setContentView(web);
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 100);
+        }
+        web.loadUrl("file:///android_asset/index.html");
+    }
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode == 100 && web != null) web.reload();
+    }
+    @Override public void onBackPressed() {
+        if (web != null && web.canGoBack()) web.goBack(); else super.onBackPressed();
+    }
+    @Override protected void onDestroy() { if(web!=null)web.destroy();super.onDestroy(); }
 }
