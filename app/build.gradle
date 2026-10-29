@@ -1,3 +1,37 @@
 plugins { id "com.android.application" }
-android { namespace "fr.nautic.test"; compileSdk 35
- defaultConfig { applicationId "fr.nautic.test"; minSdk 23; targetSdk 28; versionCode 1; versionName "0.1" } }
+
+def signingPath = System.getenv("NAUTIC_KEYSTORE_PATH")
+def signingPassword = System.getenv("NAUTIC_SIGNING_PASSWORD")
+def signedBuild = signingPath && signingPassword
+
+android {
+    namespace "fr.nautic.test"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "fr.nautic.test"
+        minSdk 23
+        targetSdk 28
+        versionCode (project.findProperty("nauticVersionCode") ?: "2").toString().toInteger()
+        versionName (project.findProperty("nauticVersionName") ?: "0.4.2").toString()
+    }
+
+    signingConfigs {
+        nauticRelease {
+            if (signedBuild) {
+                storeFile file(signingPath)
+                storePassword signingPassword
+                keyAlias "nautic"
+                keyPassword signingPassword
+                storeType "pkcs12"
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (signedBuild) signingConfig signingConfigs.nauticRelease
+        }
+    }
+}
