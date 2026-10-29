@@ -12,8 +12,8 @@ android {
         applicationId "fr.nautic.test"
         minSdk 23
         targetSdk 28
-        versionCode (project.findProperty("nauticVersionCode") ?: "2").toString().toInteger()
-        versionName (project.findProperty("nauticVersionName") ?: "0.4.2").toString()
+        versionCode = Integer.parseInt((project.findProperty("nauticVersionCode") ?: "2").toString())
+        versionName = (project.findProperty("nauticVersionName") ?: "0.4.2").toString()
     }
 
     signingConfigs {
