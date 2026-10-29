@@ -2,7 +2,7 @@
 (()=>{
 const get=id=>document.getElementById(id), native=window.NauticAndroid;
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(localStorage.getItem(k)||'{}'))}catch(e){return {...d}}};
-const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'Kotter',contacts:[],testMode:true,contactPhone:'',recentCalls:[]});
+const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[]});
 const persist=()=>{try{localStorage.setItem('nautic-extensions',JSON.stringify(state))}catch(e){alert('Stockage local indisponible : paramètres non enregistrés')}};
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const dialog=get('dialog');
@@ -61,26 +61,25 @@ const contactDefaults=[
  {label:'Contact personnel',phone:'',mode:'sms',type:'Demande d’assistance'}];
 const testNumber='0607615420';
 function contactPhone(){let n=(state.contactPhone||testNumber).replace(/[^+0-9]/g,'');return n.startsWith('0')?'+33'+n.slice(1):n}
-function messageFor(c,address){const p=latest,now=new Date(),lines=[
- 'URGENCE — Demande d’assistance',
+function messageFor(c,address){const p=latest,now=new Date(),a=String(address||'Non disponible').replace(/,\\s*/g,'\\n');return [
+ 'URGENCE',
+ 'Demande d’assistance',
  '',
- 'Motif : '+c.type,
- 'Bateau : '+(state.boatName||'Kotter'),
- '',
- 'Latitude : '+(p?p.lat.toFixed(6):'GPS indisponible'),
- 'Longitude : '+(p?p.lon.toFixed(6):'GPS indisponible'),
- 'Précision GPS : '+(p?'± '+Math.round(p.acc)+' m':'inconnue'),
- '',
- 'Adresse approximative : '+(address||'Non disponible'),
- 'Localisation sur la carte :',
- p?'https://www.google.com/maps?q='+p.lat.toFixed(6)+','+p.lon.toFixed(6):'Position indisponible',
- '',
- 'Téléphone : '+contactPhone(),
  'Date : '+now.toLocaleDateString('fr-FR'),
  'Heure : '+now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
+ 'Téléphone : '+contactPhone(),
+ 'Bateau : '+(state.boatName?.trim()||'voir paramètres'),
+ '',
+ 'Adresse approximative :',
+ a,
+ '',
+ 'Localisation sur la carte :',
+ p?'https://www.google.com/maps?q='+p.lat.toFixed(6)+','+p.lon.toFixed(6):'Position GPS indisponible',
  '',
  'Merci de me contacter.'
- ];return lines.join('\n')}
+ ].join('\\n')}
+async function emergencyPhoto(){const src=state.boatPhoto||photoFallback;if(src.startsWith('data:image/'))return src;const response=await fetch(src);if(!response.ok)throw Error('Photo du bateau indisponible');const blob=await response.blob();return await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob)})}
+async function shareEmergencyPhoto(number,message){try{const photo=await emergencyPhoto();if(!nativeCall('shareEmergencyPhoto',number,message,photo))throw Error('Partage photo non pris en charge par cette version Android')}catch(e){alert('Photo non jointe : '+e.message+'\\nLe message texte reste disponible.');smsNumber(number,message)}}
 async function resolveEmergencyAddress(){
  const p=latest;if(!p)return 'GPS indisponible';
  try{
@@ -98,13 +97,13 @@ function emergencyDialog(){const contacts=[...contactDefaults,...state.contacts]
  <label class="formLabel">Destinataire<select id="emTarget">${contacts.map((c,i)=>`<option value="${i}">${esc(c.label)}</option>`).join('')}</select></label>
  <label class="formLabel">Numéro<input id="emPhone" type="tel"></label>
  <div id="smsFields"><label class="formLabel">Message modifiable<textarea id="emText"></textarea></label></div>
- <div id="recentCalls"></div><div class="dialogActions"><button id="emAction">Appeler</button><button id="emContacts">Choisir un contact</button></div>
+ <div id="photoOption"><label class="settingRow"><input type="checkbox" id="emAttachPhoto"><span>Joindre la photo du bateau (MMS ou partage compatible)</span></label></div><div id="recentCalls"></div><div class="dialogActions"><button id="emAction">Appeler</button><button id="emContacts">Choisir un contact</button></div>
  <p class="muted">En mode réel, 15/17/18/112 : appel uniquement. Le 114 reçoit les urgences par SMS, selon les conditions du service. Aucun SMS n'est envoyé sans confirmation.</p>`);
  function renderRecent(){const box=get('recentCalls');if(!box)return;const list=Array.isArray(state.recentCalls)?state.recentCalls:[];box.innerHTML=list.length?'<p class="muted">Derniers numéros utilisés (nom abrégé à 7 caractères) :</p>'+list.map((c,i)=>'<button type="button" data-recent="'+i+'">'+esc(c.label.slice(0,7))+' · '+esc(c.number)+'</button>').join(''):'';box.querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{const c=list[Number(b.dataset.recent)];get('emPhone').value=state.testMode?testNumber:c.number;const option=contacts.findIndex(x=>x.label===c.label);if(option>=0){get('emTarget').value=String(option);refresh()}get('emPhone').value=state.testMode?testNumber:c.number;});}
- function refresh(){let c=contacts[Number(get('emTarget').value)];get('emPhone').value=state.testMode?testNumber:c.phone;let isSms=c.mode==='sms';get('smsFields').hidden=!isSms;get('emAction').textContent=isSms?'✉ Préparer le SMS':'📞 Appeler';get('emText').value=messageFor(c,get('emText').dataset.address)}
+ function refresh(){let c=contacts[Number(get('emTarget').value)];get('emPhone').value=state.testMode?testNumber:c.phone;let isSms=c.mode==='sms';get('smsFields').hidden=!isSms;get('photoOption').hidden=!isSms;get('emAction').textContent=isSms?'✉ Préparer le SMS':'📞 Appeler';get('emText').value=messageFor(c,get('emText').dataset.address)}
  get('emTarget').onchange=refresh;refresh();renderRecent();
  resolveEmergencyAddress().then(address=>{const target=get('emTarget'),text=get('emText');if(target&&text&&document.activeElement!==text){const c=contacts[Number(target.value)];text.value=messageFor(c,address);text.dataset.address=address}});
- get('emAction').onclick=()=>{let n=get('emPhone').value.trim();if(!n){alert('Numéro manquant : renseigne-le dans les paramètres ou choisis un contact');return}let c=contacts[Number(get('emTarget').value)];if(!state.testMode){state.recentCalls=[{label:c.label,number:n},...(state.recentCalls||[]).filter(x=>x.number!==n)].slice(0,8);persist();}if(c.mode==='sms')smsNumber(n,get('emText').value);else callNumber(n)};
+ get('emAction').onclick=()=>{let n=get('emPhone').value.trim();if(!n){alert('Numéro manquant : renseigne-le dans les paramètres ou choisis un contact');return}let c=contacts[Number(get('emTarget').value)];if(!state.testMode){state.recentCalls=[{label:c.label,number:n},...(state.recentCalls||[]).filter(x=>x.number!==n)].slice(0,8);persist();}if(c.mode==='sms'){if(get('emAttachPhoto').checked)shareEmergencyPhoto(n,get('emText').value);else smsNumber(n,get('emText').value)}else callNumber(n)};
  get('emContacts').onclick=()=>{if(!nativeCall('pickContact'))alert('Sélection native des contacts disponible dans la version Android')};
 }
 get('gpsCard').onclick=emergencyDialog;
