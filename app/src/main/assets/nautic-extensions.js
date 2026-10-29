@@ -13,14 +13,14 @@ const css=document.createElement('style');css.textContent=`
  dialog.nautic-full .viewer{flex:1;min-height:20vh;height:auto}
  #nauticSettingsButton{margin-left:4px}
  #mapRecenter,#mapLayers{position:absolute;z-index:800;right:8px}
- #mapRecenter{bottom:30px}#mapLayers{bottom:78px}
+ #mapRecenter{top:88px;bottom:auto}#mapLayers{top:140px;bottom:auto}
  #windWidget{left:calc(50% + 22px)!important;top:calc(50% + 28px)!important;pointer-events:none}
  #boatPhoto{width:100%;height:100%;object-fit:contain}
  dialog .choiceGrid{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
- dialog .choiceGrid button{flex:1;min-width:100px}
+ dialog .choiceGrid button{flex:1 1 145px;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.25;min-height:48px;padding:9px 8px}
  dialog textarea,dialog select{width:100%;background:#09273b;color:white;border:1px solid #4a7b91;border-radius:7px;padding:8px}
  dialog textarea{min-height:110px}
- dialog .settingRow{display:flex;align-items:center;gap:8px;margin:7px 0}
+ dialog .settingRow{display:grid;grid-template-columns:22px minmax(0,1fr);justify-content:start;align-items:center;gap:12px;margin:0;padding:9px 4px;min-height:44px;width:100%;text-align:left;line-height:1.25;font-size:15px} dialog .settingRow input[type=checkbox]{width:20px;height:20px;margin:0;justify-self:start;flex:none;accent-color:#31b9e9} dialog.nautic-full h3{margin:18px 0 8px;font-size:18px} dialog.nautic-full .dialogTop{flex:none;position:sticky;top:0;background:#0b293e;z-index:2;padding:4px 0 10px} dialog.nautic-full #dialogContent{padding-bottom:30px} dialog .choiceGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:9px} dialog .choiceGrid button{width:100%}
  .testBadge{background:#75420c;color:#fff;padding:5px;border-radius:5px;font-weight:bold}
  `;document.head.append(css);
 const openModal=(title,body,full=false)=>{dialog.classList.toggle('nautic-full',full);modal(title,body)};
@@ -94,7 +94,7 @@ get('routeCard').style.display='none';get('miniMap').style.display='none';let br
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
 function applyVisibility(){Object.entries(state.buttons).forEach(([id,yes])=>{let e=get(id);if(e)e.style.display=yes===false?'none':''})}
 function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
- openModal('Paramètres',`<h3>Tableau de bord</h3>${buttons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}> ${label}</label>`).join('')}
+ openModal('Paramètres',`<h3>Tableau de bord</h3>${buttons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <h3>Navigation</h3>${field('Seuil de déplacement confirmé (m)','settingMove',state.moveThreshold,'number')}${field('Arrêt prolongé (minutes)','settingStop',state.stopMinutes,'number')}
  <h3>Bateau</h3>${field('Nom du bateau','settingBoat',state.boatName)}
  <p>Carburant estimé consommé : <b>${(typeof fuelUsed==='number'?fuelUsed:0).toFixed(2)} L</b>. La consommation d'un arrêt de moins de ${state.stopMinutes} minutes est ajoutée à la reprise ; après ce délai elle est annulée.</p>
