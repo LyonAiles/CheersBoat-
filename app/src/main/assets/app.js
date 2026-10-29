@@ -15,7 +15,88 @@ function rad(x){return x*Math.PI/180}function distanceM(a,b){let d1=rad(b.lat-a.
 function initMap(){if(!window.L){$('mapFallback').style.display='grid';return}map=L.map('map',{zoomControl:false}).setView([47.5911,2.7521],14);L.control.zoom({position:'bottomright'}).addTo(map);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);routeLine=L.polyline(points.map(p=>[p.lat,p.lon]),{color:'#28bdf1',weight:4}).addTo(map);map.on('tileerror',()=>{$('mapFallback').style.display='grid'});map.on('tileload',()=>{$('mapFallback').style.display='none'});map.on('moveend zoomend',rotateMap);map.dragging.disable()}
 // Heading-up is a visual CSS rotation; geographic marker placement is handled by Leaflet.
 function rotateMap(){if(!map||heading===null)return;let pane=map.getPane('mapPane'),pos=L.DomUtil.getPosition(pane)||L.point(0,0),center=map.getSize().divideBy(2).subtract(pos);pane.style.transform=`translate3d(${pos.x}px,${pos.y}px,0) rotate(${-heading}deg)`;pane.style.transformOrigin=`${center.x}px ${center.y}px`;let tile=map.getPane('tilePane');tile.style.transformOrigin='center center';$('compass').style.transform=`rotate(${heading}deg)`;}
-function onPos(result){let c=result.coords,p={lat:c.latitude,lon:c.longitude,acc:c.accuracy,t:Date.now(),speed:c.speed,head:c.heading};latest=p;speed=c.speed==null?null:Math.max(0,c.speed*3.6);if(Number.isFinite(c.heading)&&speed>1)heading=c.heading;else if(prev&&distanceM(prev,p)>5&&speed>1)heading=bearing(prev,p);prev=p;$('coords').textContent=p.lat.toFixed(5)+'° N\n'+p.lon.toFixed(5)+'° E';$('connection').textContent='GPS actif · précision ±'+Math.round(p.acc)+' m';$('mapGps').textContent='GPS ±'+Math.round(p.acc)+' m';$('speedValue').textContent=speed==null?'— km/h':speed.toFixed(1)+' km/h';$('headingValue').textContent=heading==null?'—°':Math.round(heading)+'°';$('mapBoat').style.transform='translate(-50%,-50%)';$('speedCard').style.setProperty('--speedRotation',(-70+Math.min(30,speed||0)/30*140)+'deg');if(map){let ll=[p.lat,p.lon];if(!boatMarker){boatMarker=L.circleMarker(ll,{radius:7,color:'white',weight:2,fillColor:'#00d9ed',fillOpacity:1}).addTo(map);map.setView(ll,16)}else boatMarker.setLatLng(ll);map.panTo(ll,{animate:false});rotateMap()}if(recording&&p.acc<=35){let last=points.at(-1);if(!last||distanceM(last,p)>=4){if(last){let d=distanceM(last,p);if(d<200)travel+=d}points.push(p);if(points.length>12000)points.shift();localStorage.setItem('nautic-v04-points',JSON.stringify(points));localStorage.setItem('nautic-v04-travel',String(travel));if(routeLine)routeLine.setLatLngs(points.map(x=>[x.lat,x.lon]));updateLog()}}if(Date.now()-weatherAt>600000)loadWeather()}
+// GPS filtering: boat stays visually fixed, map follows accepted positions smoothly.
+// Only confirmed displacement counts; brief stops count as engine-on, long stops do not.
+let stableFix=null, movingCandidate=null, movementConfirm=0, gpsFollowTarget=null, smoothCenter=null;
+let lastFuelTick=Date.now(), fuelPending=0, fuelUsed=Number(localStorage.getItem('nautic-fuel-used')||0), stationarySince=0;
+function motionConfig(){try{let c=JSON.parse(localStorage.getItem('nautic-extensions')||'{}');return {threshold:Math.max(3,Number(c.moveThreshold)||8),stopMs:Math.max(1,Number(c.stopMinutes)||20)*60000}}catch(e){return {threshold:8,stopMs:1200000}}}
+function fuelTick(now,moving){
+ let dt=Math.max(0,Math.min(10000,now-lastFuelTick));lastFuelTick=now;
+ const rate=(Number(cfg.cons)||0)/3600000;
+ const opt=motionConfig();
+ if(moving){
+  if(stationarySince&&now-stationarySince<opt.stopMs)fuelUsed+=fuelPending;
+  fuelPending=0;stationarySince=0;fuelUsed+=dt*rate;
+ }else{
+  if(!stationarySince)stationarySince=now;
+  if(now-stationarySince<opt.stopMs)fuelPending+=dt*rate;
+  else fuelPending=0;
+ }
+ localStorage.setItem('nautic-fuel-used',String(fuelUsed));
+}
+setInterval(()=>{fuelTick(Date.now(),!!stableFix&&stationarySince===0);},1000);
+function animateFollow(){
+ if(!map||!gpsFollowTarget)return;
+ if(!smoothCenter)smoothCenter={lat:gpsFollowTarget.lat,lon:gpsFollowTarget.lon};
+ let delta=distanceM(smoothCenter,gpsFollowTarget);
+ if(delta>.15){
+  let factor=Math.min(.22,Math.max(.045,delta/100));
+  smoothCenter.lat+=(gpsFollowTarget.lat-smoothCenter.lat)*factor;
+  smoothCenter.lon+=(gpsFollowTarget.lon-smoothCenter.lon)*factor;
+  map.panTo([smoothCenter.lat,smoothCenter.lon],{animate:false,noMoveStart:true});
+ }
+}
+setInterval(animateFollow,80);
+function onPos(result){
+ const c=result.coords,now=Date.now();
+ const p={lat:c.latitude,lon:c.longitude,acc:c.accuracy,t:now,speed:c.speed,head:c.heading};
+ latest=p;
+ speed=c.speed==null?null:Math.max(0,c.speed*3.6);
+ $('coords').textContent=p.lat.toFixed(5)+'° N\n'+p.lon.toFixed(5)+'° E';
+ $('connection').textContent='GPS actif · précision ±'+Math.round(p.acc)+' m';
+ $('mapGps').textContent='GPS ±'+Math.round(p.acc)+' m';
+ $('speedValue').textContent=speed==null?'— km/h':speed.toFixed(1)+' km/h';
+ $('speedCard').style.setProperty('--speedRotation',(-70+Math.min(30,speed||0)/30*140)+'deg');
+ if(!stableFix){stableFix=p;gpsFollowTarget=p;smoothCenter={lat:p.lat,lon:p.lon};}
+ const opt=motionConfig();
+ const d=distanceM(stableFix,p);
+ const uncertainty=Math.min(25,Math.max(opt.threshold,(p.acc+(stableFix.acc||p.acc))*.35));
+ const valid=p.acc<=35;
+ let confirmed=false;
+ if(valid&&d>uncertainty){
+  if(movingCandidate&&distanceM(movingCandidate,p)<Math.max(uncertainty*2,30))movementConfirm++;
+  else movementConfirm=1;
+  movingCandidate=p;
+  if(movementConfirm>=2){confirmed=true;movingCandidate=null;movementConfirm=0;}
+ }else if(d<opt.threshold){movingCandidate=null;movementConfirm=0;}
+ if(confirmed){
+  if(Number.isFinite(c.heading)&&speed>1)heading=c.heading;
+  else heading=bearing(stableFix,p);
+  stableFix=p;gpsFollowTarget=p;
+  stationarySince=0;
+  fuelTick(now,true);
+  if(recording){let last=points.at(-1);
+   if(!last||distanceM(last,p)>=opt.threshold){
+    if(last){let leg=distanceM(last,p);if(leg<200)travel+=leg;}
+    points.push(p);if(points.length>12000)points.shift();
+    localStorage.setItem('nautic-v04-points',JSON.stringify(points));
+    localStorage.setItem('nautic-v04-travel',String(travel));
+    if(routeLine)routeLine.setLatLngs(points.map(x=>[x.lat,x.lon]));updateLog();
+   }
+  }
+ }
+ if(!confirmed&&stationarySince===0)stationarySince=now;
+ if(!confirmed&&now-stationarySince>=opt.stopMs)fuelPending=0;
+ $('headingValue').textContent=heading==null?'—°':Math.round(heading)+'°';
+ $('mapBoat').style.transform='translate(-50%,-50%)';
+ if(map){let ll=[stableFix.lat,stableFix.lon];
+  if(!boatMarker){boatMarker=L.circleMarker(ll,{radius:7,color:'white',weight:2,fillColor:'#00d9ed',fillOpacity:1}).addTo(map);map.setView(ll,16)}
+  else boatMarker.setLatLng(ll);
+  rotateMap();
+ }
+ prev=p;
+ if(now-weatherAt>600000)loadWeather();
+}
 function startGps(){if(watchId!==null)return;if(!navigator.geolocation){$('connection').textContent='GPS non pris en charge';return}$('connection').textContent='Recherche GPS…';watchId=navigator.geolocation.watchPosition(onPos,e=>{$('connection').textContent='GPS : '+e.message}, {enableHighAccuracy:true,maximumAge:1000,timeout:20000})}
 async function loadWeather(){if(!latest)return;weatherAt=Date.now();try{let u=`https://api.open-meteo.com/v1/forecast?latitude=${latest.lat}&longitude=${latest.lon}&current=wind_speed_10m,wind_direction_10m,temperature_2m,weather_code&wind_speed_unit=kmh`;let r=await fetch(u);if(!r.ok)throw Error('Réseau');weather=(await r.json()).current;$('windSpeed').textContent=Math.round(weather.wind_speed_10m)+' km/h';$('windDirection').textContent=Math.round(weather.wind_direction_10m)+'° (provenance)';$('weatherLabel').textContent=Math.round(weather.temperature_2m)+'°C';$('weatherTime').textContent='Vent actualisé '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});let angle=(weather.wind_direction_10m+180-(heading??0))%360;$('windArrow').style.transform=`rotate(${angle}deg)`}catch(e){$('weatherTime').textContent='Météo indisponible · sans Internet'}}setInterval(()=>{if(latest)loadWeather()},600000);
 function updateLog(){$('distance').textContent=(travel/1000).toFixed(2)+' km';$('routeDistance').textContent=(travel/1000).toFixed(2)+' km';$('recordState').textContent=recording?'Enregistrement actif':'En pause';$('recordDot').classList.toggle('live',recording);if(recording){let s=Math.floor((Date.now()-started)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;$('elapsed').textContent=[h,m,ss].map(x=>String(x).padStart(2,'0')).join(':')}}setInterval(updateLog,1000);updateLog();
