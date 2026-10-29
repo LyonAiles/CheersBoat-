@@ -2,8 +2,8 @@
 (()=>{
 const get=id=>document.getElementById(id), native=window.NauticAndroid;
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(localStorage.getItem(k)||'{}'))}catch(e){return {...d}}};
-const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'Kotter',contacts:[],testMode:true});
-const persist=()=>localStorage.setItem('nautic-extensions',JSON.stringify(state));
+const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'Kotter',contacts:[],testMode:true,contactPhone:'',recentCalls:[]});
+const persist=()=>{try{localStorage.setItem('nautic-extensions',JSON.stringify(state))}catch(e){alert('Stockage local indisponible : paramètres non enregistrés')}};
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const dialog=get('dialog');
 const css=document.createElement('style');css.textContent=`
@@ -21,7 +21,7 @@ const css=document.createElement('style');css.textContent=`
  dialog textarea,dialog select{width:100%;background:#09273b;color:white;border:1px solid #4a7b91;border-radius:7px;padding:8px}
  dialog textarea{min-height:110px}
  dialog .settingRow{display:grid;grid-template-columns:22px minmax(0,1fr);justify-content:start;align-items:center;gap:12px;margin:0;padding:9px 4px;min-height:44px;width:100%;text-align:left;line-height:1.25;font-size:15px} dialog .settingRow input[type=checkbox]{width:20px;height:20px;margin:0;justify-self:start;flex:none;accent-color:#31b9e9} dialog.nautic-full h3{margin:18px 0 8px;font-size:18px} dialog.nautic-full .dialogTop{flex:none;position:sticky;top:0;background:#0b293e;z-index:2;padding:4px 0 10px} dialog.nautic-full #dialogContent{padding-bottom:30px} dialog .choiceGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:9px} dialog .choiceGrid button{width:100%}
- .testBadge{background:#75420c;color:#fff;padding:5px;border-radius:5px;font-weight:bold}
+ .nautic-hidden{display:none!important} #nauticExitButton{flex:none;background:#77352c;border-color:#bd6c60} #nauticSettingsButton{flex:none} #recentCalls{width:100%;margin:8px 0} #recentCalls button{display:inline-flex;margin:3px 4px 3px 0;padding:8px;max-width:100%;overflow-wrap:anywhere} .testBadge{background:#75420c;color:#fff;padding:5px;border-radius:5px;font-weight:bold}
  `;document.head.append(css);
 const openModal=(title,body,full=false)=>{dialog.classList.toggle('nautic-full',full);modal(title,body)};
 dialog.addEventListener('close',()=>dialog.classList.remove('nautic-full'));
@@ -29,7 +29,7 @@ function nativeCall(fn,...args){if(native&&typeof native[fn]==='function'){nativ
 function callNumber(n){if(!nativeCall('call',n))location.href='tel:'+n.replace(/[^+0-9]/g,'')}
 function smsNumber(n,msg){if(!nativeCall('sms',n,msg))location.href='sms:'+n.replace(/[^+0-9]/g,'')+'?body='+encodeURIComponent(msg)}
 const head=document.querySelector('header');const settingsButton=document.createElement('button');
-settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';head.append(settingsButton);
+settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';head.append(settingsButton);const exitButton=document.createElement('button');exitButton.id='nauticExitButton';exitButton.textContent='Quitter';exitButton.title='Fermer Nautic';head.append(exitButton);exitButton.onclick=()=>{if(!confirm('Quitter Nautic ? Le suivi GPS et le journal seront interrompus.'))return;if(!nativeCall('exitApp'))alert('La fermeture est disponible dans l’application Android.');};
 const mapWrap=get('mapWrap');
 const recenter=document.createElement('button');recenter.id='mapRecenter';recenter.textContent='⌖';recenter.title='Recentrer';mapWrap.append(recenter);
 recenter.onclick=()=>{if(map&&latest){gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};map.setView([latest.lat,latest.lon],map.getZoom())}};
@@ -98,12 +98,13 @@ function emergencyDialog(){const contacts=[...contactDefaults,...state.contacts]
  <label class="formLabel">Destinataire<select id="emTarget">${contacts.map((c,i)=>`<option value="${i}">${esc(c.label)}</option>`).join('')}</select></label>
  <label class="formLabel">Numéro<input id="emPhone" type="tel"></label>
  <div id="smsFields"><label class="formLabel">Message modifiable<textarea id="emText"></textarea></label></div>
- <div class="dialogActions"><button id="emAction">Appeler</button><button id="emContacts">Choisir un contact</button></div>
+ <div id="recentCalls"></div><div class="dialogActions"><button id="emAction">Appeler</button><button id="emContacts">Choisir un contact</button></div>
  <p class="muted">En mode réel, 15/17/18/112 : appel uniquement. Le 114 reçoit les urgences par SMS, selon les conditions du service. Aucun SMS n'est envoyé sans confirmation.</p>`);
+ function renderRecent(){const box=get('recentCalls');if(!box)return;const list=Array.isArray(state.recentCalls)?state.recentCalls:[];box.innerHTML=list.length?'<p class="muted">Derniers numéros utilisés (nom abrégé à 7 caractères) :</p>'+list.map((c,i)=>'<button type="button" data-recent="'+i+'">'+esc(c.label.slice(0,7))+' · '+esc(c.number)+'</button>').join(''):'';box.querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{const c=list[Number(b.dataset.recent)];get('emPhone').value=state.testMode?testNumber:c.number;const option=contacts.findIndex(x=>x.label===c.label);if(option>=0){get('emTarget').value=String(option);refresh()}get('emPhone').value=state.testMode?testNumber:c.number;});}
  function refresh(){let c=contacts[Number(get('emTarget').value)];get('emPhone').value=state.testMode?testNumber:c.phone;let isSms=c.mode==='sms';get('smsFields').hidden=!isSms;get('emAction').textContent=isSms?'✉ Préparer le SMS':'📞 Appeler';get('emText').value=messageFor(c,get('emText').dataset.address)}
- get('emTarget').onchange=refresh;refresh();
+ get('emTarget').onchange=refresh;refresh();renderRecent();
  resolveEmergencyAddress().then(address=>{const target=get('emTarget'),text=get('emText');if(target&&text&&document.activeElement!==text){const c=contacts[Number(target.value)];text.value=messageFor(c,address);text.dataset.address=address}});
- get('emAction').onclick=()=>{let n=get('emPhone').value.trim();if(!n){alert('Numéro manquant : renseigne-le dans les paramètres ou choisis un contact');return}let c=contacts[Number(get('emTarget').value)];if(c.mode==='sms')smsNumber(n,get('emText').value);else callNumber(n)};
+ get('emAction').onclick=()=>{let n=get('emPhone').value.trim();if(!n){alert('Numéro manquant : renseigne-le dans les paramètres ou choisis un contact');return}let c=contacts[Number(get('emTarget').value)];if(!state.testMode){state.recentCalls=[{label:c.label,number:n},...(state.recentCalls||[]).filter(x=>x.number!==n)].slice(0,8);persist();}if(c.mode==='sms')smsNumber(n,get('emText').value);else callNumber(n)};
  get('emContacts').onclick=()=>{if(!nativeCall('pickContact'))alert('Sélection native des contacts disponible dans la version Android')};
 }
 get('gpsCard').onclick=emergencyDialog;
@@ -124,7 +125,7 @@ for(let i=1;i<=3;i++)get('cam'+i+'Card').onclick=()=>cameraDialogNative(i);
 // One journal, one recenter button; no obsolete Nautic footer control.
 get('routeCard').style.display='none';get('miniMap').style.display='none';let branding=document.querySelector('.branding');if(branding)branding.style.display='none';
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
-function applyVisibility(){Object.entries(state.buttons).forEach(([id,yes])=>{let e=get(id);if(e)e.style.display=yes===false?'none':''})}
+function applyVisibility(){const ids=['gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
 function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
  openModal('Paramètres',`<h3>Tableau de bord</h3>${buttons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <h3>Navigation</h3>${field('Seuil de déplacement confirmé (m)','settingMove',state.moveThreshold,'number')}${field('Arrêt prolongé (minutes)','settingStop',state.stopMinutes,'number')}
