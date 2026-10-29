@@ -79,6 +79,7 @@ public class MainActivity extends Activity {
   runOnUiThread(()->web.evaluateJavascript("window."+name+" && window."+name+"("+escaped+")",null));
  }
  public class Bridge {
+  @JavascriptInterface public void exitApp(){runOnUiThread(()->{if(web!=null)web.stopLoading();finish();});}
   @JavascriptInterface public void call(String number){runOnUiThread(()->{
    try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number))));}
    catch(Exception e){toast("Téléphone indisponible");}
