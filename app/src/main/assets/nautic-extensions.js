@@ -21,7 +21,9 @@ const css=document.createElement('style');css.textContent=`
  dialog textarea,dialog select{width:100%;background:#09273b;color:white;border:1px solid #4a7b91;border-radius:7px;padding:8px}
  dialog textarea{min-height:110px}
  dialog .settingRow{display:grid;grid-template-columns:22px minmax(0,1fr);justify-content:start;align-items:center;gap:12px;margin:0;padding:9px 4px;min-height:44px;width:100%;text-align:left;line-height:1.25;font-size:15px} dialog .settingRow input[type=checkbox]{width:20px;height:20px;margin:0;justify-self:start;flex:none;accent-color:#31b9e9} dialog.nautic-full h3{margin:18px 0 8px;font-size:18px} dialog.nautic-full .dialogTop{flex:none;position:sticky;top:0;background:#0b293e;z-index:2;padding:4px 0 10px} dialog.nautic-full #dialogContent{padding-bottom:30px} dialog .choiceGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:9px} dialog .choiceGrid button{width:100%}
- .nautic-hidden{display:none!important} #nauticExitButton{flex:none;background:#77352c;border-color:#bd6c60} #nauticSettingsButton{flex:none} #recentCalls{width:100%;margin:8px 0} #recentCalls button{display:inline-flex;margin:3px 4px 3px 0;padding:8px;max-width:100%;overflow-wrap:anywhere} .testBadge{background:#75420c;color:#fff;padding:5px;border-radius:5px;font-weight:bold}
+ .nautic-hidden{display:none!important} #nauticExitButton{flex:none;background:#77352c;border-color:#bd6c60} #nauticSettingsButton{flex:none} #recentCalls{width:100%;margin:8px 0} #recentCalls button{display:inline-flex;margin:3px 4px 3px 0;padding:8px;max-width:100%;overflow-wrap:anywhere}
+ .emChoices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,175px),1fr));gap:9px;margin:10px 0 20px}.emChoice{min-height:72px;display:flex;align-items:center;gap:9px;text-align:left;background:#103d56;padding:10px;line-height:1.2}.emChoice span{font-size:26px;flex:none}.emChoice strong{font-size:15px}.emChoice small{font-size:12px}.emChoice.active{border:2px solid #74d9f0;background:#245e75}.emPanel{padding:12px 0;border-top:1px solid #42788f}.emAction{display:block;width:100%;min-height:65px;margin:12px 0;font-size:21px;font-weight:800;background:#126b59;border:2px solid #70d6b6}.emUrgentAction{background:#b52d2d;border:2px solid #ff9b9b;color:white;font-size:23px}.emPanel #emContacts{margin-bottom:12px}
+ .testBadge{background:#75420c;color:#fff;padding:5px;border-radius:5px;font-weight:bold}
  `;document.head.append(css);
 const openModal=(title,body,full=false)=>{dialog.classList.toggle('nautic-full',full);modal(title,body)};
 dialog.addEventListener('close',()=>dialog.classList.remove('nautic-full'));
@@ -51,11 +53,11 @@ function boatDialog(){openModal('Mon bateau',`<img src="${state.boatPhoto||photo
  get('boatOpen').onclick=()=>{if(!nativeCall('openBoat'))alert('Disponible dans l’application Android')};}
 get('boatCard').onclick=boatDialog;
 const contactDefaults=[
- {label:'Secours 112',phone:'112',mode:'call',type:'Urgence'},
- {label:'SAMU 15',phone:'15',mode:'call',type:'Urgence médicale'},
- {label:'Police / gendarmerie 17',phone:'17',mode:'call',type:'Urgence de sécurité'},
- {label:'Pompiers 18',phone:'18',mode:'call',type:'Incendie ou secours'},
- {label:'Urgence SMS 114',phone:'114',mode:'sms',type:'Urgence — communication écrite'},
+ {label:'Secours 112',phone:'112',mode:'call',type:'Urgence',icon:'🆘',urgent:true},
+ {label:'SAMU 15',phone:'15',mode:'call',type:'Urgence médicale',icon:'✚',urgent:true},
+ {label:'Police / gendarmerie 17',phone:'17',mode:'call',type:'Urgence de sécurité',icon:'🛡',urgent:true},
+ {label:'Pompiers 18',phone:'18',mode:'call',type:'Incendie ou secours',icon:'🚒',urgent:true},
+ {label:'Urgence SMS 114',phone:'114',mode:'sms',type:'Urgence — communication écrite',icon:'✉',urgent:true},
  {label:'VNF locale',phone:'',mode:'call',type:'Difficulté de navigation'},
  {label:'Mécanicien local',phone:'',mode:'call',type:'Panne mécanique'},
  {label:'Contact personnel',phone:'',mode:'sms',type:'Demande d’assistance'}];
@@ -92,19 +94,47 @@ async function resolveEmergencyAddress(){
  }catch(e){return 'Non disponible (GPS indiqué ci-dessus)'}
 }
 window.nauticSelectedContact=number=>{let input=get('emPhone');if(input)input.value=number};
-function emergencyDialog(){const contacts=[...contactDefaults,...state.contacts];
- openModal('Urgences — téléphone ou SMS',`<p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'MODE TEST : tous les destinataires sont remplacés par ton numéro':'MODE RÉEL : vérifie le destinataire avant de contacter les secours'}</p>
- <label class="formLabel">Destinataire<select id="emTarget">${contacts.map((c,i)=>`<option value="${i}">${esc(c.label)}</option>`).join('')}</select></label>
- <label class="formLabel">Numéro<input id="emPhone" type="tel"></label>
- <div id="smsFields"><label class="formLabel">Message modifiable<textarea id="emText"></textarea></label></div>
- <div id="photoOption"><label class="settingRow"><input type="checkbox" id="emAttachPhoto"><span>Joindre la photo du bateau (MMS ou partage compatible)</span></label></div><div id="recentCalls"></div><div class="dialogActions"><button id="emAction">Appeler</button><button id="emContacts">Choisir un contact</button></div>
- <p class="muted">En mode réel, 15/17/18/112 : appel uniquement. Le 114 reçoit les urgences par SMS, selon les conditions du service. Aucun SMS n'est envoyé sans confirmation.</p>`);
- function renderRecent(){const box=get('recentCalls');if(!box)return;const list=Array.isArray(state.recentCalls)?state.recentCalls:[];box.innerHTML=list.length?'<p class="muted">Derniers numéros utilisés (nom abrégé à 7 caractères) :</p>'+list.map((c,i)=>'<button type="button" data-recent="'+i+'">'+esc(c.label.slice(0,7))+' · '+esc(c.number)+'</button>').join(''):'';box.querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{const c=list[Number(b.dataset.recent)];get('emPhone').value=state.testMode?testNumber:c.number;const option=contacts.findIndex(x=>x.label===c.label);if(option>=0){get('emTarget').value=String(option);refresh()}get('emPhone').value=state.testMode?testNumber:c.number;});}
- function refresh(){let c=contacts[Number(get('emTarget').value)];get('emPhone').value=state.testMode?testNumber:c.phone;let isSms=c.mode==='sms';get('smsFields').hidden=!isSms;get('photoOption').hidden=!isSms;get('emAction').textContent=isSms?'✉ Préparer le SMS':'📞 Appeler';get('emText').value=messageFor(c,get('emText').dataset.address)}
- get('emTarget').onchange=refresh;refresh();renderRecent();
- resolveEmergencyAddress().then(address=>{const target=get('emTarget'),text=get('emText');if(target&&text&&document.activeElement!==text){const c=contacts[Number(target.value)];text.value=messageFor(c,address);text.dataset.address=address}});
- get('emAction').onclick=()=>{let n=get('emPhone').value.trim();if(!n){alert('Numéro manquant : renseigne-le dans les paramètres ou choisis un contact');return}let c=contacts[Number(get('emTarget').value)];if(!state.testMode){state.recentCalls=[{label:c.label,number:n},...(state.recentCalls||[]).filter(x=>x.number!==n)].slice(0,8);persist();}if(c.mode==='sms'){if(get('emAttachPhoto').checked)shareEmergencyPhoto(n,get('emText').value);else smsNumber(n,get('emText').value)}else callNumber(n)};
- get('emContacts').onclick=()=>{if(!nativeCall('pickContact'))alert('Sélection native des contacts disponible dans la version Android')};
+function emergencyDialog(){
+ const contacts=[...contactDefaults,...state.contacts];
+ let selected=0,selectedRecent=null,autoMessage='';
+ openModal('Assistance — choisir un contact',`<p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'MODE TEST — aucun appel aux secours : numéro personnel uniquement':'MODE RÉEL — vérifie avant de contacter les secours'}</p>
+ <h3>🚨 URGENCES</h3><div id="emUrgent" class="emChoices"></div>
+ <h3>☎ Contacts et assistance</h3><div id="emNormal" class="emChoices"></div>
+ <section class="emPanel"><h3>Derniers contacts</h3><div id="recentCalls" class="emChoices"></div></section>
+ <section class="emPanel"><h3 id="emSelected"></h3><label class="formLabel">Numéro<input id="emPhone" type="tel"></label>
+ <div id="smsFields"><label class="formLabel">Message<textarea id="emText"></textarea></label>
+ <label class="settingRow"><input type="checkbox" id="emAttachPhoto"><span>Joindre la photo du bateau (partage/MMS compatible)</span></label></div>
+ <button id="emAction" class="emAction">📞 CONTACTER</button>
+ <button id="emContacts">Choisir dans les contacts du téléphone</button></section>
+ <p class="muted">Les appels ouvrent le composeur ; les messages restent à confirmer dans l'application de messagerie. Le 114 est un service d'urgence par écrit.</p>`,true);
+ function draw(){
+  const drawGroup=(id,items)=>{const box=get(id);box.innerHTML=items.map(([c,i])=>`<button type="button" class="emChoice ${selectedRecent===null&&selected===i?'active':''}" data-target="${i}"><span>${esc(c.icon|| (c.mode==='sms'?'✉':'☎'))}</span><strong>${esc(c.label)}</strong></button>`).join('');box.querySelectorAll('[data-target]').forEach(el=>el.onclick=()=>{selected=Number(el.dataset.target);selectedRecent=null;draw();refresh()})};
+  drawGroup('emUrgent',contacts.map((c,i)=>[c,i]).filter(([c])=>c.urgent));
+  drawGroup('emNormal',contacts.map((c,i)=>[c,i]).filter(([c])=>!c.urgent));
+  const list=Array.isArray(state.recentCalls)?state.recentCalls:[];
+  get('recentCalls').innerHTML=list.length?list.map((c,i)=>`<button type="button" class="emChoice ${selectedRecent===i?'active':''}" data-recent="${i}"><span>↺</span><strong>${esc(c.label.slice(0,7))}</strong><small>${esc(c.number)}</small></button>`).join(''):'<p class="muted">Aucun contact récent</p>';
+  get('recentCalls').querySelectorAll('[data-recent]').forEach(el=>el.onclick=()=>{selectedRecent=Number(el.dataset.recent);draw();refresh()});
+ }
+ function refresh(){
+  const recent=selectedRecent!==null?(state.recentCalls||[])[selectedRecent]:null;
+  const c=recent?{label:recent.label,phone:recent.number,mode:recent.mode||'call',type:recent.label}:contacts[selected];
+  get('emSelected').textContent=(c.icon||'☎')+' '+c.label;
+  get('emPhone').value=state.testMode?testNumber:c.phone;
+  const isSms=c.mode==='sms';get('smsFields').hidden=!isSms;
+  get('emAction').classList.toggle('emUrgentAction',!!c.urgent);
+  get('emAction').textContent=isSms?'✉ PRÉPARER LE MESSAGE':'📞 '+(c.urgent?'APPELER LES SECOURS':'APPELER');
+  if(isSms){autoMessage=messageFor(c,get('emText').dataset.address);get('emText').value=autoMessage;}
+ }
+ draw();refresh();
+ resolveEmergencyAddress().then(address=>{const field=get('emText');if(!field)return;const previous=autoMessage;field.dataset.address=address;const c=contacts[selected];autoMessage=messageFor(c,address);if(field.value===previous)field.value=autoMessage});
+ get('emAction').onclick=()=>{
+  const n=get('emPhone').value.trim();if(!n){alert('Numéro manquant. Renseigne-le dans les paramètres.');return}
+  const recent=selectedRecent!==null?(state.recentCalls||[])[selectedRecent]:null;
+  const c=recent?{label:recent.label,phone:recent.number,mode:recent.mode||'call',type:recent.label}:contacts[selected];
+  if(!state.testMode){state.recentCalls=[{label:c.label,number:n,mode:c.mode},...(state.recentCalls||[]).filter(x=>x.number!==n)].slice(0,8);persist()}
+  if(c.mode==='sms'){const msg=get('emText').value;if(get('emAttachPhoto').checked)shareEmergencyPhoto(n,msg);else smsNumber(n,msg)}else callNumber(n)
+ };
+ get('emContacts').onclick=()=>{if(!nativeCall('pickContact'))alert('Sélecteur de contacts indisponible')};
 }
 get('gpsCard').onclick=emergencyDialog;
 function cameraDialogNative(i){let key='cam'+i;openModal('Caméra '+i,`<div class="viewer" id="viewer"><span id="camMessage">Caméra non connectée</span><img id="cameraImg" hidden alt="Flux caméra"><video id="cameraVideo" autoplay muted playsinline hidden></video></div>
@@ -133,6 +163,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
  <p class="muted">Mode TEST : tous les appels et SMS vers ${testNumber}. Mode réel : coordonnées vérifiées uniquement.</p>
+ <h3>Caméras</h3>${[1,2,3].map(i=>field('Caméra '+i+' — adresse RTSP / MJPEG / HTTP','settingCam'+i,cfg['cam'+i])).join('')}<p class="muted">Les adresses sont enregistrées localement. Les commandes PTZ et résolution dépendent des capacités de chaque caméra.</p>
  <h3>Contacts locaux et personnels</h3><p class="muted">Une ligne par contact : nom ; numéro ; motif ; appel ou sms. Exemple : Mécanicien ; 06… ; Panne moteur ; appel</p>
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type,c.mode].join(' ; ')).join('\n'))}</textarea>
  <div class="dialogActions"><button id="settingsSave">Enregistrer</button><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
@@ -141,7 +172,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
   state.moveThreshold=Math.max(3,Number(get('settingMove').value)||8);state.stopMinutes=Math.max(1,Number(get('settingStop').value)||20);
   state.boatName=get('settingBoat').value.trim();state.contactPhone=get('settingContactPhone').value.trim();
   state.contacts=get('contactList').value.split('\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:a[3]?.toLowerCase()==='appel'?'call':'sms'}));
-  persist();applyVisibility();dialog.close();};
+  for(let i=1;i<=3;i++)cfg['cam'+i]=get('settingCam'+i).value.trim();saveCfg();persist();applyVisibility();dialog.close();};
  get('settingsMaps').onclick=mapDialog;get('settingsReset').onclick=()=>{state.buttons={};persist();applyVisibility();settingsDialog()};
 }
 settingsButton.onclick=settingsDialog;applyVisibility();
