@@ -8,35 +8,52 @@ on:
 
 jobs:
   android:
-    name: Fabriquer Nautic
+    name: Fabriquer Nautic signé
     runs-on: ubuntu-latest
-
     steps:
-      # Recuperer les fichiers du projet
-      - name: Recuperer le projet
+      - name: Récupérer le projet
         uses: actions/checkout@v4
 
-      # Installer Java 17
-      - name: Installer Java
+      - name: Installer Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # Preparer Gradle
-      - name: Installer Gradle
+      - name: Préparer Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      # Construire l'application
-      - name: Compiler Nautic
-        run: gradle --no-daemon :app:assembleDebug
+      - name: Restaurer la clé de signature privée
+        shell: bash
+        env:
+          NAUTIC_KEYSTORE_BASE64: ${{ secrets.NAUTIC_KEYSTORE_BASE64 }}
+          NAUTIC_SIGNING_PASSWORD: ${{ secrets.NAUTIC_SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$NAUTIC_KEYSTORE_BASE64" ] || [ -z "$NAUTIC_SIGNING_PASSWORD" ]; then
+            echo "::error::Configurer les secrets NAUTIC_KEYSTORE_BASE64 et NAUTIC_SIGNING_PASSWORD dans Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          printf '%s' "$NAUTIC_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nautic-release.p12"
+          chmod 600 "$RUNNER_TEMP/nautic-release.p12"
+          echo "NAUTIC_KEYSTORE_PATH=$RUNNER_TEMP/nautic-release.p12" >> "$GITHUB_ENV"
+          echo "NAUTIC_SIGNING_PASSWORD=$NAUTIC_SIGNING_PASSWORD" >> "$GITHUB_ENV"
 
-      # Conserver le fichier APK
-      - name: Publier APK
+      - name: Compiler APK de mise à jour signé
+        run: |
+          gradle --no-daemon :app:assembleRelease \
+            -PnauticVersionCode=${{ github.run_number }} \
+            -PnauticVersionName=0.4.${{ github.run_number }}
+
+      - name: Publier APK signé
         uses: actions/upload-artifact@v4
         with:
-          name: Nautic-Premier-Test
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: Nautic-APK-Signe
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+      - name: Nettoyer la clé temporaire
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/nautic-release.p12"
