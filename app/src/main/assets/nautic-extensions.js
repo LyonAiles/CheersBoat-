@@ -183,7 +183,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
   state.stopMinutes=Math.max(1,Number(get('settingStop').value)||20);
   state.boatName=get('settingBoat').value.trim();
   state.contactPhone=get('settingContactPhone').value.trim();
-  state.contacts=get('contactList').value.split('\\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:a[3]?.toLowerCase()==='appel'?'call':'sms'}));
+  state.contacts=get('contactList').value.split('\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:a[3]?.toLowerCase()==='appel'?'call':'sms'}));
   for(let i=1;i<=3;i++)cfg['cam'+i]=get('settingCam'+i).value.trim();
   if(!persist()){Object.assign(state,JSON.parse(previous));Object.assign(cfg,JSON.parse(previousCfg));return}
   try{
