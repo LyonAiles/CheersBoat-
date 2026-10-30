@@ -79,6 +79,17 @@ public class MainActivity extends Activity {
   runOnUiThread(()->web.evaluateJavascript("window."+name+" && window."+name+"("+escaped+")",null));
  }
  public class Bridge {
+  // SharedPreferences est indépendant du stockage WebView (file://).
+  @JavascriptInterface public String readSetting(String key){
+   return getSharedPreferences("nautic_settings",MODE_PRIVATE).getString(key,"");
+  }
+  @JavascriptInterface public boolean writeSetting(String key,String value){
+   return getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString(key,value).commit();
+  }
+  @JavascriptInterface public String versionName(){
+   try{return getPackageManager().getPackageInfo(getPackageName(),0).versionName;}
+   catch(Exception e){return "?";}
+  }
   @JavascriptInterface public void exitApp(){runOnUiThread(()->{if(web!=null)web.stopLoading();finish();});}
   @JavascriptInterface public void call(String number){runOnUiThread(()->{
    try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number))));}
