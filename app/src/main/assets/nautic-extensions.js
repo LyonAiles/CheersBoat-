@@ -200,7 +200,14 @@ appearanceCSS.textContent=`
 #app.nautic-layout-custom .left,#app.nautic-layout-custom .right{overflow-y:auto}
 #app.nautic-layout-custom .card,#app.nautic-layout-custom .camCard{flex:0 0 auto;min-height:90px}
 #app.nautic-edit .card,#app.nautic-edit .camCard,#app.nautic-edit .gauge{outline:2px dashed var(--nautic-accent);touch-action:none;cursor:grab}
-#app.nautic-edit .nautic-dragging{opacity:.45}\n#app.nautic-edit,#app.nautic-edit *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}\n#app.nautic-edit .card *,#app.nautic-edit .camCard *,#app.nautic-edit .gauge *{pointer-events:none!important}
+#app.nautic-edit .nautic-dragging{opacity:.45}
+@media(orientation:portrait){
+ #app .left,#app .right{display:flex;flex-direction:row;align-items:stretch;justify-content:center;gap:6px}
+ #app .left>.card{flex:0 1 calc((100% - 18px)/4);min-width:0}
+ #app .right>.camCard{flex:0 1 calc((100% - 12px)/3);min-width:0}
+}
+#app .gauges{display:flex;align-items:stretch;justify-content:center;gap:6px}
+#app .gauges>.gauge{flex:0 1 calc((100% - 12px)/3);min-width:0}\n#app.nautic-edit,#app.nautic-edit *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}\n#app.nautic-edit .card *,#app.nautic-edit .camCard *,#app.nautic-edit .gauge *{pointer-events:none!important}
 #nauticEditBanner{position:fixed;z-index:900;top:50%;left:50%;transform:translate(-50%,-50%);background:#16445b;border:2px solid #f4ce56;border-radius:10px;padding:8px 12px;color:white}
 #nauticEditBanner button{margin-left:10px;background:#1c7b61}
 #dialog.nautic-settings .dialogTop{position:sticky;top:0;z-index:12;background:#082438}
@@ -250,18 +257,39 @@ document.addEventListener('contextmenu',e=>{if(editingLayout&&get('app').contain
 document.addEventListener('selectstart',e=>{if(editingLayout&&get('app').contains(e.target))e.preventDefault()},true);
 for(const id of movableIds){
  const el=get(id);if(!el)continue;
- el.addEventListener('pointerdown',e=>{if(!editingLayout)return;dragging={el,x:e.clientX,y:e.clientY};el.classList.add('nautic-dragging');e.preventDefault();el.setPointerCapture(e.pointerId)});
- el.addEventListener('pointermove',e=>{if(!editingLayout||!dragging||dragging.el!==el)return;
-  const candidates=[...el.parentElement.children].filter(x=>x!==el&&movableIds.includes(x.id));
-  const target=candidates.find(x=>{const r=x.getBoundingClientRect();return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;});
-  if(target&&target!==el&&movableIds.includes(target.id)&&target.parentElement===el.parentElement){
-   const rect=target.getBoundingClientRect(),before=target.parentElement.classList.contains('gauges')?e.clientX<rect.left+rect.width/2:e.clientY<rect.top+rect.height/2;
-   target.parentElement.insertBefore(el,before?target:target.nextSibling);
-  }
+ el.addEventListener('pointerdown',e=>{
+  if(!editingLayout||e.button!==0)return;
+  dragging={el,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY};
+  el.classList.add('nautic-dragging');
+  e.preventDefault();
  });
- el.addEventListener('pointerup',()=>{if(dragging?.el===el){el.classList.remove('nautic-dragging');dragging=null}});
  el.addEventListener('click',e=>{if(editingLayout){e.stopImmediatePropagation();e.preventDefault()}},true);
 }
+document.addEventListener('pointermove',e=>{
+ if(!editingLayout||!dragging||e.pointerId!==dragging.pointerId)return;
+ dragging.x=e.clientX;dragging.y=e.clientY;
+ e.preventDefault();
+},{passive:false});
+document.addEventListener('pointerup',e=>{
+ if(!dragging||e.pointerId!==dragging.pointerId)return;
+ const {el,x,y,startX,startY}=dragging;
+ el.classList.remove('nautic-dragging');
+ dragging=null;
+ if(!editingLayout||Math.hypot(x-startX,y-startY)<12)return;
+ const parent=el.parentElement;
+ const candidates=[...parent.children].filter(node=>node!==el&&movableIds.includes(node.id)&&!node.hidden);
+ const target=candidates.find(node=>{const r=node.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;});
+ if(target){
+  // Échanger les positions sans perdre le suivi tactile lors d'un déplacement DOM.
+  const all=[...parent.children],from=all.indexOf(el),to=all.indexOf(target);
+  all.splice(from,1);all.splice(to,0,el);
+  all.forEach(node=>parent.appendChild(node));
+  state.appearance.order=[...document.querySelectorAll('.left > [id],.right > [id],.gauges > [id]')].map(node=>node.id).filter(id=>movableIds.includes(id));
+  persist();
+ }
+});
+document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classList.remove('nautic-dragging');dragging=null}});
+
 applyAppearance();
 
 function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
