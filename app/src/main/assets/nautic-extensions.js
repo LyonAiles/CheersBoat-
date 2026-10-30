@@ -3,7 +3,7 @@
 const get=id=>document.getElementById(id), native=window.NauticAndroid;
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(localStorage.getItem(k)||'{}'))}catch(e){return {...d}}};
 const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[]});
-const persist=()=>{try{localStorage.setItem('nautic-extensions',JSON.stringify(state))}catch(e){alert('Stockage local indisponible : paramètres non enregistrés')}};
+const persist=()=>{try{const value=JSON.stringify(state);localStorage.setItem('nautic-extensions',value);if(localStorage.getItem('nautic-extensions')!==value)throw Error('Lecture différente après écriture');return true}catch(e){alert('Échec de mémorisation des paramètres : '+e.message);return false}};
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const dialog=get('dialog');
 const css=document.createElement('style');css.textContent=`
@@ -176,11 +176,29 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type,c.mode].join(' ; ')).join('\n'))}</textarea>
  <div class="dialogActions"><button id="settingsSave">Enregistrer</button><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
  get('toggleEmergency').onclick=()=>{let pass=prompt('Code pour changer de mode :');if(pass==='xxx'){state.testMode=!state.testMode;persist();settingsDialog()}else if(pass!==null)alert('Code incorrect')};
- get('settingsSave').onclick=()=>{dialog.querySelectorAll('[data-button]').forEach(e=>state.buttons[e.dataset.button]=e.checked);
-  state.moveThreshold=Math.max(3,Number(get('settingMove').value)||8);state.stopMinutes=Math.max(1,Number(get('settingStop').value)||20);
-  state.boatName=get('settingBoat').value.trim();state.contactPhone=get('settingContactPhone').value.trim();
-  state.contacts=get('contactList').value.split('\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:a[3]?.toLowerCase()==='appel'?'call':'sms'}));
-  for(let i=1;i<=3;i++)cfg['cam'+i]=get('settingCam'+i).value.trim();saveCfg();persist();applyVisibility();dialog.close();};
+ get('settingsSave').onclick=()=>{
+  const previous=JSON.stringify(state), previousCfg=JSON.stringify(cfg);
+  dialog.querySelectorAll('[data-button]').forEach(e=>state.buttons[e.dataset.button]=e.checked);
+  state.moveThreshold=Math.max(3,Number(get('settingMove').value)||8);
+  state.stopMinutes=Math.max(1,Number(get('settingStop').value)||20);
+  state.boatName=get('settingBoat').value.trim();
+  state.contactPhone=get('settingContactPhone').value.trim();
+  state.contacts=get('contactList').value.split('\\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:a[3]?.toLowerCase()==='appel'?'call':'sms'}));
+  for(let i=1;i<=3;i++)cfg['cam'+i]=get('settingCam'+i).value.trim();
+  if(!persist()){Object.assign(state,JSON.parse(previous));Object.assign(cfg,JSON.parse(previousCfg));return}
+  try{
+    saveCfg();
+    const saved=JSON.parse(localStorage.getItem(KEY)||'{}');
+    if([1,2,3].some(i=>saved['cam'+i]!==cfg['cam'+i]))throw Error('Caméras non conservées');
+  }catch(e){
+    Object.assign(cfg,JSON.parse(previousCfg));
+    alert('Échec de sauvegarde des caméras : '+e.message);
+    return;
+  }
+  applyVisibility();
+  dialog.close();
+ };
+
  get('settingsMaps').onclick=mapDialog;get('settingsReset').onclick=()=>{state.buttons={};persist();applyVisibility();settingsDialog()};
 }
 // Météo : accès direct au radar demandé.
