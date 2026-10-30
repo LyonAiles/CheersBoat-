@@ -58,7 +58,7 @@ function setLayer(id){if(!map||!window.L)return;map.eachLayer(l=>{if(l instanceo
 function mapDialog(){openModal('Choisir la carte',`<div class="choiceGrid">${Object.entries(layerDefs).map(([k,v])=>`<button data-map="${k}">${v.label}</button>`).join('')}</div><p class="muted">Conservation du zoom et du centrage. Ces fonds nécessitent une connexion Internet.</p>`);dialog.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{setLayer(b.dataset.map);dialog.close()})}
 layers.onclick=mapDialog;
 const photoFallback='bateau.jpg';
-function applyPhoto(){const sketch=document.querySelector('#boatCard .boatSketch');if(sketch)sketch.innerHTML=`<img id="boatPhoto" src="${state.boatPhoto||photoFallback}" alt="Photographie du bateau">`}
+function applyPhoto(){const card=get('boatCard');if(!card)return;const src=state.boatPhoto||photoFallback;card.style.backgroundImage=`linear-gradient(0deg,rgba(3,20,32,.82),rgba(3,20,32,.20)),url("${src.replaceAll('"','%22')}")`;card.style.backgroundSize='cover';card.style.backgroundPosition='center';const sketch=card.querySelector('.boatSketch');if(sketch)sketch.style.display='none'}
 applyPhoto();
 window.nauticSelectedImage=data=>{state.boatPhoto=data;persist();applyPhoto();boatDialog()};
 function boatDialog(){openModal('Mon bateau',`<img src="${state.boatPhoto||photoFallback}" style="max-height:34vh;max-width:100%;object-fit:contain" alt="Bateau">
@@ -76,7 +76,7 @@ const contactDefaults=[
  {label:'Urgence SMS 114',phone:'114',mode:'sms',type:'Urgence — communication écrite',icon:'✉',urgent:true},
  {label:'VNF locale',phone:'',mode:'call',type:'Difficulté de navigation'},
  {label:'Mécanicien local',phone:'',mode:'call',type:'Panne mécanique'},
- {label:'Contact personnel',phone:'',mode:'sms',type:'Demande d’assistance'}];
+ {label:'Contact personnel',phone:'',mode:'call',type:'Contact personnel'}];
 const testNumber='0607615420';
 function contactPhone(){let n=(state.contactPhone||testNumber).replace(/[^+0-9]/g,'');return n.startsWith('0')?'+33'+n.slice(1):n}
 function messageFor(c,address){const p=latest,now=new Date(),a=String(address||'Non disponible').replace(/,\\s*/g,'\\n');return [
@@ -110,13 +110,13 @@ async function resolveEmergencyAddress(){
  }catch(e){return 'Non disponible (GPS indiqué ci-dessus)'}
 }
 window.nauticSelectedContact=number=>{let input=get('emPhone');if(input)input.value=number};
-function emergencyDialog(){
- const contacts=[...contactDefaults,...state.contacts];
- let selected=0,selectedRecent=null,autoMessage='';
- openModal('Assistance — choisir un contact',`<p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'MODE TEST — aucun appel aux secours : numéro personnel uniquement':'MODE RÉEL — vérifie avant de contacter les secours'}</p>
- <h3>🚨 URGENCES</h3><div id="emUrgent" class="emChoices"></div>
- <h3>☎ Contacts et assistance</h3><div id="emNormal" class="emChoices"></div>
- <section class="emPanel"><h3>Derniers contacts</h3><div id="recentCalls" class="emChoices"></div></section>
+function emergencyDialog(mode='urgent'){
+ const contacts=[...contactDefaults,...state.contacts.map(c=>({...c,mode:'call'}))];
+ let selected=mode==='urgent'?0:Math.max(0,contacts.findIndex(c=>!c.urgent)),selectedRecent=null,autoMessage='';
+ openModal(mode==='urgent'?'Urgences':'Contacts et assistance',`<p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'MODE TEST — aucun appel aux secours : numéro personnel uniquement':'MODE RÉEL — vérifie avant de contacter les secours'}</p>
+ ${mode==='urgent'?'<h3>🚨 URGENCES</h3><div id="emUrgent" class="emChoices"></div>':''}
+ ${mode==='contacts'?'<h3>☎ Contacts et assistance</h3><div id="emNormal" class="emChoices"></div>':''}
+ ${mode==='contacts'?'<section class="emPanel"><h3>Derniers numéros</h3><div id="recentCalls" class="emChoices"></div></section>':''}
  <section class="emPanel"><h3 id="emSelected"></h3><label class="formLabel">Numéro<input id="emPhone" type="tel"></label>
  <div id="smsFields"><label class="formLabel">Message<textarea id="emText"></textarea></label>
  <label class="settingRow"><input type="checkbox" id="emAttachPhoto"><span>Joindre la photo du bateau (partage/MMS compatible)</span></label></div>
@@ -125,18 +125,18 @@ function emergencyDialog(){
  <p class="muted">Les appels ouvrent le composeur ; les messages restent à confirmer dans l'application de messagerie. Le 114 est un service d'urgence par écrit.</p>`,true);
  function draw(){
   const drawGroup=(id,items)=>{const box=get(id);box.innerHTML=items.map(([c,i])=>`<button type="button" class="emChoice ${selectedRecent===null&&selected===i?'active':''}" data-target="${i}"><span>${esc(c.icon|| (c.mode==='sms'?'✉':'☎'))}</span><strong>${esc(c.label)}</strong></button>`).join('');box.querySelectorAll('[data-target]').forEach(el=>el.onclick=()=>{selected=Number(el.dataset.target);selectedRecent=null;draw();refresh()})};
-  drawGroup('emUrgent',contacts.map((c,i)=>[c,i]).filter(([c])=>c.urgent));
-  drawGroup('emNormal',contacts.map((c,i)=>[c,i]).filter(([c])=>!c.urgent));
+  if(mode==='urgent')drawGroup('emUrgent',contacts.map((c,i)=>[c,i]).filter(([c])=>c.urgent));
+  if(mode==='contacts')drawGroup('emNormal',contacts.map((c,i)=>[c,i]).filter(([c])=>!c.urgent));
   const list=Array.isArray(state.recentCalls)?state.recentCalls:[];
-  get('recentCalls').innerHTML=list.length?list.map((c,i)=>`<button type="button" class="emChoice ${selectedRecent===i?'active':''}" data-recent="${i}"><span>↺</span><strong>${esc(c.label.slice(0,7))}</strong><small>${esc(c.number)}</small></button>`).join(''):'<p class="muted">Aucun contact récent</p>';
-  get('recentCalls').querySelectorAll('[data-recent]').forEach(el=>el.onclick=()=>{selectedRecent=Number(el.dataset.recent);draw();refresh()});
+  if(mode==='contacts')get('recentCalls').innerHTML=list.length?list.map((c,i)=>`<button type="button" class="emChoice ${selectedRecent===i?'active':''}" data-recent="${i}"><span>↺</span><strong>${esc(c.label.slice(0,7))}</strong><small>${esc(c.number)}</small></button>`).join(''):'<p class="muted">Aucun contact récent</p>';
+  if(mode==='contacts')get('recentCalls').querySelectorAll('[data-recent]').forEach(el=>el.onclick=()=>{selectedRecent=Number(el.dataset.recent);draw();refresh()});
  }
  function refresh(){
   const recent=selectedRecent!==null?(state.recentCalls||[])[selectedRecent]:null;
   const c=recent?{label:recent.label,phone:recent.number,mode:recent.mode||'call',type:recent.label}:contacts[selected];
   get('emSelected').textContent=(c.icon||'☎')+' '+c.label;
   get('emPhone').value=state.testMode?testNumber:c.phone;
-  const isSms=c.mode==='sms';get('smsFields').hidden=!isSms;
+  const isSms=mode==='urgent'&&c.mode==='sms';get('smsFields').hidden=!isSms;
   get('emAction').classList.toggle('emUrgentAction',!!c.urgent);
   get('emAction').textContent=isSms?'✉ PRÉPARER LE MESSAGE':'📞 '+(c.urgent?'APPELER LES SECOURS':'APPELER');
   if(isSms){autoMessage=messageFor(c,get('emText').dataset.address);get('emText').value=autoMessage;}
@@ -148,11 +148,13 @@ function emergencyDialog(){
   const recent=selectedRecent!==null?(state.recentCalls||[])[selectedRecent]:null;
   const c=recent?{label:recent.label,phone:recent.number,mode:recent.mode||'call',type:recent.label}:contacts[selected];
   if(!state.testMode){state.recentCalls=[{label:c.label,number:n,mode:c.mode},...(state.recentCalls||[]).filter(x=>x.number!==n)].slice(0,8);persist()}
-  if(c.mode==='sms'){const msg=get('emText').value;if(get('emAttachPhoto').checked)shareEmergencyPhoto(n,msg);else smsNumber(n,msg)}else callNumber(n)
+  if(mode==='urgent'&&c.mode==='sms'){const msg=get('emText').value;if(get('emAttachPhoto').checked)shareEmergencyPhoto(n,msg);else smsNumber(n,msg)}else callNumber(n)
  };
  get('emContacts').onclick=()=>{if(!nativeCall('pickContact'))alert('Sélecteur de contacts indisponible')};
 }
-get('gpsCard').onclick=emergencyDialog;
+get('gpsCard').onclick=()=>emergencyDialog('urgent');
+const contactButton=document.createElement('button');contactButton.id='nauticContactsButton';contactButton.textContent='☎ Contacts';contactButton.title='Contacts, assistance et derniers numéros';contactButton.onclick=()=>emergencyDialog('contacts');
+const header=document.querySelector('#app header');header.insertBefore(contactButton,header.querySelector('#nauticSettingsButton')||header.lastElementChild);
 function cameraDialogNative(i){
  const key='cam'+i,url=cfg[key]||'';
  openModal('Caméra '+i,`<div class="nauticCameraStage" id="cameraStage">
@@ -218,6 +220,13 @@ appearanceCSS.textContent=`
 #dialog .nautic-colors{display:flex;gap:12px;flex-wrap:wrap}
 #dialog .nautic-colors label{display:flex;flex-direction:column;gap:5px}
 #dialog .nautic-colors input{width:72px;height:40px;padding:2px}
+#nauticContactsButton{font-size:clamp(10px,1.5vw,14px);white-space:nowrap;padding:6px 9px}
+dialog.nautic-full #dialogContent .emChoices{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:6px}
+dialog.nautic-full #dialogContent .emChoice{min-height:48px}
+dialog.nautic-full #dialogContent .emPanel{margin:4px 0;padding:5px}
+dialog.nautic-full #dialogContent h3{margin:7px 0 4px}
+#boatCard h3,#boatCard p{position:relative;text-shadow:0 1px 4px #000,0 1px 9px #000;background:transparent!important}
+@media(orientation:portrait){#nauticContactsButton{padding:5px 6px;font-size:10px}dialog.nautic-full #dialogContent .emChoices{grid-template-columns:repeat(auto-fit,minmax(95px,1fr))}}
 `;
 document.head.appendChild(appearanceCSS);
 function applyAppearance(){
@@ -309,8 +318,8 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
  <p class="muted">Mode TEST : tous les appels et SMS vers ${testNumber}. Mode réel : coordonnées vérifiées uniquement.</p>
  <h3>Caméras</h3>${[1,2,3].map(i=>field('Caméra '+i+' — adresse RTSP / MJPEG / HTTP','settingCam'+i,cfg['cam'+i])).join('')}<p class="muted">Les adresses sont enregistrées localement. Les commandes PTZ et résolution dépendent des capacités de chaque caméra.</p>
- <h3>Contacts locaux et personnels</h3><p class="muted">Une ligne par contact : nom ; numéro ; motif ; appel ou sms. Exemple : Mécanicien ; 06… ; Panne moteur ; appel</p>
- <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type,c.mode].join(' ; ')).join('\n'))}</textarea>
+ <h3>Contacts locaux et personnels</h3><p class="muted">Une ligne par contact : nom ; numéro ; motif. Contacts personnels : appels téléphoniques uniquement.</p>
+ <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type].join(' ; ')).join('\n'))}</textarea>
  <div class="dialogActions"><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
  dialog.classList.add('nautic-settings');
  const top=dialog.querySelector('.dialogTop');
@@ -342,7 +351,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
   state.stopMinutes=Math.max(1,Number(get('settingStop').value)||20);
   state.boatName=get('settingBoat').value.trim();
   state.contactPhone=get('settingContactPhone').value.trim();
-  state.contacts=get('contactList').value.split('\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:a[3]?.toLowerCase()==='appel'?'call':'sms'}));
+  state.contacts=get('contactList').value.split('\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:'call'}));
   for(let i=1;i<=3;i++)cfg['cam'+i]=get('settingCam'+i).value.trim();
   state.appearance={...state.appearance,
    layout:get('settingLayout').value,theme:get('settingTheme').value,
