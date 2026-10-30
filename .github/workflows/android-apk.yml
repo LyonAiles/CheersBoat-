@@ -6,6 +6,11 @@ on:
       - main
   workflow_dispatch:
 
+# Une seule compilation active; chaque nouveau commit remplace la précédente.
+concurrency:
+  group: nautic-apk-main
+  cancel-in-progress: true
+
 jobs:
   android:
     name: Fabriquer Nautic signé
