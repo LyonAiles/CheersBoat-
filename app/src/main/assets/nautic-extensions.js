@@ -183,6 +183,8 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
   for(let i=1;i<=3;i++)cfg['cam'+i]=get('settingCam'+i).value.trim();saveCfg();persist();applyVisibility();dialog.close();};
  get('settingsMaps').onclick=mapDialog;get('settingsReset').onclick=()=>{state.buttons={};persist();applyVisibility();settingsDialog()};
 }
+// Météo : accès direct au radar demandé.
+get('weatherCard').onclick=()=>{const u='https://appli.meteoetradar.fr/U13Q/frFRShare';if(!nativeCall('openExternal',u))window.open(u,'_blank','noopener')};
 settingsButton.onclick=settingsDialog;applyVisibility();
 setTimeout(()=>{if(map)setLayer(state.map)},1000);
 })();
