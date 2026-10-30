@@ -262,7 +262,15 @@ for(const id of movableIds){
 applyAppearance();
 
 function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
- openModal('Paramètres',`<h3>Tableau de bord</h3>${buttons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
+ openModal('Paramètres',`<h3>Apparence et disposition</h3>
+ <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
+ <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
+ <label>Thème<select class="nautic-select" id="settingTheme"><option value="nautic">Nautic bleu</option><option value="day">Jour clair</option><option value="night">Nuit rouge</option><option value="contrast">Contraste élevé</option><option value="custom">Couleurs personnalisées</option></select></label>
+ <div class="nautic-colors"><label>Couleur principale<input type="color" id="settingAccent" value="${esc(state.appearance.accent)}"></label><label>Fond des panneaux<input type="color" id="settingPanel" value="${esc(state.appearance.panel)}"></label></div>
+ <label>Fond<select class="nautic-select" id="settingBackground"><option value="gradient">Dégradé</option><option value="flat">Uni</option><option value="clear">Panneaux translucides</option></select></label>
+ <label>Forme des boutons<select class="nautic-select" id="settingButtons"><option value="rounded">Arrondis</option><option value="square">Carrés / plats</option><option value="round">Très arrondis</option><option value="outline">Contours seuls</option></select></label>
+ <label>Taille générale : <output id="settingScaleValue">${state.appearance.scale}%</output><input type="range" id="settingScale" min="80" max="130" step="5" value="${state.appearance.scale}"></label>
+ <h3>Tableau de bord</h3>${buttons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <h3>Navigation</h3>${field('Seuil de déplacement confirmé (m)','settingMove',state.moveThreshold,'number')}${field('Arrêt prolongé (minutes)','settingStop',state.stopMinutes,'number')}
  <h3>Bateau</h3>${field('Nom du bateau','settingBoat',state.boatName)}${field('Téléphone de rappel (inclus dans les SMS)','settingContactPhone',state.contactPhone||testNumber,'tel')}
  <p>Carburant estimé consommé : <b>${(typeof fuelUsed==='number'?fuelUsed:0).toFixed(2)} L</b>. La consommation d'un arrêt de moins de ${state.stopMinutes} minutes est ajoutée à la reprise ; après ce délai elle est annulée.</p>
@@ -272,7 +280,29 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  <h3>Caméras</h3>${[1,2,3].map(i=>field('Caméra '+i+' — adresse RTSP / MJPEG / HTTP','settingCam'+i,cfg['cam'+i])).join('')}<p class="muted">Les adresses sont enregistrées localement. Les commandes PTZ et résolution dépendent des capacités de chaque caméra.</p>
  <h3>Contacts locaux et personnels</h3><p class="muted">Une ligne par contact : nom ; numéro ; motif ; appel ou sms. Exemple : Mécanicien ; 06… ; Panne moteur ; appel</p>
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type,c.mode].join(' ; ')).join('\n'))}</textarea>
- <div class="dialogActions"><button id="settingsSave">Enregistrer</button><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
+ <div class="dialogActions"><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
+ dialog.classList.add('nautic-settings');
+ const top=dialog.querySelector('.dialogTop');
+ const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
+ top.insertBefore(saveButton,get('dialogClose'));
+ const a=state.appearance;
+ for(const [id,value] of [['settingLayout',a.layout],['settingTheme',a.theme],['settingBackground',a.background],['settingButtons',a.buttons]])get(id).value=value;
+ const markDirty=()=>{saveButton.disabled=false;saveButton.textContent='● Enregistrer';saveButton.classList.add('nautic-dirty')};
+ dialog.querySelectorAll('#dialogContent input,#dialogContent select,#dialogContent textarea').forEach(el=>{el.addEventListener('input',markDirty);el.addEventListener('change',markDirty)});
+ get('settingScale').addEventListener('input',e=>get('settingScaleValue').textContent=e.target.value+'%');
+ get('settingTheme').addEventListener('change',()=>{
+  const t=get('settingTheme').value,colors=themeColors[t];
+  if(colors){get('settingAccent').value=colors[0];get('settingPanel').value=colors[1]}
+ });
+ get('settingAccent').addEventListener('input',()=>{get('settingTheme').value='custom'});
+ get('settingPanel').addEventListener('input',()=>{get('settingTheme').value='custom'});
+ get('settingArrange').onclick=()=>{
+  get('settingLayout').value='custom';
+  saveButton.disabled=false;
+  saveButton.click();
+  beginLayoutEdit();
+ };
+ get('dialogClose').addEventListener('click',()=>dialog.classList.remove('nautic-settings'),{once:true});
  get('toggleEmergency').onclick=()=>{let pass=prompt('Code pour changer de mode :');if(pass==='xxx'){state.testMode=!state.testMode;persist();settingsDialog()}else if(pass!==null)alert('Code incorrect')};
  get('settingsSave').onclick=()=>{
   const previous=JSON.stringify(state), previousCfg=JSON.stringify(cfg);
@@ -283,6 +313,11 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
   state.contactPhone=get('settingContactPhone').value.trim();
   state.contacts=get('contactList').value.split('\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:a[3]?.toLowerCase()==='appel'?'call':'sms'}));
   for(let i=1;i<=3;i++)cfg['cam'+i]=get('settingCam'+i).value.trim();
+  state.appearance={...state.appearance,
+   layout:get('settingLayout').value,theme:get('settingTheme').value,
+   accent:get('settingAccent').value,panel:get('settingPanel').value,
+   background:get('settingBackground').value,buttons:get('settingButtons').value,
+   scale:Number(get('settingScale').value)};
   if(!persist()){Object.assign(state,JSON.parse(previous));Object.assign(cfg,JSON.parse(previousCfg));return}
   try{
     saveCfg();
@@ -293,7 +328,8 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
     alert('Échec de sauvegarde des caméras : '+e.message);
     return;
   }
-  applyVisibility();
+  applyVisibility();applyAppearance();
+  dialog.classList.remove('nautic-settings');
   dialog.close();
  };
 
