@@ -202,7 +202,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
   if(!persist()){Object.assign(state,JSON.parse(previous));Object.assign(cfg,JSON.parse(previousCfg));return}
   try{
     saveCfg();
-    const saved=JSON.parse(localStorage.getItem(KEY)||'{}');
+    const saved=JSON.parse(readSetting(KEY)||'{}');
     if([1,2,3].some(i=>saved['cam'+i]!==cfg['cam'+i]))throw Error('Caméras non conservées');
   }catch(e){
     Object.assign(cfg,JSON.parse(previousCfg));
@@ -217,6 +217,14 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
 }
 // Météo : accès direct au radar demandé.
 get('weatherCard').onclick=()=>{const u='https://appli.meteoetradar.fr/U13Q/frFRShare';if(!nativeCall('openExternal',u))window.open(u,'_blank','noopener')};
+const brand=document.querySelector('header .brand');
+if(brand){
+ const version=document.createElement('small');
+ version.id='nauticVersion';
+ version.style.cssText='margin-left:7px;font-size:11px;font-weight:400;opacity:.72;white-space:nowrap';
+ version.textContent='v'+(native&&typeof native.versionName==='function'?native.versionName():'?');
+ brand.appendChild(version);
+}
 settingsButton.onclick=settingsDialog;applyVisibility();
 setTimeout(()=>{if(map)setLayer(state.map)},1000);
 })();
