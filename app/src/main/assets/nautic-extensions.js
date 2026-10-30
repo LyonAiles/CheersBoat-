@@ -177,6 +177,90 @@ for(let i=1;i<=3;i++)get('cam'+i+'Card').onclick=()=>cameraDialogNative(i);
 get('routeCard').style.display='none';get('miniMap').style.display='none';let branding=document.querySelector('.branding');if(branding)branding.style.display='none';
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
 function applyVisibility(){const ids=['gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
+
+const appearanceDefaults={theme:'nautic',background:'gradient',buttons:'rounded',labels:'both',scale:100,accent:'#31b9e9',panel:'#09283e',layout:'navigation',order:[]};
+state.appearance=Object.assign({},appearanceDefaults,state.appearance||{});
+const movableIds=['gpsCard','boatCard','fuelCard','logCard','speedCard','headingCard','weatherCard','cam1Card','cam2Card','cam3Card'];
+const themeColors={nautic:['#31b9e9','#09283e'],day:['#176a9d','#dbeaf0'],night:['#d75a5a','#241719'],contrast:['#ffff00','#000000']};
+const appearanceCSS=document.createElement('style');
+appearanceCSS.textContent=`
+:root{--nautic-accent:#31b9e9;--nautic-panel:#09283e;--nautic-radius:12px;--nautic-scale:1}
+#app .card,#app .camCard,#app .gauge,#app .route,#app .miniMap{background:var(--nautic-panel);border-color:var(--nautic-accent);border-radius:var(--nautic-radius)}
+#app .card h3,#app .camCard h3{color:var(--nautic-accent)}
+#app button{border-radius:var(--nautic-radius)}
+#app{font-size:calc(14px * var(--nautic-scale))}
+#app.nautic-bg-flat{background:var(--nautic-panel)}
+#app.nautic-bg-clear .card,#app.nautic-bg-clear .camCard,#app.nautic-bg-clear .gauge{background:color-mix(in srgb,var(--nautic-panel) 58%,transparent)}
+#app.nautic-btn-flat button{box-shadow:none;border-radius:0}
+#app.nautic-btn-round button{border-radius:30px}
+#app.nautic-btn-outline button{background:transparent;border:2px solid var(--nautic-accent)}
+#app.nautic-layout-manoeuvres .layout{grid-template-columns:minmax(145px,16%) minmax(0,1fr) minmax(260px,33%)}
+#app.nautic-layout-manoeuvres .center{grid-template-rows:minmax(0,1fr) 110px}
+#app.nautic-layout-manoeuvres .camCard{flex:1}
+#app.nautic-layout-custom .left,#app.nautic-layout-custom .right{overflow-y:auto}
+#app.nautic-layout-custom .card,#app.nautic-layout-custom .camCard{flex:0 0 auto;min-height:90px}
+#app.nautic-edit .card,#app.nautic-edit .camCard,#app.nautic-edit .gauge{outline:2px dashed var(--nautic-accent);touch-action:none;cursor:grab}
+#app.nautic-edit .nautic-dragging{opacity:.45}
+#nauticEditBanner{position:fixed;z-index:900;top:48px;left:50%;transform:translateX(-50%);background:#16445b;border:2px solid #f4ce56;border-radius:10px;padding:8px 12px;color:white}
+#nauticEditBanner button{margin-left:10px;background:#1c7b61}
+#dialog.nautic-settings .dialogTop{position:sticky;top:0;z-index:12;background:#082438}
+#dialog.nautic-settings #settingsSave{background:#235f4b;border:2px solid #6ad7a8;min-width:110px;font-weight:bold}
+#dialog.nautic-settings #settingsSave.nautic-dirty{background:#b46515;border-color:#ffd47b}
+#dialog.nautic-settings #dialogContent{overflow-y:auto}
+#dialog .nautic-select{display:block;width:100%;padding:8px;background:#09273b;color:white;border:1px solid #4a7b91;border-radius:7px;margin:5px 0 12px}
+#dialog .nautic-colors{display:flex;gap:12px;flex-wrap:wrap}
+#dialog .nautic-colors label{display:flex;flex-direction:column;gap:5px}
+#dialog .nautic-colors input{width:72px;height:40px;padding:2px}
+`;
+document.head.appendChild(appearanceCSS);
+function applyAppearance(){
+ const a=state.appearance,app=get('app');
+ if(!app)return;
+ document.documentElement.style.setProperty('--nautic-accent',a.accent);
+ document.documentElement.style.setProperty('--nautic-panel',a.panel);
+ document.documentElement.style.setProperty('--nautic-radius',a.buttons==='square'?'0px':a.buttons==='round'?'30px':'12px');
+ document.documentElement.style.setProperty('--nautic-scale',String((Number(a.scale)||100)/100));
+ app.classList.remove('nautic-bg-flat','nautic-bg-clear','nautic-btn-flat','nautic-btn-round','nautic-btn-outline','nautic-layout-manoeuvres','nautic-layout-custom');
+ if(a.background==='flat')app.classList.add('nautic-bg-flat');
+ if(a.background==='clear')app.classList.add('nautic-bg-clear');
+ if(a.buttons==='square')app.classList.add('nautic-btn-flat');
+ if(a.buttons==='round')app.classList.add('nautic-btn-round');
+ if(a.buttons==='outline')app.classList.add('nautic-btn-outline');
+ if(a.layout==='manoeuvres')app.classList.add('nautic-layout-manoeuvres');
+ if(a.layout==='custom')app.classList.add('nautic-layout-custom');
+ if(Array.isArray(a.order)&&a.order.length){
+  for(const id of a.order){const el=get(id);if(el&&el.parentElement)el.parentElement.appendChild(el)}
+ }
+ if(map)setTimeout(()=>map.invalidateSize(),120);
+}
+let editingLayout=false,dragging=null;
+function stopLayoutEdit(){
+ editingLayout=false;get('app').classList.remove('nautic-edit');
+ get('nauticEditBanner')?.remove();dragging=null;
+ state.appearance.order=[...document.querySelectorAll('.left > [id],.right > [id],.gauges > [id]')].map(e=>e.id).filter(id=>movableIds.includes(id));
+ persist();
+}
+function beginLayoutEdit(){
+ if(editingLayout)return;
+ editingLayout=true;get('app').classList.add('nautic-edit');
+ const banner=document.createElement('div');banner.id='nauticEditBanner';banner.innerHTML='Disposition : glisser les panneaux <button id="nauticEditDone">✓ Terminer</button>';
+ document.body.appendChild(banner);get('nauticEditDone').onclick=stopLayoutEdit;
+}
+for(const id of movableIds){
+ const el=get(id);if(!el)continue;
+ el.addEventListener('pointerdown',e=>{if(!editingLayout)return;dragging={el,x:e.clientX,y:e.clientY};el.classList.add('nautic-dragging');e.preventDefault();el.setPointerCapture(e.pointerId)});
+ el.addEventListener('pointermove',e=>{if(!editingLayout||!dragging||dragging.el!==el)return;
+  const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.card,.camCard,.gauge');
+  if(target&&target!==el&&movableIds.includes(target.id)&&target.parentElement===el.parentElement){
+   const rect=target.getBoundingClientRect(),before=target.parentElement.classList.contains('gauges')?e.clientX<rect.left+rect.width/2:e.clientY<rect.top+rect.height/2;
+   target.parentElement.insertBefore(el,before?target:target.nextSibling);
+  }
+ });
+ el.addEventListener('pointerup',()=>{if(dragging?.el===el){el.classList.remove('nautic-dragging');dragging=null}});
+ el.addEventListener('click',e=>{if(editingLayout){e.stopImmediatePropagation();e.preventDefault()}},true);
+}
+applyAppearance();
+
 function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
  openModal('Paramètres',`<h3>Tableau de bord</h3>${buttons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <h3>Navigation</h3>${field('Seuil de déplacement confirmé (m)','settingMove',state.moveThreshold,'number')}${field('Arrêt prolongé (minutes)','settingStop',state.stopMinutes,'number')}
