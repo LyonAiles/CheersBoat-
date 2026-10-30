@@ -1,9 +1,23 @@
 /* Nautic full adjustments: runs after app.js, uses Android bridge for native functions. */
 (()=>{
 const get=id=>document.getElementById(id), native=window.NauticAndroid;
-const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(localStorage.getItem(k)||'{}'))}catch(e){return {...d}}};
+const readSetting=(key)=>{try{
+ const fromAndroid=native&&typeof native.readSetting==='function'?native.readSetting(key):'';
+ if(fromAndroid)return fromAndroid;
+ const old=localStorage.getItem(key)||'';
+ if(old&&native&&typeof native.writeSetting==='function')native.writeSetting(key,old);
+ return old;
+}catch(e){try{return localStorage.getItem(key)||''}catch(_){return ''}}};
+const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{}'))}catch(e){return {...d}}};
 const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[]});
-const persist=()=>{try{const value=JSON.stringify(state);localStorage.setItem('nautic-extensions',value);if(localStorage.getItem('nautic-extensions')!==value)throw Error('Lecture différente après écriture');return true}catch(e){alert('Échec de mémorisation des paramètres : '+e.message);return false}};
+const persist=()=>{try{
+ const value=JSON.stringify(state);
+ if(native&&typeof native.writeSetting==='function'){
+  if(!native.writeSetting('nautic-extensions',value)||native.readSetting('nautic-extensions')!==value)throw Error('Écriture Android non confirmée');
+ }
+ try{localStorage.setItem('nautic-extensions',value)}catch(_){}
+ return true;
+}catch(e){alert('Échec de mémorisation des paramètres : '+e.message);return false}};
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const dialog=get('dialog');
 const css=document.createElement('style');css.textContent=`
