@@ -200,8 +200,8 @@ appearanceCSS.textContent=`
 #app.nautic-layout-custom .left,#app.nautic-layout-custom .right{overflow-y:auto}
 #app.nautic-layout-custom .card,#app.nautic-layout-custom .camCard{flex:0 0 auto;min-height:90px}
 #app.nautic-edit .card,#app.nautic-edit .camCard,#app.nautic-edit .gauge{outline:2px dashed var(--nautic-accent);touch-action:none;cursor:grab}
-#app.nautic-edit .nautic-dragging{opacity:.45}
-#nauticEditBanner{position:fixed;z-index:900;top:48px;left:50%;transform:translateX(-50%);background:#16445b;border:2px solid #f4ce56;border-radius:10px;padding:8px 12px;color:white}
+#app.nautic-edit .nautic-dragging{opacity:.45}\n#app.nautic-edit,#app.nautic-edit *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}\n#app.nautic-edit .card *,#app.nautic-edit .camCard *,#app.nautic-edit .gauge *{pointer-events:none!important}
+#nauticEditBanner{position:fixed;z-index:900;top:50%;left:50%;transform:translate(-50%,-50%);background:#16445b;border:2px solid #f4ce56;border-radius:10px;padding:8px 12px;color:white}
 #nauticEditBanner button{margin-left:10px;background:#1c7b61}
 #dialog.nautic-settings .dialogTop{position:sticky;top:0;z-index:12;background:#082438}
 #dialog.nautic-settings #settingsSave{background:#235f4b;border:2px solid #6ad7a8;min-width:110px;font-weight:bold}
@@ -246,11 +246,14 @@ function beginLayoutEdit(){
  const banner=document.createElement('div');banner.id='nauticEditBanner';banner.innerHTML='Disposition : glisser les panneaux <button id="nauticEditDone">✓ Terminer</button>';
  document.body.appendChild(banner);get('nauticEditDone').onclick=stopLayoutEdit;
 }
+document.addEventListener('contextmenu',e=>{if(editingLayout&&get('app').contains(e.target))e.preventDefault()},true);
+document.addEventListener('selectstart',e=>{if(editingLayout&&get('app').contains(e.target))e.preventDefault()},true);
 for(const id of movableIds){
  const el=get(id);if(!el)continue;
  el.addEventListener('pointerdown',e=>{if(!editingLayout)return;dragging={el,x:e.clientX,y:e.clientY};el.classList.add('nautic-dragging');e.preventDefault();el.setPointerCapture(e.pointerId)});
  el.addEventListener('pointermove',e=>{if(!editingLayout||!dragging||dragging.el!==el)return;
-  const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.card,.camCard,.gauge');
+  const candidates=[...el.parentElement.children].filter(x=>x!==el&&movableIds.includes(x.id));
+  const target=candidates.find(x=>{const r=x.getBoundingClientRect();return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom;});
   if(target&&target!==el&&movableIds.includes(target.id)&&target.parentElement===el.parentElement){
    const rect=target.getBoundingClientRect(),before=target.parentElement.classList.contains('gauges')?e.clientX<rect.left+rect.width/2:e.clientY<rect.top+rect.height/2;
    target.parentElement.insertBefore(el,before?target:target.nextSibling);
