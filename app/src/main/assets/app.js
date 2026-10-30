@@ -1,12 +1,25 @@
 'use strict';
-const $=id=>document.getElementById(id), KEY='nautic-v04';let cfg={fuel:400,tank:600,cons:4,emergency:'',cam1:'',cam2:'',cam3:''};try{Object.assign(cfg,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){};
+const $=id=>document.getElementById(id), KEY='nautic-v04';let cfg={fuel:400,tank:600,cons:4,emergency:'',cam1:'',cam2:'',cam3:''};try{
+ const bridge=window.NauticAndroid;
+ const saved=bridge&&typeof bridge.readSetting==='function'?bridge.readSetting(KEY):'';
+ const previous=localStorage.getItem(KEY)||'';
+ Object.assign(cfg,JSON.parse(saved||previous||'{}'));
+ if(!saved&&previous&&bridge&&typeof bridge.writeSetting==='function')bridge.writeSetting(KEY,previous);
+}catch(e){};
 let map,boatMarker,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null;
 try{points=JSON.parse(localStorage.getItem('nautic-v04-points')||'[]');travel=Number(localStorage.getItem('nautic-v04-travel')||0)}catch(e){}
 const fmt=n=>Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2});
 function clock(){let d=new Date();$('clock').textContent=d.toLocaleString('fr-FR',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}clock();setInterval(clock,30000);
 function modal(title,body){$('dialogTitle').textContent=title;$('dialogContent').innerHTML=body;$('dialog').showModal()}$('dialogClose').onclick=()=>$('dialog').close();
 function field(label,id,value,type='text'){return `<label class="formLabel">${label}<input id="${id}" type="${type}" value="${String(value??'').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;')}"></label>`}
-function saveCfg(){localStorage.setItem(KEY,JSON.stringify(cfg));fuelUpdate()}
+function saveCfg(){
+ const value=JSON.stringify(cfg),bridge=window.NauticAndroid;
+ if(bridge&&typeof bridge.writeSetting==='function'){
+  if(!bridge.writeSetting(KEY,value)||bridge.readSetting(KEY)!==value)throw Error('Paramètres Android non mémorisés');
+ }
+ try{localStorage.setItem(KEY,value)}catch(e){if(!bridge)throw e}
+ fuelUpdate();
+}
 function fuelUpdate(){let f=Math.max(0,Number(cfg.fuel)||0),t=Math.max(1,Number(cfg.tank)||1),c=Number(cfg.cons)||0;$('fuelbar').style.width=Math.min(100,100*f/t)+'%';$('fuelQty').textContent=fmt(f)+' L';$('fuelMax').textContent='/ '+fmt(t)+' L';$('consValue').textContent=fmt(c);$('hours').textContent=c>0?fmt(f/c):'—'}fuelUpdate();
 function openFuel(){modal('Carburant',field('Carburant restant (L)','inFuel',cfg.fuel,'number')+field('Capacité du réservoir (L)','inTank',cfg.tank,'number')+field('Consommation de référence (L/h)','inCons',cfg.cons,'number')+'<p class="muted">Estimation manuelle : aucune mesure du moteur n’est disponible.</p><button id="saveFuel">Enregistrer</button>');$('saveFuel').onclick=()=>{cfg.fuel=Math.max(0,Number($('inFuel').value));cfg.tank=Math.max(1,Number($('inTank').value));cfg.cons=Math.max(.1,Number($('inCons').value));saveCfg();$('dialog').close()}}
 function openBoat(){modal('Mon bateau','<p>Kotter acier · 13,40 × 4,30 m · tirant d’eau 1,35 m · tirant d’air 3,45 m.</p><div class="dialogActions"><button id="openBoat">Ouvrir Mon bateau</button><button id="embedBoat">Afficher dans Nautic</button></div><div id="boatEmbed"></div><p class="muted">L’intégration dans une fenêtre dépend des autorisations du site existant. La base de données n’est pas encore fusionnée.</p>');$('openBoat').onclick=()=>window.open('https://cerulean-mochi-747b13.netlify.app','_blank','noopener');$('embedBoat').onclick=()=>{$('boatEmbed').innerHTML='<iframe title="Mon bateau" src="https://cerulean-mochi-747b13.netlify.app" style="width:100%;height:50vh;border:1px solid #41768b;border-radius:8px;background:white"></iframe>'}}
