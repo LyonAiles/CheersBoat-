@@ -31,7 +31,6 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.graphics.PixelFormat;
-import android.view.WindowManager;
 import android.widget.TextView;
 import android.graphics.drawable.GradientDrawable;
 import java.io.ByteArrayOutputStream;
@@ -229,8 +228,7 @@ public class MainActivity extends Activity {
    web.setPivotX(0);web.setPivotY(0);
    web.animate().scaleX(.06f).scaleY(.06f).alpha(0f).setDuration(320).withEndAction(()->{
     anchor.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(220).start();
-    Intent home=new Intent(Intent.ACTION_MAIN);home.addCategory(Intent.CATEGORY_HOME);
-    home.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(home);
+    moveTaskToBack(true);
    }).start();
   }catch(Exception e){removeAnchor();toast("Impossible de réduire Nautic");}
  }
@@ -249,7 +247,8 @@ public class MainActivity extends Activity {
  }
  @Override protected void onResume(){
   super.onResume();
-  if(overlayRequested&&Settings.canDrawOverlays(this)){overlayRequested=false;minimizeToAnchor();}
+  if(overlayRequested){overlayRequested=false;if(Settings.canDrawOverlays(this))toast("Autorisation accordée. Touche l’ancre de Nautic pour réduire.");}
+  else if(anchorOverlay!=null){removeAnchor();if(web!=null)web.animate().cancel();if(web!=null){web.setScaleX(1f);web.setScaleY(1f);web.setAlpha(1f);}}
  }
  private void sendRecentCalls(){
   JSONArray out=new JSONArray();
