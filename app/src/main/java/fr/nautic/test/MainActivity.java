@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -118,6 +119,30 @@ public class MainActivity extends Activity {
     requestPermissions(new String[]{Manifest.permission.READ_CALL_LOG},CALLS);return;
    }
    sendRecentCalls();
+  });}
+  @JavascriptInterface public void cameraActivities(String pkg){runOnUiThread(()->{
+   try{
+    if(pkg==null||pkg.trim().isEmpty()){js("nauticCameraActivities","[]");return;}
+    JSONArray out=new JSONArray();
+    android.content.pm.PackageInfo info=getPackageManager().getPackageInfo(pkg,PackageManager.GET_ACTIVITIES);
+    if(info.activities!=null)for(ActivityInfo a:info.activities){
+     if(!a.exported)continue;
+     JSONObject item=new JSONObject();
+     item.put("name",a.name);
+     item.put("label",a.loadLabel(getPackageManager()).toString());
+     out.put(item);
+    }
+    js("nauticCameraActivities",out.toString());
+   }catch(Exception e){js("nauticCameraActivities","[]");toast("Activités accessibles introuvables");}
+  });}
+  @JavascriptInterface public void launchCameraActivity(String pkg,String activity){runOnUiThread(()->{
+   try{
+    android.content.pm.PackageInfo info=getPackageManager().getPackageInfo(pkg,PackageManager.GET_ACTIVITIES);
+    boolean allowed=false;
+    if(info.activities!=null)for(ActivityInfo a:info.activities)if(a.exported&&a.name.equals(activity))allowed=true;
+    if(!allowed){toast("Activité non accessible");return;}
+    Intent i=new Intent(Intent.ACTION_MAIN);i.setClassName(pkg,activity);startActivity(i);
+   }catch(Exception e){toast("Cette activité refuse le lancement direct");}
   });}
   @JavascriptInterface public void openCameraApp(String packageName,String deepLink){runOnUiThread(()->{
    try{
