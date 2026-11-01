@@ -153,8 +153,9 @@ function emergencyDialog(mode='urgent'){
  get('emContacts').onclick=()=>{if(!nativeCall('pickContact'))alert('Sélecteur de contacts indisponible')};
 }
 get('gpsCard').onclick=()=>emergencyDialog('urgent');
+const tapoButton=document.createElement('button');tapoButton.id='nauticTapoButton';tapoButton.textContent='▣ Tapo';tapoButton.title='Ouvrir Tapo pour afficher la double vue';tapoButton.onclick=()=>{if(!nativeCall('openTapo'))alert('Ouvre Tapo et sélectionne la double vue TC47')};
 const contactButton=document.createElement('button');contactButton.id='nauticContactsButton';contactButton.textContent='☎ Contacts';contactButton.title='Contacts, assistance et derniers numéros';contactButton.onclick=()=>emergencyDialog('contacts');
-const header=document.querySelector('#app header');header.insertBefore(contactButton,header.querySelector('#nauticSettingsButton')||header.lastElementChild);
+const header=document.querySelector('#app header');header.insertBefore(contactButton,header.querySelector('#nauticSettingsButton')||header.lastElementChild);header.insertBefore(tapoButton,contactButton);
 function cameraDialogNative(i){
  const key='cam'+i,url=cfg[key]||'';
  openModal('Caméra '+i,`<div class="nauticCameraStage" id="cameraStage">
