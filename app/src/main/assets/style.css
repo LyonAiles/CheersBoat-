@@ -248,3 +248,11 @@ header #connection{max-width:28%;font-size:11px}
 @media(orientation:landscape){#app header time#clock{top:50%!important;transform:translate(-50%,-50%)!important;font-size:clamp(20px,3vw,30px)!important}}
 @media(orientation:portrait){#app header time#clock{top:47px!important;font-size:26px!important}}
 #app .gauges #nauticCallsSlot[hidden]{display:none!important}
+
+/* Bandeau : horloge centrale visible, commandes 20/21 à droite */
+#app header{position:relative!important;display:flex!important;align-items:flex-start!important}
+#app header #nauticHeaderControls{position:absolute!important;right:9px!important;top:8px!important;display:flex!important;gap:10px!important;align-items:center!important;z-index:30!important}
+#app header #clock{display:block!important;visibility:visible!important;opacity:1!important;position:absolute!important;left:50%!important;transform:translateX(-50%)!important;top:48px!important;color:#fff!important;background:#082438!important;font:bold 25px/30px system-ui,sans-serif!important;letter-spacing:1px!important;padding:0 10px!important;z-index:30!important;white-space:nowrap!important;min-width:90px;text-align:center}
+#app header #clock[hidden],#app header #nauticHeaderControls button[hidden]{display:none!important}
+#app header .brand{max-width:48%;overflow:hidden;white-space:nowrap}
+@media(orientation:landscape){#app header #clock{top:50%!important;transform:translate(-50%,-50%)!important}}
