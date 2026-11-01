@@ -242,3 +242,9 @@ header #connection{max-width:28%;font-size:11px}
  #app header #clock{top:49px;left:50%;font-size:26px!important;line-height:29px;padding:0 8px;max-width:90%}
  #app .gauges #nauticContactsButton{font-size:14px}
 }
+
+/* Priorité explicite sur les anciennes règles header time{display:none}. */
+#app header time#clock{display:block!important;visibility:visible!important;opacity:1!important;position:absolute!important;left:50%!important;transform:translateX(-50%)!important;z-index:999!important;color:#fff!important;font-weight:800!important;pointer-events:none}
+@media(orientation:landscape){#app header time#clock{top:50%!important;transform:translate(-50%,-50%)!important;font-size:clamp(20px,3vw,30px)!important}}
+@media(orientation:portrait){#app header time#clock{top:47px!important;font-size:26px!important}}
+#app .gauges #nauticCallsSlot[hidden]{display:none!important}
