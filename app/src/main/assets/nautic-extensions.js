@@ -355,6 +355,8 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  ${field('Lien profond (facultatif)','settingCam'+i+'Scheme',state['camera'+i].scheme)}
  ${field('Adresse RTSP / MJPEG / HTTP','settingCam'+i,cfg['cam'+i])}
  <button type="button" id="settingCam${i}Photo">🖼 Image du panneau</button>
+ <button type="button" id="settingCam${i}Scan">🔎 Tester les activités Android</button>
+ <div id="settingCam${i}ScanResults" class="muted"></div>
  </section>`).join('')}
  <p class="muted">Le choix de Tapo ouvre son application. La sélection d’un objectif précis ou de la double vue dépend des fonctions accessibles de Tapo.</p>
  <h3>Contacts locaux et personnels</h3><p class="muted">Une ligne par contact : nom ; numéro ; motif. Contacts personnels : appels téléphoniques uniquement.</p>
@@ -367,6 +369,17 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  for(let i=1;i<=3;i++){
   get('settingCam'+i+'App').value=state['camera'+i].app;
   get('settingCam'+i+'Photo').onclick=()=>{window.nauticCameraPhotoPending=i;nativeCall('pickImage')};
+  get('settingCam'+i+'Scan').onclick=()=>{
+   const pkg=get('settingCam'+i+'Package').value.trim()||(get('settingCam'+i+'App').value==='tapo'?'com.tplink.iot':'');
+   const box=get('settingCam'+i+'ScanResults');box.textContent='Recherche des activités accessibles…';
+   window.nauticCameraActivities=json=>{
+    let rows=[];try{rows=JSON.parse(json)}catch(e){}
+    box.replaceChildren();
+    if(!rows.length){box.textContent='Aucune activité accessible détectée.';return}
+    rows.forEach(a=>{const btn=document.createElement('button');btn.type='button';btn.style.cssText='display:block;width:100%;margin:5px 0;white-space:normal;overflow-wrap:anywhere;text-align:left';btn.textContent=(a.label||'Activité')+' — '+a.name;btn.onclick=()=>nativeCall('launchCameraActivity',pkg,a.name);box.append(btn)});
+   };
+   if(!nativeCall('cameraActivities',pkg))box.textContent='Diagnostic disponible dans la nouvelle APK Android.';
+  };
  }
  const a=state.appearance;
  for(const [id,value] of [['settingLayout',a.layout],['settingTheme',a.theme],['settingBackground',a.background],['settingButtons',a.buttons]])get(id).value=value;
