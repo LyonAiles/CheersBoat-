@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id), KEY='nautic-v04';let cfg={fuel:400,tank
  Object.assign(cfg,JSON.parse(saved||previous||'{}'));
  if(!saved&&previous&&bridge&&typeof bridge.writeSetting==='function')bridge.writeSetting(KEY,previous);
 }catch(e){};
-let map,boatMarker,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null;
+let speedSamples=[],speedLastMotion=0;const WIND_PERIOD=300000;let windBusy=false;let map,boatMarker,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null;
 try{points=JSON.parse(localStorage.getItem('nautic-v04-points')||'[]');travel=Number(localStorage.getItem('nautic-v04-travel')||0)}catch(e){}
 const fmt=n=>Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2});
 function clock(){let d=new Date();$('clock').textContent=d.toLocaleString('fr-FR',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}clock();setInterval(clock,30000);
@@ -70,10 +70,16 @@ function onPos(result){
  const p={lat:c.latitude,lon:c.longitude,acc:c.accuracy,t:now,speed:c.speed,head:c.heading};
  latest=p;
  speed=c.speed==null?null:Math.max(0,c.speed*3.6);
+ if(speed!==null){
+  speedSamples.push({v:speed,t:now});speedSamples=speedSamples.filter(x=>now-x.t<6500);
+  const avg=speedSamples.reduce((a,x)=>a+x.v,0)/speedSamples.length;
+  if(avg>=1.5)speedLastMotion=now;
+  speed=(avg<1.5&&now-speedLastMotion>3500)?0:avg;
+ }
  $('coords').textContent=p.lat.toFixed(5)+'° N\n'+p.lon.toFixed(5)+'° E';
  $('connection').textContent='GPS actif · précision ±'+Math.round(p.acc)+' m';
  $('mapGps').textContent='GPS ±'+Math.round(p.acc)+' m';
- $('speedValue').textContent=speed==null?'— km/h':speed.toFixed(1)+' km/h';
+ $('speedValue').textContent=speed==null?'—':speed.toFixed(1);
  $('speedCard').style.setProperty('--speedRotation',(-70+Math.min(30,speed||0)/30*140)+'deg');
  if(!stableFix){stableFix=p;gpsFollowTarget=p;smoothCenter={lat:p.lat,lon:p.lon};}
  const opt=motionConfig();
@@ -116,8 +122,8 @@ function onPos(result){
  if(now-weatherAt>600000)loadWeather();
 }
 function startGps(){if(watchId!==null)return;if(!navigator.geolocation){$('connection').textContent='GPS non pris en charge';return}$('connection').textContent='Recherche GPS…';watchId=navigator.geolocation.watchPosition(onPos,e=>{$('connection').textContent='GPS : '+e.message}, {enableHighAccuracy:true,maximumAge:1000,timeout:20000})}
-async function loadWeather(){if(!latest)return;try{let u=`https://api.open-meteo.com/v1/forecast?latitude=${latest.lat}&longitude=${latest.lon}&current=wind_speed_10m,wind_direction_10m,temperature_2m,weather_code&wind_speed_unit=kmh`;let r=await fetch(u);if(!r.ok)throw Error('Réseau');weather=(await r.json()).current;weatherAt=Date.now();$('windSpeed').textContent=Math.round(weather.wind_speed_10m)+' km/h';$('windDirection').textContent=Math.round(weather.wind_direction_10m)+'° (provenance)';$('weatherLabel').textContent=Math.round(weather.temperature_2m)+'°C';$('weatherTime').textContent='Vent actualisé '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});let angle=(weather.wind_direction_10m+180-(heading??0))%360;$('windArrow').style.transform=`rotate(${angle}deg)`}catch(e){$('weatherTime').textContent='Météo indisponible · sans Internet'}}setInterval(()=>{if(latest)loadWeather()},600000);
-setInterval(()=>{const el=$('weatherTime');if(!el||!weatherAt)return;const remain=Math.max(0,600000-(Date.now()-weatherAt)),mins=Math.floor(remain/60000),secs=Math.floor(remain%60000/1000);el.textContent='Prochain vent : '+String(mins).padStart(2,'0')+':'+String(secs).padStart(2,'0');const bar=$('windRefreshBar');if(bar)bar.style.width=(100-remain/600000*100).toFixed(1)+'%';},1000);
+async function loadWeather(){if(!latest||windBusy)return;windBusy=true;try{let u=`https://api.open-meteo.com/v1/forecast?latitude=${latest.lat}&longitude=${latest.lon}&current=wind_speed_10m,wind_direction_10m,temperature_2m,weather_code&wind_speed_unit=kmh`;let r=await fetch(u);if(!r.ok)throw Error('Réseau');weather=(await r.json()).current;weatherAt=Date.now();$('windSpeed').textContent=Math.round(weather.wind_speed_10m)+' km/h';$('windDirection').textContent=Math.round(weather.wind_direction_10m)+'°';$('weatherLabel').textContent=Math.round(weather.temperature_2m)+'°C';$('weatherTime').textContent='Vent actualisé '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});let angle=(weather.wind_direction_10m+180-(heading??0))%360;$('windArrow').style.transform=`rotate(${angle}deg)`}catch(e){$('weatherTime').textContent='Météo indisponible · sans Internet'}finally{windBusy=false}}setInterval(()=>{if(latest)loadWeather()},WIND_PERIOD);
+setInterval(()=>{const el=$('weatherTime');if(!el||!weatherAt)return;const remain=Math.max(0,WIND_PERIOD-(Date.now()-weatherAt)),mins=Math.floor(remain/60000),secs=Math.floor(remain%60000/1000);el.textContent='Prochain vent : '+String(mins).padStart(2,'0')+':'+String(secs).padStart(2,'0');const bar=$('windRefreshBar');if(bar)bar.style.width=(100-remain/WIND_PERIOD*100).toFixed(1)+'%';},1000);
 function updateLog(){$('distance').textContent=(travel/1000).toFixed(2)+' km';$('routeDistance').textContent=(travel/1000).toFixed(2)+' km';$('recordState').textContent=recording?'Enregistrement actif':'En pause';$('recordDot').classList.toggle('live',recording);if(recording){let s=Math.floor((Date.now()-started)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;$('elapsed').textContent=[h,m,ss].map(x=>String(x).padStart(2,'0')).join(':')}}setInterval(updateLog,1000);updateLog();
 function exportCsv(){let csv=['date,latitude,longitude,precision_m,vitesse_m_s,cap_deg',...points.map(p=>[new Date(p.t).toISOString(),p.lat,p.lon,p.acc,p.speed??'',p.head??''].join(','))].join('\n');let u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=u;a.download='nautic-journal.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 function logDialog(){modal('Journal de bord',`<p>Points enregistrés : ${points.length}<br>Distance GPS estimée : ${(travel/1000).toFixed(2)} km</p><p class="muted">Le navigateur doit rester ouvert pour enregistrer le trajet. Le suivi en arrière-plan n’est pas garanti.</p><div class="dialogActions"><button id="recordBtn">${recording?'Arrêter':'Démarrer'} l’enregistrement</button><button id="csvBtn">Exporter CSV</button><button id="eraseBtn">Effacer</button></div>`);$('recordBtn').onclick=()=>{recording=!recording;if(recording){started=Date.now();startGps()}updateLog();logDialog()};$('csvBtn').onclick=exportCsv;$('eraseBtn').onclick=()=>{if(confirm('Effacer le trajet et la distance enregistrée ?')){points=[];travel=0;localStorage.removeItem('nautic-v04-points');localStorage.removeItem('nautic-v04-travel');if(routeLine)routeLine.setLatLngs([]);updateLog();logDialog()}}}
@@ -137,3 +143,21 @@ fullBtn?.addEventListener('click',async()=>{try{if(document.fullscreenElement){a
 document.addEventListener('fullscreenchange',()=>{if(fullBtn)fullBtn.textContent=document.fullscreenElement?'⤢':'⛶';setTimeout(()=>{if(map)map.invalidateSize()},120)});
 window.addEventListener('resize',()=>{if(map)requestAnimationFrame(()=>map.invalidateSize())});
 window.addEventListener('orientationchange',()=>setTimeout(()=>{if(map)map.invalidateSize()},300));
+
+(function(){
+ const style=document.createElement('style');style.textContent=`
+ #speedCard{position:relative;justify-self:center;align-self:stretch;max-width:100%;overflow:hidden}
+ #speedCard .gaugeTop{font-variant-numeric:tabular-nums;font-size:clamp(29px,4.5vw,56px)!important;font-weight:800;text-shadow:0 0 13px #24b9e680;margin:0 auto 3px}
+ #speedCard .arc{width:min(180px,88%);aspect-ratio:2/1;border:10px solid #153e53;border-bottom:0;border-radius:160px 160px 0 0;overflow:visible;box-shadow:0 -3px 12px #0e6a8b55}
+ #speedCard .arc::before{border-color:#39d3ff;border-right-color:transparent;border-bottom:0;filter:drop-shadow(0 0 3px #26d6ff)}
+ #speedCard .arcInner{font-size:13px;left:calc(50% - 5px);bottom:-6px;color:#f6dc76}
+ #speedCard .speedScale{width:min(190px,94%);display:flex;justify-content:space-between;margin:3px auto 0;font-size:12px;font-weight:800;color:#c7eaf8}
+ #speedCard .speedUnit{font-size:10px;opacity:.75;margin-top:2px}
+ #weatherCard{cursor:pointer}
+ `;document.head.appendChild(style);
+ const card=$('speedCard'),old=card.querySelector('small');if(old)old.remove();
+ const scale=document.createElement('div');scale.className='speedScale';scale.innerHTML='<span>0</span><span>30</span>';card.appendChild(scale);
+ const unit=document.createElement('small');unit.className='speedUnit';unit.textContent='km/h';card.appendChild(unit);
+ const weatherCard=$('weatherCard');weatherCard.title='Toucher pour actualiser le vent';weatherCard.addEventListener('click',()=>{if(!windBusy)loadWeather()});
+ const wind=$('windWidget');if(wind){wind.style.pointerEvents='auto';wind.title='Toucher pour actualiser le vent';wind.addEventListener('click',()=>{if(!windBusy)loadWeather()})}
+})();
