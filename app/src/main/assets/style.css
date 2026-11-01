@@ -256,3 +256,7 @@ header #connection{max-width:28%;font-size:11px}
 #app header #clock[hidden],#app header #nauticHeaderControls button[hidden]{display:none!important}
 #app header .brand{max-width:48%;overflow:hidden;white-space:nowrap}
 @media(orientation:landscape){#app header #clock{top:50%!important;transform:translate(-50%,-50%)!important}}
+
+/* Horloge hors du header : placement fixe sur la seconde ligne du bandeau. */
+body > #clock{position:fixed!important;display:block!important;visibility:visible!important;opacity:1!important;top:103px!important;left:50%!important;transform:translateX(-50%)!important;width:112px!important;height:39px!important;line-height:39px!important;text-align:center!important;background:#0b3048!important;color:#fff!important;font:bold 28px system-ui,sans-serif!important;border:1px solid #307c9d!important;border-radius:9px!important;z-index:9999!important;pointer-events:none!important;box-shadow:0 2px 9px #0008!important}
+@media(orientation:landscape){body > #clock{top:8px!important}}
