@@ -105,6 +105,13 @@ public class MainActivity extends Activity {
    catch(Exception e){return "?";}
   }
   @JavascriptInterface public void minimizeNautic(){runOnUiThread(()->minimizeToAnchor());}
+  @JavascriptInterface public boolean anchorPermissionGranted(){return Settings.canDrawOverlays(MainActivity.this);}
+  @JavascriptInterface public void openAnchorPermissionSettings(){runOnUiThread(()->{
+   try{
+    Intent i=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()));
+    startActivity(i);
+   }catch(Exception e){toast("Ouvre les paramètres Android de Nautic > Afficher par-dessus");}
+  });}
   @JavascriptInterface public void exitApp(){runOnUiThread(()->{if(web!=null)web.stopLoading();finish();});}
   @JavascriptInterface public void call(String number){runOnUiThread(()->{
    try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number))));}
@@ -187,7 +194,7 @@ public class MainActivity extends Activity {
  }
  private void minimizeToAnchor(){
   if(!Settings.canDrawOverlays(this)){
-   web.evaluateJavascript("if(window.nauticLocalAnchorToggle)window.nauticLocalAnchorToggle()",null);
+   toast("Autorisation de superposition manquante : Paramètres Nautic > Autorisation Android");
    return;
   }
   try{
