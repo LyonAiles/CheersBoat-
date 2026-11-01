@@ -220,3 +220,13 @@ header #clock{position:absolute;left:50%;transform:translateX(-50%);font-size:cl
 header .brand{z-index:1}
 header #connection{max-width:28%;font-size:11px}
 @media(max-width:700px){header #clock{font-size:20px}header .brand{font-size:18px}header #connection{max-width:25%;font-size:10px}}
+
+/* En portrait : horloge sur une ligne dédiée, jamais recouverte par les boutons. */
+@media(orientation:portrait){
+ #app{grid-template-rows:76px minmax(0,1fr) 130px}
+ #app header{display:flex;position:relative;align-items:flex-start;flex-wrap:nowrap;padding-top:4px;gap:5px}
+ #app header #clock{position:absolute;top:43px;left:50%;transform:translateX(-50%);display:block!important;visibility:visible!important;z-index:10;font-size:24px!important;line-height:27px;background:#082438;padding:0 14px;border-radius:8px}
+ #app header .brand{font-size:17px;flex-shrink:0}
+ #app header #connection{font-size:10px;max-width:30%;overflow:hidden;max-height:34px}
+ #app header button{padding:4px 6px;min-width:27px}
+}
