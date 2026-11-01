@@ -10,6 +10,7 @@ const readSetting=(key)=>{try{
 }catch(e){try{return localStorage.getItem(key)||''}catch(_){return ''}}};
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{}'))}catch(e){return {...d}}};
 const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:true});
+if(!readSetting('nautic-clock-visible-v3')){state.buttons.clock=true;try{localStorage.setItem('nautic-clock-visible-v3','1')}catch(e){}}
 if(!readSetting('nautic-object-numbers-v2')){state.objectNumbers=true;try{localStorage.setItem('nautic-object-numbers-v2','1')}catch(e){}}
 const persist=()=>{try{
  const value=JSON.stringify(state);
@@ -443,6 +444,7 @@ function settingsDialog(){let buttons=[['clock','10 · Heure'],['nauticSettingsB
 get('weatherCard').onclick=()=>{const u='https://appli.meteoetradar.fr/U13Q/frFRShare';if(!nativeCall('openExternal',u))window.open(u,'_blank','noopener')};
 // Horloge explicite : les anciens styles cachaient les éléments <time>.
 const clockElement=document.getElementById('clock');
+if(clockElement){clockElement.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});setInterval(()=>{clockElement.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})},10000);}
 if(clockElement){
  clockElement.style.setProperty('display','block','important');
  clockElement.style.setProperty('visibility','visible','important');
