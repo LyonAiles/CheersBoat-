@@ -26,6 +26,14 @@ import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
 import android.view.WindowManager;
 import android.widget.Toast;
+import android.provider.Settings;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.graphics.PixelFormat;
+import android.view.WindowManager;
+import android.widget.TextView;
+import android.graphics.drawable.GradientDrawable;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
@@ -33,6 +41,9 @@ public class MainActivity extends Activity {
  private static final int PICK_PHONE=201, PICK_IMAGE=202, GPS=100, CAMERA=101, CALLS=103;
  private WebView web;
  private PermissionRequest pendingCamera;
+ private WindowManager overlayManager;
+ private View anchorOverlay;
+ private boolean overlayRequested=false;
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -94,6 +105,7 @@ public class MainActivity extends Activity {
    try{return getPackageManager().getPackageInfo(getPackageName(),0).versionName;}
    catch(Exception e){return "?";}
   }
+  @JavascriptInterface public void minimizeNautic(){runOnUiThread(()->minimizeToAnchor());}
   @JavascriptInterface public void exitApp(){runOnUiThread(()->{if(web!=null)web.stopLoading();finish();});}
   @JavascriptInterface public void call(String number){runOnUiThread(()->{
    try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number))));}
@@ -174,6 +186,71 @@ public class MainActivity extends Activity {
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);startActivity(i);
   });}
  }
+ private void minimizeToAnchor(){
+  if(!Settings.canDrawOverlays(this)){
+   overlayRequested=true;
+   toast("Autorise Nautic à s’afficher par-dessus les autres applications");
+   Intent permission=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()));
+   try{startActivity(permission);}catch(Exception e){toast("Autorisation de fenêtre flottante inaccessible");}
+   return;
+  }
+  if(anchorOverlay!=null)return;
+  try{
+   overlayManager=(WindowManager)getSystemService(WINDOW_SERVICE);
+   TextView anchor=new TextView(this);
+   anchor.setText("⚓");anchor.setTextSize(29);anchor.setGravity(Gravity.CENTER);
+   anchor.setTextColor(0xffffffff);
+   GradientDrawable bg=new GradientDrawable();bg.setColor(0xee09283e);bg.setCornerRadius(48);
+   bg.setStroke(2,0xff31b9e9);anchor.setBackground(bg);
+   int size=(int)(58*getResources().getDisplayMetrics().density);
+   int type=android.os.Build.VERSION.SDK_INT>=26?WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY:WindowManager.LayoutParams.TYPE_PHONE;
+   WindowManager.LayoutParams params=new WindowManager.LayoutParams(size,size,type,
+    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+    PixelFormat.TRANSLUCENT);
+   params.gravity=Gravity.TOP|Gravity.START;
+   params.x=12;params.y=(int)(80*getResources().getDisplayMetrics().density);
+   anchor.setAlpha(0f);anchor.setScaleX(.35f);anchor.setScaleY(.35f);
+   overlayManager.addView(anchor,params);anchorOverlay=anchor;
+   final float[] down={0,0};final int[] origin={0,0};final boolean[] moved={false};
+   anchor.setOnTouchListener((v,event)->{
+    if(event.getAction()==MotionEvent.ACTION_DOWN){
+     down[0]=event.getRawX();down[1]=event.getRawY();origin[0]=params.x;origin[1]=params.y;moved[0]=false;return true;
+    }
+    if(event.getAction()==MotionEvent.ACTION_MOVE){
+     int dx=(int)(event.getRawX()-down[0]),dy=(int)(event.getRawY()-down[1]);
+     if(Math.abs(dx)>12||Math.abs(dy)>12)moved[0]=true;
+     if(moved[0]){params.x=Math.max(0,origin[0]+dx);params.y=Math.max(0,origin[1]+dy);
+      try{overlayManager.updateViewLayout(anchor,params);}catch(Exception ignored){}}
+     return true;
+    }
+    if(event.getAction()==MotionEvent.ACTION_UP){if(!moved[0])restoreFromAnchor();return true;}
+    return true;
+   });
+   web.setPivotX(0);web.setPivotY(0);
+   web.animate().scaleX(.06f).scaleY(.06f).alpha(0f).setDuration(320).withEndAction(()->{
+    anchor.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(220).start();
+    Intent home=new Intent(Intent.ACTION_MAIN);home.addCategory(Intent.CATEGORY_HOME);
+    home.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(home);
+   }).start();
+  }catch(Exception e){removeAnchor();toast("Impossible de réduire Nautic");}
+ }
+ private void restoreFromAnchor(){
+  Intent intent=new Intent(this,MainActivity.class);
+  intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+  startActivity(intent);
+  web.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(350).start();
+  if(anchorOverlay!=null)anchorOverlay.animate().alpha(0f).scaleX(.35f).scaleY(.35f).setDuration(250).withEndAction(()->removeAnchor()).start();
+ }
+ private void removeAnchor(){
+  if(anchorOverlay!=null&&overlayManager!=null){
+   try{overlayManager.removeView(anchorOverlay);}catch(Exception ignored){}
+  }
+  anchorOverlay=null;
+ }
+ @Override protected void onResume(){
+  super.onResume();
+  if(overlayRequested&&Settings.canDrawOverlays(this)){overlayRequested=false;minimizeToAnchor();}
+ }
  private void sendRecentCalls(){
   JSONArray out=new JSONArray();
   try(Cursor c=getContentResolver().query(CallLog.Calls.CONTENT_URI,
@@ -223,5 +300,5 @@ public class MainActivity extends Activity {
     r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});else r.deny();}
  }
  @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
- @Override protected void onDestroy(){if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
+ @Override protected void onDestroy(){removeAnchor();if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
 }
