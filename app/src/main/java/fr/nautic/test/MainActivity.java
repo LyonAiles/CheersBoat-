@@ -187,9 +187,7 @@ public class MainActivity extends Activity {
  }
  private void minimizeToAnchor(){
   if(!Settings.canDrawOverlays(this)){
-   overlayRequested=true;
-   toast("Autorise Nautic à s'afficher au-dessus des autres applications");
-   try{startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}catch(Exception e){toast("Réglage indisponible");}
+   toast("Ancre non autorisée par Android. Vérifie Afficher par-dessus et fenêtres pop-up en arrière-plan dans les autorisations de Nautic.");
    return;
   }
   try{
