@@ -115,9 +115,9 @@ window.nauticPhoneCallHistory=json=>{try{phoneHistory=JSON.parse(json).filter(c=
 function emergencyDialog(mode='urgent'){
  const contacts=[...contactDefaults,...state.contacts.map(c=>({...c,mode:'call'}))];
  let selected=mode==='urgent'?0:Math.max(0,contacts.findIndex(c=>!c.urgent)),selectedRecent=null,autoMessage='';
- openModal(mode==='urgent'?'Urgences':'Contacts et assistance',`<p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'MODE TEST — aucun appel aux secours : numéro personnel uniquement':'MODE RÉEL — vérifie avant de contacter les secours'}</p>
+ openModal(mode==='urgent'?'Urgences':'Derniers appels',`${mode==='urgent'?`<p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'MODE TEST — aucun appel aux secours : numéro personnel uniquement':'MODE RÉEL — vérifie avant de contacter les secours'}</p>`:''}
  ${mode==='urgent'?'<h3>🚨 URGENCES</h3><div id="emUrgent" class="emChoices"></div>':''}
- ${mode==='contacts'?'<h3>☎ Contacts et assistance</h3><div id="emNormal" class="emChoices"></div>':''}
+
  ${mode==='contacts'?'<section class="emPanel"><h3>Derniers numéros</h3><div id="recentCalls" class="emChoices"></div></section>':''}
  <section class="emPanel"><h3 id="emSelected"></h3><label class="formLabel">Numéro<input id="emPhone" type="tel"></label>
  <div id="smsFields"><label class="formLabel">Message<textarea id="emText"></textarea></label>
@@ -128,7 +128,7 @@ function emergencyDialog(mode='urgent'){
  function draw(){
   const drawGroup=(id,items)=>{const box=get(id);box.innerHTML=items.map(([c,i])=>`<button type="button" class="emChoice ${selectedRecent===null&&selected===i?'active':''}" data-target="${i}"><span>${esc(c.icon|| (c.mode==='sms'?'✉':'☎'))}</span><strong>${esc(c.label)}</strong></button>`).join('');box.querySelectorAll('[data-target]').forEach(el=>el.onclick=()=>{selected=Number(el.dataset.target);selectedRecent=null;draw();refresh()})};
   if(mode==='urgent')drawGroup('emUrgent',contacts.map((c,i)=>[c,i]).filter(([c])=>c.urgent));
-  if(mode==='contacts')drawGroup('emNormal',contacts.map((c,i)=>[c,i]).filter(([c])=>!c.urgent));
+
   const list=[...phoneHistory,...(Array.isArray(state.recentCalls)?state.recentCalls:[])].filter((c,i,arr)=>arr.findIndex(x=>x.number===c.number)===i).slice(0,12);
   if(mode==='contacts')get('recentCalls').innerHTML=list.length?list.map((c,i)=>`<button type="button" class="emChoice ${selectedRecent===i?'active':''}" data-recent="${i}"><span>↺</span><strong>${esc(c.label)}</strong><small>${esc(c.number)}</small></button>`).join(''):'<p class="muted">Aucun contact récent</p>';
   if(mode==='contacts')get('recentCalls').querySelectorAll('[data-recent]').forEach(el=>el.onclick=()=>{selectedRecent=Number(el.dataset.recent);draw();refresh()});
@@ -157,7 +157,7 @@ function emergencyDialog(mode='urgent'){
 }
 get('gpsCard').onclick=()=>emergencyDialog('urgent');
 
-const contactButton=document.createElement('button');contactButton.id='nauticContactsButton';contactButton.textContent='☎ Contacts';contactButton.title='Contacts, assistance et derniers numéros';contactButton.onclick=()=>emergencyDialog('contacts');
+const contactButton=document.createElement('button');contactButton.id='nauticContactsButton';contactButton.textContent='☎ Derniers appels';contactButton.title='Contacts, assistance et derniers numéros';contactButton.onclick=()=>emergencyDialog('contacts');
 const header=document.querySelector('#app header');header.insertBefore(contactButton,header.querySelector('#nauticSettingsButton')||header.lastElementChild);
 function cameraDialogNative(i){
  const key='cam'+i,url=cfg[key]||'';
@@ -180,14 +180,24 @@ function cameraDialogNative(i){
 }
 for(let i=1;i<=3;i++)get('cam'+i+'Card').onclick=()=>cameraDialogNative(i);
 const tapoCam=get('cam1Card');
-tapoCam.querySelector('h3').innerHTML='▣ Tapo TC47 — Double vue <span>⛶</span>';
-get('cam1Body').innerHTML='<span>📷 TC47<br><small>Ouvrir Tapo · double vue</small></span>';
+tapoCam.querySelector('h3').innerHTML='▣ Roof — TC47 <span>⛶</span>';
+get('cam1Body').innerHTML='<span>📷 Roof<br><small>Ouvrir Tapo</small></span>';
 tapoCam.onclick=()=>{if(!nativeCall('openTapo'))alert('Application Tapo indisponible')};
 // One journal, one recenter button; no obsolete Nautic footer control.
 get('routeCard').style.display='none';get('miniMap').style.display='none';let branding=document.querySelector('.branding');if(branding)branding.style.display='none';
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
 function applyVisibility(){const ids=['gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
 
+state.camera1=Object.assign({name:'Roof',app:'tapo',package:'com.tplink.iot',scheme:'',image:''},state.camera1||{});
+function updateRoof(){
+ const c=state.camera1,card=get('cam1Card'),body=get('cam1Body');
+ card.querySelector('h3').innerHTML='▣ '+esc(c.name)+' <span>⛶</span>';
+ body.innerHTML='<span>📷 '+esc(c.name)+'</span>';
+ body.style.backgroundImage=c.image?'linear-gradient(#001b2a33,#001b2a55),url("'+c.image.replaceAll('"','%22')+'")':'';
+ body.style.backgroundSize='cover';body.style.backgroundPosition='center';
+ card.onclick=()=>{if(c.app==='tapo')nativeCall('openTapo');else if(c.app==='stream')cameraDialogNative(1);else nativeCall('openCameraApp',c.package,c.scheme)};
+}
+updateRoof();
 const appearanceDefaults={theme:'nautic',background:'gradient',buttons:'rounded',labels:'both',scale:100,accent:'#31b9e9',panel:'#09283e',layout:'navigation',order:[]};
 state.appearance=Object.assign({},appearanceDefaults,state.appearance||{});
 const movableIds=['gpsCard','boatCard','fuelCard','logCard','speedCard','headingCard','weatherCard','cam1Card','cam2Card','cam3Card'];
@@ -325,7 +335,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
  <p class="muted">Mode TEST : tous les appels et SMS vers ${testNumber}. Mode réel : coordonnées vérifiées uniquement.</p>
- <h3>Caméras</h3>${[1,2,3].map(i=>field('Caméra '+i+' — adresse RTSP / MJPEG / HTTP','settingCam'+i,cfg['cam'+i])).join('')}<p class="muted">Les adresses sont enregistrées localement. Les commandes PTZ et résolution dépendent des capacités de chaque caméra.</p>
+ <h3>Caméra 1 — Roof</h3>${field('Nom du panneau','settingCam1Name',state.camera1.name)}<label>Application<select class="nautic-select" id="settingCam1App"><option value="tapo">Tapo</option><option value="stream">Flux réseau</option><option value="other">Autre application</option></select></label>${field('Paquet Android de l’application','settingCam1Package',state.camera1.package)}${field('Lien profond facultatif','settingCam1Scheme',state.camera1.scheme)}${field('Adresse RTSP / HTTP','settingCam1',cfg.cam1)}<button type="button" id="settingCam1Photo">🖼 Image du panneau Roof</button><h3>Autres caméras</h3>${[2,3].map(i=>field('Caméra '+i+' — adresse RTSP / MJPEG / HTTP','settingCam'+i,cfg['cam'+i])).join('')}
  <h3>Contacts locaux et personnels</h3><p class="muted">Une ligne par contact : nom ; numéro ; motif. Contacts personnels : appels téléphoniques uniquement.</p>
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type].join(' ; ')).join('\n'))}</textarea>
  <div class="dialogActions"><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
@@ -333,6 +343,8 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
  top.insertBefore(saveButton,get('dialogClose'));
+ get('settingCam1App').value=state.camera1.app;
+ get('settingCam1Photo').onclick=()=>{window.nauticRoofPhotoPending=true;nativeCall('pickImage')};
  const a=state.appearance;
  for(const [id,value] of [['settingLayout',a.layout],['settingTheme',a.theme],['settingBackground',a.background],['settingButtons',a.buttons]])get(id).value=value;
  const markDirty=()=>{saveButton.disabled=false;saveButton.textContent='● Enregistrer';saveButton.classList.add('nautic-dirty')};
@@ -361,6 +373,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
   state.contactPhone=get('settingContactPhone').value.trim();
   state.contacts=get('contactList').value.split('\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:'call'}));
   for(let i=1;i<=3;i++)cfg['cam'+i]=get('settingCam'+i).value.trim();
+  state.camera1={...state.camera1,name:get('settingCam1Name').value.trim()||'Roof',app:get('settingCam1App').value,package:get('settingCam1Package').value.trim(),scheme:get('settingCam1Scheme').value.trim()};
   state.appearance={...state.appearance,
    layout:get('settingLayout').value,theme:get('settingTheme').value,
    accent:get('settingAccent').value,panel:get('settingPanel').value,
@@ -376,7 +389,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
     alert('Échec de sauvegarde des caméras : '+e.message);
     return;
   }
-  applyVisibility();applyAppearance();
+  applyVisibility();applyAppearance();updateRoof();
   dialog.classList.remove('nautic-settings');
   dialog.close();
  };
