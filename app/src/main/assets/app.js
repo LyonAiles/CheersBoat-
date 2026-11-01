@@ -21,7 +21,24 @@ function saveCfg(){
  fuelUpdate();
 }
 function fuelUpdate(){let f=Math.max(0,Number(cfg.fuel)||0),t=Math.max(1,Number(cfg.tank)||1),c=Number(cfg.cons)||0;$('fuelbar').style.width=Math.min(100,100*f/t)+'%';$('fuelQty').textContent=fmt(f)+' L';$('fuelMax').textContent='/ '+fmt(t)+' L';$('consValue').textContent=fmt(c);$('hours').textContent=c>0?fmt(f/c):'—'}fuelUpdate();
-function openFuel(){modal('Carburant',field('Carburant restant (L)','inFuel',cfg.fuel,'number')+field('Capacité du réservoir (L)','inTank',cfg.tank,'number')+field('Consommation de référence (L/h)','inCons',cfg.cons,'number')+'<p class="muted">Estimation manuelle : aucune mesure du moteur n’est disponible.</p><button id="saveFuel">Enregistrer</button>');$('saveFuel').onclick=()=>{cfg.fuel=Math.max(0,Number($('inFuel').value));cfg.tank=Math.max(1,Number($('inTank').value));cfg.cons=Math.max(.1,Number($('inCons').value));saveCfg();$('dialog').close()}}
+// Chauffage : estimation horodatée, conservée entre deux ouvertures de Nautic.
+let heatingRate=Number(localStorage.getItem('nautic-heating-rate')??2.5);
+if(!Number.isFinite(heatingRate)||heatingRate<0)heatingRate=2.5;
+let heatingActive=localStorage.getItem('nautic-heating-active')!=='false';
+let heatingUsed=Number(localStorage.getItem('nautic-heating-used')||0);
+let heatingLast=Number(localStorage.getItem('nautic-heating-last')||Date.now());
+function heatingTick(){
+ const now=Date.now(),dt=Math.max(0,now-heatingLast);
+ if(heatingActive)heatingUsed+=dt/86400000*heatingRate;
+ heatingLast=now;
+ localStorage.setItem('nautic-heating-last',String(now));
+ localStorage.setItem('nautic-heating-used',String(heatingUsed));
+}
+setInterval(heatingTick,60000);
+function openFuel(){heatingTick();modal('Carburant',field('Carburant restant (L)','inFuel',cfg.fuel,'number')+field('Capacité du réservoir (L)','inTank',cfg.tank,'number')+field('Consommation de référence (L/h)','inCons',cfg.cons,'number')+
+field('Chauffage — consommation quotidienne (L/jour)','inHeatingRate',heatingRate,'number')+
+'<label class="settingRow"><input type="checkbox" id="inHeatingActive" '+(heatingActive?'checked':'')+'> Chauffage en service</label>'+
+'<p class="muted">Chauffage estimé : '+heatingUsed.toFixed(2)+' L depuis le début du suivi. Moteur estimé : '+fuelUsed.toFixed(2)+' L. Total : '+(heatingUsed+fuelUsed).toFixed(2)+' L. Ces estimations ne sont pas automatiquement soustraites du carburant saisi.</p><button id="saveFuel">Enregistrer</button>');$('saveFuel').onclick=()=>{cfg.fuel=Math.max(0,Number($('inFuel').value));cfg.tank=Math.max(1,Number($('inTank').value));cfg.cons=Math.max(.1,Number($('inCons').value));heatingTick();heatingRate=Math.max(0,Number($('inHeatingRate').value)||0);heatingActive=$('inHeatingActive').checked;localStorage.setItem('nautic-heating-rate',String(heatingRate));localStorage.setItem('nautic-heating-active',String(heatingActive));saveCfg();$('dialog').close()}}
 function openBoat(){modal('Mon bateau','<p>Kotter acier · 13,40 × 4,30 m · tirant d’eau 1,35 m · tirant d’air 3,45 m.</p><div class="dialogActions"><button id="openBoat">Ouvrir Mon bateau</button><button id="embedBoat">Afficher dans Nautic</button></div><div id="boatEmbed"></div><p class="muted">L’intégration dans une fenêtre dépend des autorisations du site existant. La base de données n’est pas encore fusionnée.</p>');$('openBoat').onclick=()=>window.open('https://cerulean-mochi-747b13.netlify.app','_blank','noopener');$('embedBoat').onclick=()=>{$('boatEmbed').innerHTML='<iframe title="Mon bateau" src="https://cerulean-mochi-747b13.netlify.app" style="width:100%;height:50vh;border:1px solid #41768b;border-radius:8px;background:white"></iframe>'}}
 function sms(){if(!latest){startGps();modal('Position GPS','Le GPS cherche une position. Réessaie lorsque les coordonnées apparaissent.');return}modal('SMS d’urgence',field('Numéro du destinataire (à choisir)','emergencyNumber',cfg.emergency,'tel')+`<p>Position : ${latest.lat.toFixed(6)}, ${latest.lon.toFixed(6)}<br>Précision annoncée : ±${Math.round(latest.acc)} m</p><p class="muted">Le SMS sera préparé dans l’application de messagerie ; tu devras confirmer son envoi. Ne remplace pas l’appel aux secours ou la VHF.</p><button id="smsSend">Préparer le SMS</button>`);$('smsSend').onclick=()=>{let n=$('emergencyNumber').value.trim();if(!n){alert('Renseigne un numéro.');return}cfg.emergency=n;saveCfg();let m=`Position du bateau : ${latest.lat.toFixed(6)}, ${latest.lon.toFixed(6)} (précision GPS ±${Math.round(latest.acc)} m). https://maps.google.com/?q=${latest.lat},${latest.lon}`;location.href='sms:'+encodeURIComponent(n)+'?body='+encodeURIComponent(m)}}
 function rad(x){return x*Math.PI/180}function distanceM(a,b){let d1=rad(b.lat-a.lat),d2=rad(b.lon-a.lon),q=Math.sin(d1/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(d2/2)**2;return 12742000*Math.asin(Math.min(1,Math.sqrt(q)))}function bearing(a,b){let dl=rad(b.lon-a.lon),x=Math.sin(dl)*Math.cos(rad(b.lat)),y=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(dl);return(Math.atan2(x,y)*180/Math.PI+360)%360}
