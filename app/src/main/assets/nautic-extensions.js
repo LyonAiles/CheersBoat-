@@ -10,7 +10,8 @@ const readSetting=(key)=>{try{
 }catch(e){try{return localStorage.getItem(key)||''}catch(_){return ''}}};
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{}'))}catch(e){return {...d}}};
 const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:true});
-if(!readSetting('nautic-clock-visible-v3')){state.buttons.clock=true;try{localStorage.setItem('nautic-clock-visible-v3','1')}catch(e){}}
+// L'horloge reste affichée, indépendamment des anciens réglages de visibilité.
+state.buttons.clock=true;
 if(!readSetting('nautic-object-numbers-v2')){state.objectNumbers=true;try{localStorage.setItem('nautic-object-numbers-v2','1')}catch(e){}}
 const persist=()=>{try{
  const value=JSON.stringify(state);
@@ -191,7 +192,7 @@ tapoCam.onclick=()=>{if(!nativeCall('openTapo'))alert('Application Tapo indispon
 // One journal, one recenter button; no obsolete Nautic footer control.
 get('routeCard').style.display='none';get('miniMap').style.display='none';let branding=document.querySelector('.branding');if(branding)branding.style.display='none';
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
-function applyVisibility(){const ids=['clock','nauticSettingsButton','nauticExitButton','nauticContactsButton','nauticCallsSlot','mapWrap','gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
+function applyVisibility(){const ids=['nauticSettingsButton','nauticExitButton','nauticContactsButton','nauticCallsSlot','mapWrap','gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
 
 const cameraDefaults=[
  {name:'Roof',app:'tapo',package:'com.tplink.iot',scheme:'',image:''},
@@ -336,7 +337,7 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 
 applyAppearance();
 
-function settingsDialog(){let buttons=[['clock','10 · Heure'],['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Quitter'],['nauticContactsButton','26 · Bouton Derniers appels'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
+function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Quitter'],['nauticContactsButton','26 · Bouton Derniers appels'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
  openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet. Le 35 peut être masqué dans Tableau de bord.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><h3>Fenêtre flottante</h3><button type="button" id="settingFloatAnchor">⚓ Réduire Nautic en ancre flottante</button><p class="muted">Permet de passer à une autre application et de revenir à Nautic. Autorisation Android nécessaire.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
@@ -444,6 +445,7 @@ function settingsDialog(){let buttons=[['clock','10 · Heure'],['nauticSettingsB
 get('weatherCard').onclick=()=>{const u='https://appli.meteoetradar.fr/U13Q/frFRShare';if(!nativeCall('openExternal',u))window.open(u,'_blank','noopener')};
 // Horloge explicite : les anciens styles cachaient les éléments <time>.
 const clockElement=document.getElementById('clock');
+if(clockElement){clockElement.hidden=false;clockElement.classList.remove('nautic-hidden');clockElement.removeAttribute('aria-hidden');}
 if(clockElement){clockElement.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});setInterval(()=>{clockElement.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})},10000);}
 if(clockElement){
  clockElement.style.setProperty('display','block','important');
