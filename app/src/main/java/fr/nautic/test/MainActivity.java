@@ -187,7 +187,7 @@ public class MainActivity extends Activity {
  }
  private void minimizeToAnchor(){
   if(!Settings.canDrawOverlays(this)){
-   toast("Ancre non autorisée par Android. Vérifie Afficher par-dessus et fenêtres pop-up en arrière-plan dans les autorisations de Nautic.");
+   web.evaluateJavascript("if(window.nauticLocalAnchorToggle)window.nauticLocalAnchorToggle()",null);
    return;
   }
   try{
