@@ -434,6 +434,15 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
 }
 // Météo : accès direct au radar demandé.
 get('weatherCard').onclick=()=>{const u='https://appli.meteoetradar.fr/U13Q/frFRShare';if(!nativeCall('openExternal',u))window.open(u,'_blank','noopener')};
+const brandAnchor=document.querySelector('header .brand');
+if(brandAnchor){
+ brandAnchor.title='Réduire Nautic en ancre flottante';
+ brandAnchor.style.cursor='pointer';
+ brandAnchor.setAttribute('role','button');brandAnchor.tabIndex=0;
+ const minimize=()=>{if(!nativeCall('minimizeNautic'))alert('Ancre flottante disponible dans l’application Android.')};
+ brandAnchor.addEventListener('click',minimize);
+ brandAnchor.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();minimize()}});
+}
 const brand=document.querySelector('header .brand');
 if(brand){
  const version=document.createElement('small');
