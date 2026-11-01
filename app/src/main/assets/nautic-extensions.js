@@ -9,7 +9,7 @@ const readSetting=(key)=>{try{
  return old;
 }catch(e){try{return localStorage.getItem(key)||''}catch(_){return ''}}};
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{}'))}catch(e){return {...d}}};
-const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[]});
+const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:false});
 const persist=()=>{try{
  const value=JSON.stringify(state);
  if(native&&typeof native.writeSetting==='function'){
@@ -158,7 +158,10 @@ function emergencyDialog(mode='urgent'){
 get('gpsCard').onclick=()=>emergencyDialog('urgent');
 
 const contactButton=document.createElement('button');contactButton.id='nauticContactsButton';contactButton.textContent='☎ Derniers appels';contactButton.title='Contacts, assistance et derniers numéros';contactButton.onclick=()=>emergencyDialog('contacts');
-const header=document.querySelector('#app header');header.insertBefore(contactButton,header.querySelector('#nauticSettingsButton')||header.lastElementChild);
+const header=document.querySelector('#app header');
+// Derniers appels occupe l'emplacement 35, à gauche du compteur de vitesse.
+const gauges=document.querySelector('#app .gauges');
+if(gauges){const slot=document.createElement('div');slot.id='nauticCallsSlot';slot.appendChild(contactButton);gauges.insertBefore(slot,gauges.firstChild);}else header.appendChild(contactButton);
 function cameraDialogNative(i){
  const key='cam'+i,url=cfg[key]||'';
  openModal('Caméra '+i,`<div class="nauticCameraStage" id="cameraStage">
@@ -332,7 +335,7 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 applyAppearance();
 
 function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
- openModal('Paramètres',`<h3>Fenêtre flottante</h3><button type="button" id="settingFloatAnchor">⚓ Réduire Nautic en ancre flottante</button><p class="muted">Permet de passer à une autre application et de revenir à Nautic. Autorisation Android nécessaire.</p><h3>Apparence et disposition</h3>
+ openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">26 : bouton Derniers appels · 27 : texte du bouton · 35 : ancien emplacement à gauche du compteur.</p><h3>Fenêtre flottante</h3><button type="button" id="settingFloatAnchor">⚓ Réduire Nautic en ancre flottante</button><p class="muted">Permet de passer à une autre application et de revenir à Nautic. Autorisation Android nécessaire.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
  <label>Thème<select class="nautic-select" id="settingTheme"><option value="nautic">Nautic bleu</option><option value="day">Jour clair</option><option value="night">Nuit rouge</option><option value="contrast">Contraste élevé</option><option value="custom">Couleurs personnalisées</option></select></label>
@@ -363,6 +366,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type].join(' ; ')).join('\n'))}</textarea>
  <div class="dialogActions"><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
  dialog.classList.add('nautic-settings');
+ get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
  get('settingFloatAnchor').onclick=()=>{dialog.close();if(!nativeCall('minimizeNautic'))alert('Fonction disponible uniquement dans l’application Android.');};
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
@@ -452,6 +456,14 @@ if(brand){
  version.textContent='v'+(native&&typeof native.versionName==='function'?native.versionName():'?');
  brand.appendChild(version);
 }
+function applyObjectNumbers(){
+ document.querySelectorAll('.nautic-object-tag').forEach(e=>e.remove());
+ if(!state.objectNumbers)return;
+ const named=[['nauticContactsButton','26'],['nauticCallsSlot','35'],['speedCard','36'],['fuelCard','34'],['gpsCard','31'],['boatCard','32'],['logCard','33'],['clock','10'],['nauticSettingsButton','20'],['nauticExitButton','21'],['mapWrap','40'],['weatherCard','37'],['headingCard','38'],['cam1Card','41'],['cam2Card','42'],['cam3Card','43']];
+ named.forEach(([id,num])=>{const el=get(id);if(!el)return;el.style.position='relative';const tag=document.createElement('span');tag.className='nautic-object-tag';tag.textContent=num;tag.style.cssText='position:absolute;top:1px;left:1px;z-index:500;background:#ffe24b;color:#111;font:bold 11px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';el.appendChild(tag)});
+ const label=document.createElement('span');label.className='nautic-object-tag';label.textContent='27';label.style.cssText='position:absolute;right:1px;bottom:1px;background:#ffe24b;color:#111;font:bold 10px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';contactButton.appendChild(label);
+}
+applyObjectNumbers();
 settingsButton.onclick=settingsDialog;applyVisibility();
 setTimeout(()=>{if(map)setLayer(state.map)},1000);
 })();
