@@ -260,3 +260,8 @@ header #connection{max-width:28%;font-size:11px}
 /* Horloge hors du header : placement fixe sur la seconde ligne du bandeau. */
 body > #clock{position:fixed!important;display:block!important;visibility:visible!important;opacity:1!important;top:103px!important;left:50%!important;transform:translateX(-50%)!important;width:112px!important;height:39px!important;line-height:39px!important;text-align:center!important;background:#0b3048!important;color:#fff!important;font:bold 28px system-ui,sans-serif!important;border:1px solid #307c9d!important;border-radius:9px!important;z-index:9999!important;pointer-events:none!important;box-shadow:0 2px 9px #0008!important}
 @media(orientation:landscape){body > #clock{top:8px!important}}
+
+/* Horloge dans la bande libre du haut, sans chevauchement des cartes. */
+body > #clock{top:73px!important;left:50%!important;transform:translateX(-50%)!important;width:auto!important;min-width:92px!important;height:38px!important;line-height:38px!important;font-size:25px!important;padding:0 7px!important;box-sizing:border-box!important}
+body.nautic-mini-mode > #clock{display:none!important}
+@media(orientation:landscape){body > #clock{top:8px!important}}
