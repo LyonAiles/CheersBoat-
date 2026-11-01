@@ -188,68 +188,22 @@ public class MainActivity extends Activity {
  private void minimizeToAnchor(){
   if(!Settings.canDrawOverlays(this)){
    overlayRequested=true;
-   toast("Autorise Nautic à s’afficher par-dessus les autres applications");
-   Intent permission=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()));
-   try{startActivity(permission);}catch(Exception e){toast("Autorisation de fenêtre flottante inaccessible");}
+   toast("Autorise Nautic à s'afficher au-dessus des autres applications");
+   try{startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}catch(Exception e){toast("Réglage indisponible");}
    return;
   }
-  if(anchorOverlay!=null)return;
   try{
-   overlayManager=(WindowManager)getSystemService(WINDOW_SERVICE);
-   TextView anchor=new TextView(this);
-   anchor.setText("⚓");anchor.setTextSize(29);anchor.setGravity(Gravity.CENTER);
-   anchor.setTextColor(0xffffffff);
-   GradientDrawable bg=new GradientDrawable();bg.setColor(0xee09283e);bg.setCornerRadius(48);
-   bg.setStroke(2,0xff31b9e9);anchor.setBackground(bg);
-   int size=(int)(58*getResources().getDisplayMetrics().density);
-   int type=android.os.Build.VERSION.SDK_INT>=26?WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY:WindowManager.LayoutParams.TYPE_PHONE;
-   WindowManager.LayoutParams params=new WindowManager.LayoutParams(size,size,type,
-    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-    PixelFormat.TRANSLUCENT);
-   params.gravity=Gravity.TOP|Gravity.START;
-   params.x=12;params.y=(int)(80*getResources().getDisplayMetrics().density);
-   anchor.setAlpha(0f);anchor.setScaleX(.35f);anchor.setScaleY(.35f);
-   overlayManager.addView(anchor,params);anchorOverlay=anchor;
-   toast("Ancre flottante créée");
-   final float[] down={0,0};final int[] origin={0,0};final boolean[] moved={false};
-   anchor.setOnTouchListener((v,event)->{
-    if(event.getAction()==MotionEvent.ACTION_DOWN){
-     down[0]=event.getRawX();down[1]=event.getRawY();origin[0]=params.x;origin[1]=params.y;moved[0]=false;return true;
-    }
-    if(event.getAction()==MotionEvent.ACTION_MOVE){
-     int dx=(int)(event.getRawX()-down[0]),dy=(int)(event.getRawY()-down[1]);
-     if(Math.abs(dx)>12||Math.abs(dy)>12)moved[0]=true;
-     if(moved[0]){params.x=Math.max(0,origin[0]+dx);params.y=Math.max(0,origin[1]+dy);
-      try{overlayManager.updateViewLayout(anchor,params);}catch(Exception ignored){}}
-     return true;
-    }
-    if(event.getAction()==MotionEvent.ACTION_UP){if(!moved[0])restoreFromAnchor();return true;}
-    return true;
-   });
+   Intent service=new Intent(this,AnchorService.class);
+   if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(service);else startService(service);
    web.setPivotX(0);web.setPivotY(0);
-   web.animate().scaleX(.06f).scaleY(.06f).alpha(0f).setDuration(320).withEndAction(()->{
-    anchor.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(220).start();
-    moveTaskToBack(true);
-   }).start();
-  }catch(Exception e){removeAnchor();toast("Ancre flottante refusée : "+e.getClass().getSimpleName());}
- }
- private void restoreFromAnchor(){
-  Intent intent=new Intent(this,MainActivity.class);
-  intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT|Intent.FLAG_ACTIVITY_SINGLE_TOP);
-  startActivity(intent);
-  web.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(350).start();
-  if(anchorOverlay!=null)anchorOverlay.animate().alpha(0f).scaleX(.35f).scaleY(.35f).setDuration(250).withEndAction(()->removeAnchor()).start();
- }
- private void removeAnchor(){
-  if(anchorOverlay!=null&&overlayManager!=null){
-   try{overlayManager.removeView(anchorOverlay);}catch(Exception ignored){}
-  }
-  anchorOverlay=null;
+   web.animate().alpha(0f).scaleX(.12f).scaleY(.12f).setDuration(300).withEndAction(()->moveTaskToBack(true)).start();
+  }catch(Exception e){toast("Réduction impossible : "+e.getClass().getSimpleName());}
  }
  @Override protected void onResume(){
   super.onResume();
-  if(overlayRequested){overlayRequested=false;if(Settings.canDrawOverlays(this))toast("Autorisation accordée. Touche l’ancre de Nautic pour réduire.");}
-  else if(anchorOverlay!=null){removeAnchor();if(web!=null)web.animate().cancel();if(web!=null){web.setScaleX(1f);web.setScaleY(1f);web.setAlpha(1f);}}
+  if(web!=null){web.animate().cancel();web.setAlpha(1f);web.setScaleX(1f);web.setScaleY(1f);}
+  if(overlayRequested){overlayRequested=false;if(Settings.canDrawOverlays(this))toast("Autorisation accordée : touche l'ancre pour réduire");}
+  else stopService(new Intent(this,AnchorService.class));
  }
  private void sendRecentCalls(){
   JSONArray out=new JSONArray();
@@ -300,5 +254,5 @@ public class MainActivity extends Activity {
     r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});else r.deny();}
  }
  @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
- @Override protected void onDestroy(){removeAnchor();if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
+ @Override protected void onDestroy(){if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
 }
