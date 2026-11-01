@@ -110,6 +110,8 @@ async function resolveEmergencyAddress(){
  }catch(e){return 'Non disponible (GPS indiqué ci-dessus)'}
 }
 window.nauticSelectedContact=number=>{let input=get('emPhone');if(input)input.value=number};
+let phoneHistory=[];
+window.nauticPhoneCallHistory=json=>{try{phoneHistory=JSON.parse(json).filter(c=>c.number);const box=get('recentCalls');if(box&&dialog.open)box.dispatchEvent(new Event('nautic-history-ready'))}catch(e){phoneHistory=[]}};
 function emergencyDialog(mode='urgent'){
  const contacts=[...contactDefaults,...state.contacts.map(c=>({...c,mode:'call'}))];
  let selected=mode==='urgent'?0:Math.max(0,contacts.findIndex(c=>!c.urgent)),selectedRecent=null,autoMessage='';
@@ -127,12 +129,12 @@ function emergencyDialog(mode='urgent'){
   const drawGroup=(id,items)=>{const box=get(id);box.innerHTML=items.map(([c,i])=>`<button type="button" class="emChoice ${selectedRecent===null&&selected===i?'active':''}" data-target="${i}"><span>${esc(c.icon|| (c.mode==='sms'?'✉':'☎'))}</span><strong>${esc(c.label)}</strong></button>`).join('');box.querySelectorAll('[data-target]').forEach(el=>el.onclick=()=>{selected=Number(el.dataset.target);selectedRecent=null;draw();refresh()})};
   if(mode==='urgent')drawGroup('emUrgent',contacts.map((c,i)=>[c,i]).filter(([c])=>c.urgent));
   if(mode==='contacts')drawGroup('emNormal',contacts.map((c,i)=>[c,i]).filter(([c])=>!c.urgent));
-  const list=Array.isArray(state.recentCalls)?state.recentCalls:[];
-  if(mode==='contacts')get('recentCalls').innerHTML=list.length?list.map((c,i)=>`<button type="button" class="emChoice ${selectedRecent===i?'active':''}" data-recent="${i}"><span>↺</span><strong>${esc(c.label.slice(0,7))}</strong><small>${esc(c.number)}</small></button>`).join(''):'<p class="muted">Aucun contact récent</p>';
+  const list=[...phoneHistory,...(Array.isArray(state.recentCalls)?state.recentCalls:[])].filter((c,i,arr)=>arr.findIndex(x=>x.number===c.number)===i).slice(0,12);
+  if(mode==='contacts')get('recentCalls').innerHTML=list.length?list.map((c,i)=>`<button type="button" class="emChoice ${selectedRecent===i?'active':''}" data-recent="${i}"><span>↺</span><strong>${esc(c.label)}</strong><small>${esc(c.number)}</small></button>`).join(''):'<p class="muted">Aucun contact récent</p>';
   if(mode==='contacts')get('recentCalls').querySelectorAll('[data-recent]').forEach(el=>el.onclick=()=>{selectedRecent=Number(el.dataset.recent);draw();refresh()});
  }
  function refresh(){
-  const recent=selectedRecent!==null?(state.recentCalls||[])[selectedRecent]:null;
+  const recent=selectedRecent!==null?[...phoneHistory,...(state.recentCalls||[])].filter((c,i,arr)=>arr.findIndex(x=>x.number===c.number)===i)[selectedRecent]:null;
   const c=recent?{label:recent.label,phone:recent.number,mode:recent.mode||'call',type:recent.label}:contacts[selected];
   get('emSelected').textContent=(c.icon||'☎')+' '+c.label;
   get('emPhone').value=state.testMode?testNumber:c.phone;
@@ -142,10 +144,11 @@ function emergencyDialog(mode='urgent'){
   if(isSms){autoMessage=messageFor(c,get('emText').dataset.address);get('emText').value=autoMessage;}
  }
  draw();refresh();
+ if(mode==='contacts'){get('recentCalls').addEventListener('nautic-history-ready',()=>{selectedRecent=null;draw();refresh()});nativeCall('recentPhoneCalls');}
  resolveEmergencyAddress().then(address=>{const field=get('emText');if(!field)return;const previous=autoMessage;field.dataset.address=address;const c=contacts[selected];autoMessage=messageFor(c,address);if(field.value===previous)field.value=autoMessage});
  get('emAction').onclick=()=>{
   const n=get('emPhone').value.trim();if(!n){alert('Numéro manquant. Renseigne-le dans les paramètres.');return}
-  const recent=selectedRecent!==null?(state.recentCalls||[])[selectedRecent]:null;
+  const recent=selectedRecent!==null?[...phoneHistory,...(state.recentCalls||[])].filter((c,i,arr)=>arr.findIndex(x=>x.number===c.number)===i)[selectedRecent]:null;
   const c=recent?{label:recent.label,phone:recent.number,mode:recent.mode||'call',type:recent.label}:contacts[selected];
   if(!state.testMode){state.recentCalls=[{label:c.label,number:n,mode:c.mode},...(state.recentCalls||[]).filter(x=>x.number!==n)].slice(0,8);persist()}
   if(mode==='urgent'&&c.mode==='sms'){const msg=get('emText').value;if(get('emAttachPhoto').checked)shareEmergencyPhoto(n,msg);else smsNumber(n,msg)}else callNumber(n)
@@ -153,9 +156,9 @@ function emergencyDialog(mode='urgent'){
  get('emContacts').onclick=()=>{if(!nativeCall('pickContact'))alert('Sélecteur de contacts indisponible')};
 }
 get('gpsCard').onclick=()=>emergencyDialog('urgent');
-const tapoButton=document.createElement('button');tapoButton.id='nauticTapoButton';tapoButton.textContent='▣ Tapo';tapoButton.title='Ouvrir Tapo pour afficher la double vue';tapoButton.onclick=()=>{if(!nativeCall('openTapo'))alert('Ouvre Tapo et sélectionne la double vue TC47')};
+
 const contactButton=document.createElement('button');contactButton.id='nauticContactsButton';contactButton.textContent='☎ Contacts';contactButton.title='Contacts, assistance et derniers numéros';contactButton.onclick=()=>emergencyDialog('contacts');
-const header=document.querySelector('#app header');header.insertBefore(contactButton,header.querySelector('#nauticSettingsButton')||header.lastElementChild);header.insertBefore(tapoButton,contactButton);
+const header=document.querySelector('#app header');header.insertBefore(contactButton,header.querySelector('#nauticSettingsButton')||header.lastElementChild);
 function cameraDialogNative(i){
  const key='cam'+i,url=cfg[key]||'';
  openModal('Caméra '+i,`<div class="nauticCameraStage" id="cameraStage">
@@ -176,6 +179,10 @@ function cameraDialogNative(i){
  else if(/^https?:\/\//i.test(url))showCamUrl(url,i);
 }
 for(let i=1;i<=3;i++)get('cam'+i+'Card').onclick=()=>cameraDialogNative(i);
+const tapoCam=get('cam1Card');
+tapoCam.querySelector('h3').innerHTML='▣ Tapo TC47 — Double vue <span>⛶</span>';
+get('cam1Body').innerHTML='<span>📷 TC47<br><small>Ouvrir Tapo · double vue</small></span>';
+tapoCam.onclick=()=>{if(!nativeCall('openTapo'))alert('Application Tapo indisponible')};
 // One journal, one recenter button; no obsolete Nautic footer control.
 get('routeCard').style.display='none';get('miniMap').style.display='none';let branding=document.querySelector('.branding');if(branding)branding.style.display='none';
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
