@@ -7,6 +7,11 @@
  <uses-permission android:name="android.permission.CAMERA"/>
  <uses-permission android:name="android.permission.READ_CALL_LOG"/>
  <uses-feature android:name="android.hardware.camera" android:required="false"/>
+ <queries>
+  <package android:name="com.tplink.iot"/>
+  <package android:name="com.tuya.smart"/>
+  <package android:name="fr.scssentinel.iscssentinel"/>
+ </queries>
  <application android:label="Nautic" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="true">
   <activity android:name=".MainActivity" android:exported="true">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
