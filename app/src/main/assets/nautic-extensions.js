@@ -9,7 +9,8 @@ const readSetting=(key)=>{try{
  return old;
 }catch(e){try{return localStorage.getItem(key)||''}catch(_){return ''}}};
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{}'))}catch(e){return {...d}}};
-const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:false});
+const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:true});
+if(typeof state.objectNumbers!=='boolean')state.objectNumbers=true;
 const persist=()=>{try{
  const value=JSON.stringify(state);
  if(native&&typeof native.writeSetting==='function'){
@@ -440,6 +441,15 @@ function settingsDialog(){let buttons=[['nauticCallsSlot','35 · Derniers appels
 }
 // Météo : accès direct au radar demandé.
 get('weatherCard').onclick=()=>{const u='https://appli.meteoetradar.fr/U13Q/frFRShare';if(!nativeCall('openExternal',u))window.open(u,'_blank','noopener')};
+// Horloge explicite : les anciens styles cachaient les éléments <time>.
+const clockElement=document.getElementById('clock');
+if(clockElement){
+ clockElement.style.setProperty('display','block','important');
+ clockElement.style.setProperty('visibility','visible','important');
+ clockElement.style.setProperty('opacity','1','important');
+ clockElement.style.setProperty('z-index','999','important');
+ clockElement.style.setProperty('color','#fff','important');
+}
 const brandAnchor=document.querySelector('header .brand');
 if(brandAnchor){
  brandAnchor.title='Réduire Nautic en ancre flottante';
