@@ -67,7 +67,7 @@ function boatDialog(){openModal('Mon bateau',`<img src="${state.boatPhoto||photo
  <p class="muted">Le site Mon bateau s'ouvre dans une fenêtre Android intégrée, sans navigateur externe.</p>`,true);
  get('boatImage').onclick=()=>{if(!nativeCall('pickImage')){let f=document.createElement('input');f.type='file';f.accept='image/*';f.onchange=()=>{let file=f.files[0];if(!file)return;if(file.size>3000000){alert('Image trop volumineuse');return}let r=new FileReader();r.onload=()=>window.nauticSelectedImage(r.result);r.readAsDataURL(file)};f.click()}};
  get('boatOpen').onclick=()=>{if(!nativeCall('openBoat'))alert('Disponible dans l’application Android')};}
-get('boatCard').onclick=boatDialog;
+get('boatCard').onclick=()=>{if(!nativeCall('openBoat'))boatDialog()};
 const contactDefaults=[
  {label:'Secours 112',phone:'112',mode:'call',type:'Urgence',icon:'🆘',urgent:true},
  {label:'SAMU 15',phone:'15',mode:'call',type:'Urgence médicale',icon:'✚',urgent:true},
