@@ -444,6 +444,9 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
 // Météo : accès direct au radar demandé.
 get('weatherCard').onclick=()=>{const u='https://appli.meteoetradar.fr/U13Q/frFRShare';if(!nativeCall('openExternal',u))window.open(u,'_blank','noopener')};
 // Horloge explicite : les anciens styles cachaient les éléments <time>.
+// Horloge déplacée hors du header, où des règles historiques se contredisent.
+const fixedClock=document.getElementById('clock');
+if(fixedClock){document.body.appendChild(fixedClock);fixedClock.hidden=false;fixedClock.removeAttribute('aria-hidden');}
 const clockElement=document.getElementById('clock');
 if(clockElement){clockElement.hidden=false;clockElement.classList.remove('nautic-hidden');clockElement.removeAttribute('aria-hidden');}
 if(clockElement){clockElement.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});setInterval(()=>{clockElement.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})},10000);}
