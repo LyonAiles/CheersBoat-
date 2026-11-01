@@ -210,6 +210,7 @@ public class MainActivity extends Activity {
    params.x=12;params.y=(int)(80*getResources().getDisplayMetrics().density);
    anchor.setAlpha(0f);anchor.setScaleX(.35f);anchor.setScaleY(.35f);
    overlayManager.addView(anchor,params);anchorOverlay=anchor;
+   toast("Ancre flottante créée");
    final float[] down={0,0};final int[] origin={0,0};final boolean[] moved={false};
    anchor.setOnTouchListener((v,event)->{
     if(event.getAction()==MotionEvent.ACTION_DOWN){
@@ -230,7 +231,7 @@ public class MainActivity extends Activity {
     anchor.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(220).start();
     moveTaskToBack(true);
    }).start();
-  }catch(Exception e){removeAnchor();toast("Impossible de réduire Nautic");}
+  }catch(Exception e){removeAnchor();toast("Ancre flottante refusée : "+e.getClass().getSimpleName());}
  }
  private void restoreFromAnchor(){
   Intent intent=new Intent(this,MainActivity.class);
