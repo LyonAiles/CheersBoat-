@@ -64,3 +64,91 @@ dialog.nautic-full .dialogTop button{min-width:52px;min-height:48px}
  .right .camCard h3{font-size:clamp(10px,2vw,14px)}
  #speedValue{font-size:clamp(26px,6vw,40px)!important}
 }
+
+/* Ajustement à l'écran : priorité à la carte et aux commandes essentielles. */
+#app{padding:clamp(2px,.35vw,5px);gap:4px}
+.layout{gap:5px}
+.left,.right,.center{gap:5px}
+header{min-width:0;gap:clamp(4px,.9vw,12px)!important;padding:0 clamp(4px,.6vw,9px)}
+header .brand{font-size:clamp(15px,2.2vw,29px);flex:0 0 auto}
+header time{font-size:clamp(10px,1.05vw,14px);white-space:nowrap}
+header #connection{font-size:clamp(9px,.9vw,12px)}
+.card{padding:clamp(4px,.65vw,9px);justify-content:center}
+.card h3,.camCard h3{font-size:clamp(10px,1.04vw,15px);margin:0 0 3px;line-height:1.1}
+.card p{font-size:clamp(10px,.9vw,13px);line-height:1.15;margin:2px 0}
+.coords{font-size:clamp(11px,1.12vw,17px);line-height:1.2;margin:2px 0}
+.card small,.card .muted{font-size:clamp(9px,.8vw,11px)}
+.camCard{min-height:0}
+.camCard h3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.camBody{min-height:0}
+.camBody small{display:none}
+#gpsCard p:last-child{display:none}
+#logCard small{display:none}
+#boatCard .boatSketch{display:none}
+#boatCard p{font-size:clamp(9px,.86vw,12px);line-height:1.13}
+#fuelCard .fuelbar{height:8px}
+#fuelCard .fuelrow{margin:2px 0}
+#speedCard{order:2}
+#headingCard{order:1}
+#weatherCard{order:3}
+#speedCard .gaugeTop{font-size:clamp(26px,3.1vw,44px)!important;line-height:1}
+#speedCard .arc{width:min(112px,75%);border-width:7px}
+#speedCard .arc::before{border-width:7px}
+#speedCard .speedScale{font-size:11px;margin:1px auto 0}
+#speedCard .speedUnit{font-size:9px;margin:0}
+.gauges{min-height:0}
+.gauges>.gauge{min-height:0;overflow:hidden}
+#weatherCard .weatherSymbol{font-size:clamp(15px,2vw,25px)}
+#weatherTime{font-size:clamp(9px,.8vw,11px)}
+#windWidget{padding:4px 7px}
+#windWidget strong{font-size:clamp(13px,1.3vw,18px)}
+#windWidget .windArrow{font-size:clamp(20px,2vw,29px)}
+#mapGps{padding:4px 7px;font-size:10px}
+@media(orientation:landscape){
+ #app{grid-template-rows:clamp(37px,8.5dvh,55px) minmax(0,1fr) 0px!important}
+ .layout{grid-template-columns:minmax(125px,19%) minmax(0,1fr) minmax(145px,24%);min-height:0}
+ .center{grid-template-rows:minmax(0,1fr) clamp(82px,20dvh,125px)}
+ .left>.card{flex:1 1 0;min-height:0}
+ .right>.camCard{flex:1 1 0;min-height:0}
+ .gauges{display:flex;justify-content:center;align-items:stretch}
+ .gauges>.gauge{flex:1 1 0;min-width:0}
+ #boatCard{min-height:0}
+ #boatCard p{max-height:45%;overflow:hidden}
+}
+@media(orientation:portrait){
+ #app{grid-template-rows:clamp(38px,6dvh,52px) minmax(0,1fr) 0px!important}
+ .layout{grid-template-columns:minmax(0,1fr);grid-template-rows:clamp(65px,12dvh,112px) minmax(0,1fr) clamp(65px,12dvh,115px);gap:4px}
+ .left,.right{display:flex!important;flex-direction:row!important;justify-content:center;gap:4px;min-height:0}
+ .left>.card{flex:1 1 0!important;min-width:0;padding:3px}
+ .right>.camCard{flex:1 1 0!important;min-width:0}
+ .center{grid-template-rows:minmax(0,1fr) clamp(75px,12dvh,110px);gap:4px}
+ .gauges{display:flex;justify-content:center;gap:4px}
+ .gauges>.gauge{flex:1 1 0;min-width:0}
+ .left .card h3,.right .camCard h3{font-size:clamp(8px,2.2vw,12px);line-height:1.1}
+ .left .card p,.left .card small,.right .camBody{font-size:clamp(8px,1.9vw,11px)}
+ .left .coords{font-size:clamp(9px,2.2vw,12px);white-space:normal;overflow-wrap:anywhere}
+ #boatCard p{display:none}
+ #fuelCard .fuelrow{font-size:9px}
+ #logCard p:nth-of-type(n+2){display:none}
+ .right .camBody small{display:none}
+ #speedCard .arc{width:min(95px,72%)}
+ #speedCard .gaugeTop{font-size:clamp(23px,6vw,34px)!important}
+ #weatherCard .weatherSymbol{display:none}
+ #weatherTime{font-size:9px}
+ #mapGps{font-size:9px}
+ #windWidget{max-width:45%;padding:3px 5px}
+ #windWidget strong{font-size:12px}
+ header #connection{display:none}
+ header time{display:none}
+ #nauticContactsButton{font-size:10px;padding:4px 6px}
+}
+@media(max-height:430px) and (orientation:landscape){
+ .card p:nth-of-type(n+3){display:none}
+ #boatCard p{display:none}
+ .camBody small{display:none}
+ .center{grid-template-rows:minmax(0,1fr) 76px}
+ #speedCard .arc{width:min(84px,68%)}
+ #speedCard .gaugeTop{font-size:25px!important}
+ #speedCard .speedUnit{display:none}
+ #weatherCard .weatherSymbol{display:none}
+}
