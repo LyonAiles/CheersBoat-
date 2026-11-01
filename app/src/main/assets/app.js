@@ -9,7 +9,7 @@ const $=id=>document.getElementById(id), KEY='nautic-v04';let cfg={fuel:400,tank
 let speedSamples=[],speedLastMotion=0;const WIND_PERIOD=300000;let windBusy=false;let map,boatMarker,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null;
 try{points=JSON.parse(localStorage.getItem('nautic-v04-points')||'[]');travel=Number(localStorage.getItem('nautic-v04-travel')||0)}catch(e){}
 const fmt=n=>Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2});
-function clock(){let d=new Date();$('clock').textContent=d.toLocaleString('fr-FR',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}clock();setInterval(clock,30000);
+function clock(){let d=new Date();$('clock').textContent=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});$('clock').title=d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}clock();setInterval(clock,1000);
 function modal(title,body){$('dialogTitle').textContent=title;$('dialogContent').innerHTML=body;$('dialog').showModal()}$('dialogClose').onclick=()=>$('dialog').close();
 function field(label,id,value,type='text'){return `<label class="formLabel">${label}<input id="${id}" type="${type}" value="${String(value??'').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;')}"></label>`}
 function saveCfg(){
