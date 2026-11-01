@@ -18,11 +18,11 @@ public class AnchorService extends Service {
   startForeground(1212,nb.setSmallIcon(android.R.drawable.ic_menu_compass).setContentTitle("Nautic réduit").setContentText("Toucher pour ouvrir Nautic").setContentIntent(pi).setOngoing(true).build());
   try{
    wm=(WindowManager)getSystemService(WINDOW_SERVICE);
-   TextView b=new TextView(this);b.setText("⚓");b.setTextSize(29);b.setGravity(Gravity.CENTER);b.setTextColor(-1);
-   GradientDrawable bg=new GradientDrawable();bg.setColor(0xee09283e);bg.setCornerRadius(52);bg.setStroke(2,0xff31b9e9);b.setBackground(bg);
-   int size=(int)(58*getResources().getDisplayMetrics().density);
+   TextView b=new TextView(this);b.setText("⚓");b.setTextSize(20);b.setGravity(Gravity.CENTER);b.setTextColor(-1);
+   GradientDrawable bg=new GradientDrawable();bg.setColor(0xee09283e);bg.setCornerRadius(40);bg.setStroke(2,0xff31b9e9);b.setBackground(bg);
+   int size=(int)(38*getResources().getDisplayMetrics().density);
    WindowManager.LayoutParams p=new WindowManager.LayoutParams(size,size,Build.VERSION.SDK_INT>=26?WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY:WindowManager.LayoutParams.TYPE_PHONE,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
-   p.gravity=Gravity.TOP|Gravity.START;p.x=12;p.y=(int)(80*getResources().getDisplayMetrics().density);
+   p.gravity=Gravity.TOP|Gravity.START;p.x=(int)(6*getResources().getDisplayMetrics().density);p.y=(int)(6*getResources().getDisplayMetrics().density);
    b.setAlpha(0f);b.setScaleX(.35f);b.setScaleY(.35f);wm.addView(b,p);anchor=b;
    final float[] down={0,0};final int[] start={0,0};final boolean[] moved={false};
    b.setOnTouchListener((v,e)->{
