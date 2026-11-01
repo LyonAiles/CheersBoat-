@@ -459,12 +459,12 @@ if(clockElement){
 }
 window.nauticLocalAnchorToggle=function(){
  let mini=document.getElementById('nauticLocalMini');
- if(mini){mini.remove();document.getElementById('app').style.display='';return}
- const app=document.getElementById('app');app.style.display='none';
+ if(mini){mini.remove();document.body.classList.remove('nautic-mini-mode');document.getElementById('app').style.display='';return}
+ const app=document.getElementById('app');app.style.display='none';document.body.classList.add('nautic-mini-mode');
  mini=document.createElement('button');mini.id='nauticLocalMini';mini.textContent='⚓';
  mini.title='Agrandir Nautic';mini.style.cssText='position:fixed;top:6px;left:6px;width:36px;height:36px;z-index:99999;background:#09283e;color:white;border:2px solid #31b9e9;border-radius:50%;font-size:19px;box-shadow:0 4px 20px #0008;transition:transform .3s;transform:scale(.3)';
  document.body.appendChild(mini);requestAnimationFrame(()=>mini.style.transform='scale(1)');
- mini.onclick=()=>{mini.style.transform='scale(.3)';setTimeout(()=>{mini.remove();app.style.display='';},220)};
+ mini.onclick=()=>{mini.style.transform='scale(.3)';setTimeout(()=>{mini.remove();app.style.display='';document.body.classList.remove('nautic-mini-mode');},220)};
 };
 const brandAnchor=document.querySelector('header .brand');
 if(brandAnchor){
