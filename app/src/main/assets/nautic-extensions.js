@@ -332,7 +332,7 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 applyAppearance();
 
 function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
- openModal('Paramètres',`<h3>Apparence et disposition</h3>
+ openModal('Paramètres',`<h3>Fenêtre flottante</h3><button type="button" id="settingFloatAnchor">⚓ Réduire Nautic en ancre flottante</button><p class="muted">Permet de passer à une autre application et de revenir à Nautic. Autorisation Android nécessaire.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
  <label>Thème<select class="nautic-select" id="settingTheme"><option value="nautic">Nautic bleu</option><option value="day">Jour clair</option><option value="night">Nuit rouge</option><option value="contrast">Contraste élevé</option><option value="custom">Couleurs personnalisées</option></select></label>
@@ -363,6 +363,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type].join(' ; ')).join('\n'))}</textarea>
  <div class="dialogActions"><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
  dialog.classList.add('nautic-settings');
+ get('settingFloatAnchor').onclick=()=>{dialog.close();if(!nativeCall('minimizeNautic'))alert('Fonction disponible uniquement dans l’application Android.');};
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
  top.insertBefore(saveButton,get('dialogClose'));
