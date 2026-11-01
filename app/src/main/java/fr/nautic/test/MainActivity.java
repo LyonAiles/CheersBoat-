@@ -110,6 +110,15 @@ public class MainActivity extends Activity {
     startActivityForResult(i,PICK_IMAGE);
    }catch(Exception e){toast("Galerie indisponible");}
   });}
+  @JavascriptInterface public void openTapo(){runOnUiThread(()->{
+   try{
+    Intent launch=getPackageManager().getLaunchIntentForPackage("com.tplink.iot");
+    if(launch==null){
+     Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse("tapo://"));
+     startActivity(i);
+    }else startActivity(launch);
+   }catch(Exception e){toast("Ouvre Tapo pour choisir la double vue");}
+  });}
   @JavascriptInterface public void openBoat(){runOnUiThread(()->{
    Intent i=new Intent(MainActivity.this,BoatActivity.class);startActivity(i);
   });}
