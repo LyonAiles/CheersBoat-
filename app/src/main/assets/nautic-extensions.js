@@ -450,6 +450,15 @@ if(clockElement){
  clockElement.style.setProperty('z-index','999','important');
  clockElement.style.setProperty('color','#fff','important');
 }
+window.nauticLocalAnchorToggle=function(){
+ let mini=document.getElementById('nauticLocalMini');
+ if(mini){mini.remove();document.getElementById('app').style.display='';return}
+ const app=document.getElementById('app');app.style.display='none';
+ mini=document.createElement('button');mini.id='nauticLocalMini';mini.textContent='⚓';
+ mini.title='Agrandir Nautic';mini.style.cssText='position:fixed;top:65px;left:10px;width:58px;height:58px;z-index:99999;background:#09283e;color:white;border:2px solid #31b9e9;border-radius:50%;font-size:29px;box-shadow:0 4px 20px #0008;transition:transform .3s;transform:scale(.3)';
+ document.body.appendChild(mini);requestAnimationFrame(()=>mini.style.transform='scale(1)');
+ mini.onclick=()=>{mini.style.transform='scale(.3)';setTimeout(()=>{mini.remove();app.style.display='';},220)};
+};
 const brandAnchor=document.querySelector('header .brand');
 if(brandAnchor){
  brandAnchor.title='Réduire Nautic en ancre flottante';
