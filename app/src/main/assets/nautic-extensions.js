@@ -47,8 +47,8 @@ dialog.addEventListener('close',()=>dialog.classList.remove('nautic-full'));
 function nativeCall(fn,...args){if(native&&typeof native[fn]==='function'){native[fn](...args);return true}return false}
 function callNumber(n){if(!nativeCall('call',n))location.href='tel:'+n.replace(/[^+0-9]/g,'')}
 function smsNumber(n,msg){if(!nativeCall('sms',n,msg))location.href='sms:'+n.replace(/[^+0-9]/g,'')+'?body='+encodeURIComponent(msg)}
-const head=document.querySelector('header');const settingsButton=document.createElement('button');
-settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';head.append(settingsButton);const exitButton=document.createElement('button');exitButton.id='nauticExitButton';exitButton.textContent='Quitter';exitButton.title='Fermer Nautic';head.append(exitButton);exitButton.onclick=()=>{if(!confirm('Quitter Nautic ? Le suivi GPS et le journal seront interrompus.'))return;if(!nativeCall('exitApp'))alert('La fermeture est disponible dans l’application Android.');};
+const head=document.querySelector('header');const headerControls=document.createElement('div');headerControls.id='nauticHeaderControls';head.appendChild(headerControls);const settingsButton=document.createElement('button');
+settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';headerControls.append(settingsButton);const exitButton=document.createElement('button');exitButton.id='nauticExitButton';exitButton.textContent='Quitter';exitButton.title='Fermer Nautic';headerControls.append(exitButton);exitButton.onclick=()=>{if(!confirm('Quitter Nautic ? Le suivi GPS et le journal seront interrompus.'))return;if(!nativeCall('exitApp'))alert('La fermeture est disponible dans l’application Android.');};
 const mapWrap=get('mapWrap');
 const recenter=document.createElement('button');recenter.id='mapRecenter';recenter.textContent='⌖';recenter.title='Recentrer';mapWrap.append(recenter);
 recenter.onclick=()=>{if(map&&latest){gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};map.setView([latest.lat,latest.lon],map.getZoom())}};
@@ -190,7 +190,7 @@ tapoCam.onclick=()=>{if(!nativeCall('openTapo'))alert('Application Tapo indispon
 // One journal, one recenter button; no obsolete Nautic footer control.
 get('routeCard').style.display='none';get('miniMap').style.display='none';let branding=document.querySelector('.branding');if(branding)branding.style.display='none';
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
-function applyVisibility(){const ids=['nauticCallsSlot','gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
+function applyVisibility(){const ids=['clock','nauticSettingsButton','nauticExitButton','nauticContactsButton','nauticCallsSlot','mapWrap','gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
 
 const cameraDefaults=[
  {name:'Roof',app:'tapo',package:'com.tplink.iot',scheme:'',image:''},
@@ -335,7 +335,7 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 
 applyAppearance();
 
-function settingsDialog(){let buttons=[['nauticCallsSlot','35 · Derniers appels (emplacement 35)'],['gpsCard','31 · Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
+function settingsDialog(){let buttons=[['clock','10 · Heure'],['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Quitter'],['nauticContactsButton','26 · Bouton Derniers appels'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
  openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet. Le 35 peut être masqué dans Tableau de bord.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><h3>Fenêtre flottante</h3><button type="button" id="settingFloatAnchor">⚓ Réduire Nautic en ancre flottante</button><p class="muted">Permet de passer à une autre application et de revenir à Nautic. Autorisation Android nécessaire.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
@@ -455,7 +455,7 @@ window.nauticLocalAnchorToggle=function(){
  if(mini){mini.remove();document.getElementById('app').style.display='';return}
  const app=document.getElementById('app');app.style.display='none';
  mini=document.createElement('button');mini.id='nauticLocalMini';mini.textContent='⚓';
- mini.title='Agrandir Nautic';mini.style.cssText='position:fixed;top:65px;left:10px;width:58px;height:58px;z-index:99999;background:#09283e;color:white;border:2px solid #31b9e9;border-radius:50%;font-size:29px;box-shadow:0 4px 20px #0008;transition:transform .3s;transform:scale(.3)';
+ mini.title='Agrandir Nautic';mini.style.cssText='position:fixed;top:6px;left:6px;width:36px;height:36px;z-index:99999;background:#09283e;color:white;border:2px solid #31b9e9;border-radius:50%;font-size:19px;box-shadow:0 4px 20px #0008;transition:transform .3s;transform:scale(.3)';
  document.body.appendChild(mini);requestAnimationFrame(()=>mini.style.transform='scale(1)');
  mini.onclick=()=>{mini.style.transform='scale(.3)';setTimeout(()=>{mini.remove();app.style.display='';},220)};
 };
