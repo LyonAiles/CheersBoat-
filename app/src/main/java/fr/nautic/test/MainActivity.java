@@ -119,6 +119,19 @@ public class MainActivity extends Activity {
    }
    sendRecentCalls();
   });}
+  @JavascriptInterface public void openCameraApp(String packageName,String deepLink){runOnUiThread(()->{
+   try{
+    if(deepLink!=null&&!deepLink.trim().isEmpty()){
+     Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse(deepLink));
+     if(packageName!=null&&!packageName.trim().isEmpty())intent.setPackage(packageName);
+     startActivity(intent);return;
+    }
+    if(packageName==null||packageName.trim().isEmpty()){toast("Identifiant de l’application manquant");return;}
+    Intent launch=getPackageManager().getLaunchIntentForPackage(packageName);
+    if(launch==null){toast("Application caméra non trouvée");return;}
+    startActivity(launch);
+   }catch(Exception e){toast("Impossible d’ouvrir l’application caméra");}
+  });}
   @JavascriptInterface public void openTapo(){runOnUiThread(()->{
    try{
     Intent launch=getPackageManager().getLaunchIntentForPackage("com.tplink.iot");
