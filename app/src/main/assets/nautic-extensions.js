@@ -189,7 +189,7 @@ tapoCam.onclick=()=>{if(!nativeCall('openTapo'))alert('Application Tapo indispon
 // One journal, one recenter button; no obsolete Nautic footer control.
 get('routeCard').style.display='none';get('miniMap').style.display='none';let branding=document.querySelector('.branding');if(branding)branding.style.display='none';
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
-function applyVisibility(){const ids=['gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
+function applyVisibility(){const ids=['nauticCallsSlot','gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
 
 const cameraDefaults=[
  {name:'Roof',app:'tapo',package:'com.tplink.iot',scheme:'',image:''},
@@ -334,8 +334,8 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 
 applyAppearance();
 
-function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
- openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">26 : bouton Derniers appels · 27 : texte du bouton · ancien emplacement 35 remplacé.</p><h3>Fenêtre flottante</h3><button type="button" id="settingFloatAnchor">⚓ Réduire Nautic en ancre flottante</button><p class="muted">Permet de passer à une autre application et de revenir à Nautic. Autorisation Android nécessaire.</p><h3>Apparence et disposition</h3>
+function settingsDialog(){let buttons=[['nauticCallsSlot','35 · Derniers appels (emplacement 35)'],['gpsCard','31 · Position GPS / urgences'],['boatCard','Mon bateau'],['fuelCard','Carburant'],['logCard','Journal'],['cam1Card','Caméra avant'],['cam2Card','Caméra côté'],['cam3Card','Caméra sous-marine'],['speedCard','Vitesse'],['headingCard','Cap'],['weatherCard','Météo']];
+ openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet. Le 35 peut être masqué dans Tableau de bord.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><h3>Fenêtre flottante</h3><button type="button" id="settingFloatAnchor">⚓ Réduire Nautic en ancre flottante</button><p class="muted">Permet de passer à une autre application et de revenir à Nautic. Autorisation Android nécessaire.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
  <label>Thème<select class="nautic-select" id="settingTheme"><option value="nautic">Nautic bleu</option><option value="day">Jour clair</option><option value="night">Nuit rouge</option><option value="contrast">Contraste élevé</option><option value="custom">Couleurs personnalisées</option></select></label>
@@ -367,6 +367,7 @@ function settingsDialog(){let buttons=[['gpsCard','Position GPS / urgences'],['b
  <div class="dialogActions"><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
  dialog.classList.add('nautic-settings');
  get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
+ applyObjectNumbers();
  get('settingFloatAnchor').onclick=()=>{dialog.close();if(!nativeCall('minimizeNautic'))alert('Fonction disponible uniquement dans l’application Android.');};
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
@@ -459,10 +460,24 @@ if(brand){
 function applyObjectNumbers(){
  document.querySelectorAll('.nautic-object-tag').forEach(e=>e.remove());
  if(!state.objectNumbers)return;
- const named=[['nauticContactsButton','26'],['speedCard','36'],['fuelCard','34'],['gpsCard','31'],['boatCard','32'],['logCard','33'],['clock','10'],['nauticSettingsButton','20'],['nauticExitButton','21'],['mapWrap','40'],['weatherCard','37'],['headingCard','38'],['cam1Card','41'],['cam2Card','42'],['cam3Card','43']];
- named.forEach(([id,num])=>{const el=get(id);if(!el)return;el.style.position='relative';const tag=document.createElement('span');tag.className='nautic-object-tag';tag.textContent=num;tag.style.cssText='position:absolute;top:1px;left:1px;z-index:500;background:#ffe24b;color:#111;font:bold 11px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';el.appendChild(tag)});
- const label=document.createElement('span');label.className='nautic-object-tag';label.textContent='27';label.style.cssText='position:absolute;right:1px;bottom:1px;background:#ffe24b;color:#111;font:bold 10px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';contactButton.appendChild(label);
+ const named=[['clock',10,'Horloge'],['nauticSettingsButton',20,'Paramètres'],['nauticExitButton',21,'Quitter'],['nauticContactsButton',26,'Derniers appels'],['gpsCard',31,'GPS'],['boatCard',32,'Mon bateau'],['logCard',33,'Journal'],['fuelCard',34,'Carburant'],['nauticCallsSlot',35,'Conteneur appels'],['speedCard',36,'Vitesse'],['weatherCard',37,'Météo'],['headingCard',38,'Cap'],['mapWrap',40,'Carte'],['cam1Card',41,'Caméra Roof'],['cam2Card',42,'Caméra Côté'],['cam3Card',43,'Caméra Fond']];
+ const used=new Set(named.map(x=>x[0]));
+ // Les commandes et les objets possédant un identifiant conservent un numéro stable.
+ const extras=[...document.querySelectorAll('#app [id]')].filter(e=>!used.has(e.id)&&!e.closest('dialog')&&!e.closest('.leaflet-container')&&(/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(e.tagName)||e.classList.contains('mapWidget')));
+ extras.forEach((el,i)=>named.push([el.id,String(50+i),el.title||el.textContent.trim().slice(0,35)||el.id]));
+ const summary=get('nauticNumberDirectory');
+ if(summary)summary.textContent=named.map(([id,n,label])=>n+' · '+label).join('  |  ')+'  |  27 · Texte Derniers appels';
+ named.forEach(([id,num])=>{const el=get(id);if(!el||el.hidden||el.closest('[hidden]'))return;
+  if(getComputedStyle(el).position==='static')el.style.position='relative';
+  const tag=document.createElement('span');tag.className='nautic-object-tag';tag.textContent=num;
+  tag.style.cssText='position:absolute;top:1px;left:1px;z-index:500;background:#ffe24b;color:#111;font:bold 10px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';
+  el.appendChild(tag);
+ });
+ const label=document.createElement('span');label.className='nautic-object-tag';label.textContent='27';
+ label.style.cssText='position:absolute;right:1px;bottom:1px;background:#ffe24b;color:#111;font:bold 10px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';
+ contactButton.appendChild(label);
 }
+
 applyObjectNumbers();
 settingsButton.onclick=settingsDialog;applyVisibility();
 setTimeout(()=>{if(map)setLayer(state.map)},1000);
