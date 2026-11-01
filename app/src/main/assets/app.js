@@ -29,13 +29,13 @@ function fuelRemaining(){
  }
  return Math.max(0,Math.min(Math.max(1,Number(cfg.tank)||1),Number(cfg.fuelBaseline)-Math.max(0,total-Number(cfg.usedBaseline||0))));
 }
-function fuelUpdate(){let f=fuelRemaining(),t=Math.max(1,Number(cfg.tank)||1),c=Number(cfg.cons)||0;$('fuelbar').style.width=Math.min(100,100*f/t)+'%';$('fuelQty').textContent=fmt(f)+' L';$('fuelMax').textContent='/ '+fmt(t)+' L';$('consValue').textContent=fmt(c);$('hours').textContent=c>0?fmt(f/c):'—'}fuelUpdate();
-// Chauffage : estimation horodatée, conservée entre deux ouvertures de Nautic.
+function fuelUpdate(){let f=fuelRemaining(),t=Math.max(1,Number(cfg.tank)||1),c=Number(cfg.cons)||0;$('fuelbar').style.width=Math.min(100,100*f/t)+'%';$('fuelQty').textContent=fmt(f)+' L';$('fuelMax').textContent='/ '+fmt(t)+' L';$('consValue').textContent=fmt(c);$('hours').textContent=c>0?fmt(f/c):'—'}// Chauffage : estimation horodatée, conservée entre deux ouvertures de Nautic.
 let heatingRate=Number(localStorage.getItem('nautic-heating-rate')??2.5);
 if(!Number.isFinite(heatingRate)||heatingRate<0)heatingRate=2.5;
 let heatingActive=localStorage.getItem('nautic-heating-active')!=='false';
 let heatingUsed=Number(localStorage.getItem('nautic-heating-used')||0);
 let heatingLast=Number(localStorage.getItem('nautic-heating-last')||Date.now());
+fuelUpdate();
 function heatingTick(){
  const now=Date.now(),dt=Math.max(0,now-heatingLast);
  if(heatingActive)heatingUsed+=dt/86400000*heatingRate;
