@@ -60,7 +60,7 @@ layers.onclick=mapDialog;
 const photoFallback='bateau.jpg';
 function applyPhoto(){const card=get('boatCard');if(!card)return;const src=state.boatPhoto||photoFallback;card.style.backgroundImage=`linear-gradient(0deg,rgba(3,20,32,.82),rgba(3,20,32,.20)),url("${src.replaceAll('"','%22')}")`;card.style.backgroundSize='cover';card.style.backgroundPosition='center';const sketch=card.querySelector('.boatSketch');if(sketch)sketch.style.display='none'}
 applyPhoto();
-window.nauticSelectedImage=data=>{state.boatPhoto=data;persist();applyPhoto();boatDialog()};
+window.nauticSelectedImage=data=>{if(window.nauticRoofPhotoPending){window.nauticRoofPhotoPending=false;state.camera1.image=data;persist();updateRoof();return}state.boatPhoto=data;persist();applyPhoto();boatDialog()};
 function boatDialog(){openModal('Mon bateau',`<img src="${state.boatPhoto||photoFallback}" style="max-height:34vh;max-width:100%;object-fit:contain" alt="Bateau">
  <p>Kotter acier · 13,40 × 4,30 m · TE 1,35 m · TA 3,45 m</p>
  <div class="dialogActions"><button id="boatImage">Choisir une photo</button><button id="boatOpen">Ouvrir Mon bateau dans Nautic</button></div>
@@ -409,3 +409,13 @@ if(brand){
 settingsButton.onclick=settingsDialog;applyVisibility();
 setTimeout(()=>{if(map)setLayer(state.map)},1000);
 })();
+
+/* Contacts : noms et numéros lisibles, sans colonnes étroites. */
+(function(){const style=document.createElement('style');style.textContent=`
+#dialog #recentCalls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:7px}
+#dialog #recentCalls .emChoice{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;min-height:56px;height:auto;padding:8px 12px;gap:2px;text-align:left}
+#dialog #recentCalls .emChoice>span{display:none}
+#dialog #recentCalls .emChoice strong{display:block;max-width:100%;font-size:clamp(13px,1.4vw,19px);line-height:1.15;overflow-wrap:anywhere;word-break:normal;white-space:normal}
+#dialog #recentCalls .emChoice small{display:block;max-width:100%;font-size:clamp(11px,1.1vw,15px);line-height:1.2;overflow-wrap:anywhere;white-space:normal}
+@media(orientation:portrait){#dialog #recentCalls{grid-template-columns:repeat(2,minmax(0,1fr))}#dialog #recentCalls .emChoice{padding:6px;min-height:58px}}
+`;document.head.appendChild(style)})();
