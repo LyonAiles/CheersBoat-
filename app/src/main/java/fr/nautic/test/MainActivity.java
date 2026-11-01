@@ -10,6 +10,9 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.provider.CallLog;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import android.database.Cursor;
 import android.util.Base64;
 import android.webkit.GeolocationPermissions;
@@ -26,7 +29,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
 public class MainActivity extends Activity {
- private static final int PICK_PHONE=201, PICK_IMAGE=202, GPS=100, CAMERA=101;
+ private static final int PICK_PHONE=201, PICK_IMAGE=202, GPS=100, CAMERA=101, CALLS=103;
  private WebView web;
  private PermissionRequest pendingCamera;
  @Override public void onCreate(Bundle state){
@@ -110,6 +113,12 @@ public class MainActivity extends Activity {
     startActivityForResult(i,PICK_IMAGE);
    }catch(Exception e){toast("Galerie indisponible");}
   });}
+  @JavascriptInterface public void recentPhoneCalls(){runOnUiThread(()->{
+   if(checkSelfPermission(Manifest.permission.READ_CALL_LOG)!=PackageManager.PERMISSION_GRANTED){
+    requestPermissions(new String[]{Manifest.permission.READ_CALL_LOG},CALLS);return;
+   }
+   sendRecentCalls();
+  });}
   @JavascriptInterface public void openTapo(){runOnUiThread(()->{
    try{
     Intent launch=getPackageManager().getLaunchIntentForPackage("com.tplink.iot");
@@ -126,6 +135,23 @@ public class MainActivity extends Activity {
    if(!address.toLowerCase().startsWith("rtsp://")){toast("Adresse RTSP invalide");return;}
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);startActivity(i);
   });}
+ }
+ private void sendRecentCalls(){
+  JSONArray out=new JSONArray();
+  try(Cursor c=getContentResolver().query(CallLog.Calls.CONTENT_URI,
+   new String[]{CallLog.Calls.NUMBER,CallLog.Calls.CACHED_NAME,CallLog.Calls.TYPE},
+   null,null,CallLog.Calls.DATE+" DESC")){
+   if(c!=null){java.util.HashSet<String> seen=new java.util.HashSet<>();
+    while(c.moveToNext()&&out.length()<12){
+     String number=c.getString(0),name=c.getString(1);
+     if(number==null||number.trim().isEmpty()||!seen.add(number))continue;
+     JSONObject item=new JSONObject();item.put("number",number);
+     item.put("label",name==null||name.trim().isEmpty()?number:name);
+     out.put(item);
+    }
+   }
+  }catch(Exception e){toast("Historique des appels inaccessible");}
+  js("nauticPhoneCallHistory",out.toString());
  }
  @Override protected void onActivityResult(int request,int result,Intent data){
   super.onActivityResult(request,result,data);
@@ -153,6 +179,7 @@ public class MainActivity extends Activity {
  @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){
   super.onRequestPermissionsResult(code,permissions,results);
   if(code==GPS&&web!=null)web.reload();
+  if(code==CALLS){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)sendRecentCalls();else js("nauticPhoneCallHistory","[]");}
   if(code==CAMERA&&pendingCamera!=null){PermissionRequest r=pendingCamera;pendingCamera=null;
    if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)
     r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});else r.deny();}
