@@ -35,7 +35,6 @@ if(!Number.isFinite(heatingRate)||heatingRate<0)heatingRate=2.5;
 let heatingActive=localStorage.getItem('nautic-heating-active')!=='false';
 let heatingUsed=Number(localStorage.getItem('nautic-heating-used')||0);
 let heatingLast=Number(localStorage.getItem('nautic-heating-last')||Date.now());
-fuelUpdate();
 function heatingTick(){
  const now=Date.now(),dt=Math.max(0,now-heatingLast);
  if(heatingActive)heatingUsed+=dt/86400000*heatingRate;
@@ -78,6 +77,7 @@ function rotateMap(){if(!map)return;let pane=map.getPane('mapPane'),pos=L.DomUti
 // Only confirmed displacement counts; brief stops count as engine-on, long stops do not.
 let stableFix=null, movingCandidate=null, movementConfirm=0, gpsFollowTarget=null, smoothCenter=null;
 let lastFuelTick=Date.now(), fuelPending=0, fuelUsed=Number(localStorage.getItem('nautic-fuel-used')||0), stationarySince=0;
+fuelUpdate();
 function motionConfig(){try{let c=JSON.parse(localStorage.getItem('nautic-extensions')||'{}');return {threshold:Math.max(3,Number(c.moveThreshold)||8),stopMs:Math.max(1,Number(c.stopMinutes)||20)*60000}}catch(e){return {threshold:8,stopMs:1200000}}}
 function fuelTick(now,moving){
  let dt=Math.max(0,Math.min(10000,now-lastFuelTick));lastFuelTick=now;
