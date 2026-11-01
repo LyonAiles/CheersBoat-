@@ -10,7 +10,7 @@ const readSetting=(key)=>{try{
 }catch(e){try{return localStorage.getItem(key)||''}catch(_){return ''}}};
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{}'))}catch(e){return {...d}}};
 const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:true});
-if(typeof state.objectNumbers!=='boolean')state.objectNumbers=true;
+if(!readSetting('nautic-object-numbers-v2')){state.objectNumbers=true;try{localStorage.setItem('nautic-object-numbers-v2','1')}catch(e){}}
 const persist=()=>{try{
  const value=JSON.stringify(state);
  if(native&&typeof native.writeSetting==='function'){
