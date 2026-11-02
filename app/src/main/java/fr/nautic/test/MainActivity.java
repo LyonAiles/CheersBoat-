@@ -101,7 +101,6 @@ public class MainActivity extends Activity {
    try{return getPackageManager().getPackageInfo(getPackageName(),0).versionName;}
    catch(Exception e){return "?";}
   }
-  @JavascriptInterface public void minimizeNautic(){runOnUiThread(()->toggleHalfWindow());}
   @JavascriptInterface public void exitApp(){runOnUiThread(()->{if(web!=null)web.stopLoading();finish();});}
   @JavascriptInterface public void call(String number){runOnUiThread(()->{
    try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number))));}
