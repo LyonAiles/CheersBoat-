@@ -472,14 +472,10 @@ window.nauticLocalAnchorToggle=function(){
 };
 const brandAnchor=document.getElementById('nauticAnchor');
 if(brandAnchor){
- brandAnchor.title='Réduire ou agrandir Nautic à 50 %';
+ brandAnchor.title='Réduire ou agrandir la fenêtre Nautic';
  brandAnchor.style.cursor='pointer';
  const toggle=()=>{
-  const reduced=document.body.classList.toggle('nautic-half-size');
-  brandAnchor.setAttribute('aria-label',reduced?'Agrandir Nautic':'Réduire Nautic à 50 %');
-  const clock=document.getElementById('clock');
-  if(clock)clock.style.display=reduced?'none':'';
-  try{window.dispatchEvent(new Event('resize'))}catch(e){}
+  if(!nativeCall('minimizeNautic'))alert('Fenêtre flottante disponible dans l’application Android.');
  };
  brandAnchor.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();toggle()});
  brandAnchor.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}});
