@@ -193,15 +193,26 @@ public class MainActivity extends Activity {
   });}
  }
  private void minimizeToAnchor(){
-  if(!Settings.canDrawOverlays(this)){
-   toast("Autorisation de superposition manquante : Paramètres Nautic > Autorisation Android");
+  // Même chemin natif que l'application de test, sans faux mode réduit WebView.
+  if(android.os.Build.VERSION.SDK_INT>=23&&!Settings.canDrawOverlays(this)){
+   overlayRequested=true;
+   toast("Autorise l'affichage par-dessus, puis reviens à Nautic");
+   try{startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}
+   catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}
    return;
   }
   try{
+   AnchorService.overlayVisible=false;
    Intent service=new Intent(this,AnchorService.class);
    if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(service);else startService(service);
-   web.setPivotX(0);web.setPivotY(0);
-   web.animate().alpha(0f).scaleX(.12f).scaleY(.12f).setDuration(300).withEndAction(()->moveTaskToBack(true)).start();
+   // Ne jamais cacher Nautic si le système n'a pas réellement créé l'ancre.
+   web.postDelayed(()->{
+    if(AnchorService.overlayVisible){
+     web.setPivotX(0);web.setPivotY(0);
+     web.animate().alpha(0f).scaleX(.12f).scaleY(.12f).setDuration(250)
+       .withEndAction(()->moveTaskToBack(true)).start();
+    }else toast("Ancre système non créée : Nautic reste ouvert");
+   },450);
   }catch(Exception e){toast("Réduction impossible : "+e.getClass().getSimpleName());}
  }
  @Override protected void onResume(){
