@@ -470,14 +470,19 @@ window.nauticLocalAnchorToggle=function(){
  document.body.appendChild(mini);requestAnimationFrame(()=>mini.style.transform='scale(1)');
  mini.onclick=()=>{mini.style.transform='scale(.3)';setTimeout(()=>{mini.remove();app.style.display='';document.body.classList.remove('nautic-mini-mode');},220)};
 };
-const brandAnchor=document.querySelector('header .brand');
+const brandAnchor=document.getElementById('nauticAnchor');
 if(brandAnchor){
- brandAnchor.title='Réduire Nautic en ancre flottante';
+ brandAnchor.title='Réduire ou agrandir Nautic à 50 %';
  brandAnchor.style.cursor='pointer';
- brandAnchor.setAttribute('role','button');brandAnchor.tabIndex=0;
- const minimize=()=>{if(!nativeCall('minimizeNautic'))alert('Ancre flottante disponible dans l’application Android.')};
- brandAnchor.addEventListener('click',minimize);
- brandAnchor.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();minimize()}});
+ const toggle=()=>{
+  const reduced=document.body.classList.toggle('nautic-half-size');
+  brandAnchor.setAttribute('aria-label',reduced?'Agrandir Nautic':'Réduire Nautic à 50 %');
+  const clock=document.getElementById('clock');
+  if(clock)clock.style.display=reduced?'none':'';
+  try{window.dispatchEvent(new Event('resize'))}catch(e){}
+ };
+ brandAnchor.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();toggle()});
+ brandAnchor.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}});
 }
 const brand=document.querySelector('header .brand');
 if(brand){
