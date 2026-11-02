@@ -266,9 +266,5 @@ body > #clock{top:73px!important;left:50%!important;transform:translateX(-50%)!i
 body.nautic-mini-mode > #clock{display:none!important}
 @media(orientation:landscape){body > #clock{top:8px!important}}
 
-/* Test isolé : seule l'ancre déjà présente commande l'échelle du tableau de bord. */
+/* L'ancre est cliquable, mais aucune réduction CSS : taille gérée par Android. */
 #nauticAnchor{display:inline-block;cursor:pointer;touch-action:manipulation}
-#app{transform-origin:top left}
-body.nautic-half-size #app{transform:scale(.5)!important;width:100%!important;transition:none!important}
-body.nautic-half-size{overflow:auto!important}
-body.nautic-half-size > #clock{display:none!important}
