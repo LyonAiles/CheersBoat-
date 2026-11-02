@@ -201,9 +201,8 @@ public class MainActivity extends Activity {
    // Ne jamais cacher Nautic si le système n'a pas réellement créé l'ancre.
    web.postDelayed(()->{
     if(AnchorService.overlayVisible){
-     web.setPivotX(0);web.setPivotY(0);
-     web.animate().alpha(0f).scaleX(.12f).scaleY(.12f).setDuration(250)
-       .withEndAction(()->moveTaskToBack(true)).start();
+     // Aucun rétrécissement de la WebView : elle doit simplement passer derrière l'ancre.
+     moveTaskToBack(true);
     }else toast("Ancre système non créée : Nautic reste ouvert");
    },450);
   }catch(Exception e){toast("Réduction impossible : "+e.getClass().getSimpleName());}
@@ -212,7 +211,7 @@ public class MainActivity extends Activity {
   super.onResume();
   if(web!=null){web.animate().cancel();web.setAlpha(1f);web.setScaleX(1f);web.setScaleY(1f);}
   if(overlayRequested){overlayRequested=false;if(Settings.canDrawOverlays(this))toast("Autorisation accordée : touche l'ancre pour réduire");}
-  else stopService(new Intent(this,AnchorService.class));
+  // Ne pas détruire l'ancre sur un simple onResume : seul son clic la ferme.
  }
  private void sendRecentCalls(){
   JSONArray out=new JSONArray();
