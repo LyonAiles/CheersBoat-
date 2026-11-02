@@ -263,12 +263,17 @@ body > #clock{position:fixed!important;display:block!important;visibility:visibl
 
 /* Horloge dans la bande libre du haut, sans chevauchement des cartes. */
 body > #clock{top:73px!important;left:50%!important;transform:translateX(-50%)!important;width:auto!important;min-width:92px!important;height:38px!important;line-height:38px!important;font-size:25px!important;padding:0 7px!important;box-sizing:border-box!important}
-body.nautic-mini-mode > #clock{display:none!important}
 @media(orientation:landscape){body > #clock{top:8px!important}}
 
-/* L'ancre est cliquable, mais aucune réduction CSS : taille gérée par Android. */
-#nauticAnchor{display:inline-block;cursor:pointer;touch-action:manipulation}
 
 /* Horloge : dans le bandeau supérieur, plus sur les cartes GPS/carburant. */
 body > #clock{top:8px!important;left:50%!important;transform:translateX(-50%)!important;height:40px!important;line-height:40px!important;z-index:9999!important}
 @media(orientation:portrait){body > #clock{top:8px!important}}
+
+/* Ajustements de lisibilité : horloge compacte et commandes cartographiques séparées. */
+body > #clock{width:auto!important;min-width:76px!important;height:32px!important;line-height:32px!important;font-size:21px!important;padding:0 9px!important;top:7px!important}
+#nauticAnchor{cursor:default;pointer-events:none}
+#mapWrap .leaflet-top.leaflet-right{top:142px!important;right:8px!important}
+#mapWrap .leaflet-control-zoom{margin-top:0!important;margin-right:0!important}
+#mapWrap #compass{right:12px!important;top:10px!important}
+@media(max-width:760px){#mapWrap .leaflet-top.leaflet-right{top:152px!important}#mapWrap #compass{right:10px!important}}
