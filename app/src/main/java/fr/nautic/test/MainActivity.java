@@ -40,10 +40,6 @@ public class MainActivity extends Activity {
  private static final int PICK_PHONE=201, PICK_IMAGE=202, GPS=100, CAMERA=101, CALLS=103;
  private WebView web;
  private PermissionRequest pendingCamera;
- private WindowManager overlayManager;
- private View anchorOverlay;
- private boolean overlayRequested=false;
- private boolean halfWindowOpen=false;
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -106,13 +102,6 @@ public class MainActivity extends Activity {
    catch(Exception e){return "?";}
   }
   @JavascriptInterface public void minimizeNautic(){runOnUiThread(()->toggleHalfWindow());}
-  @JavascriptInterface public boolean anchorPermissionGranted(){return Settings.canDrawOverlays(MainActivity.this);}
-  @JavascriptInterface public void openAnchorPermissionSettings(){runOnUiThread(()->{
-   try{
-    Intent i=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()));
-    startActivity(i);
-   }catch(Exception e){toast("Ouvre les paramètres Android de Nautic > Afficher par-dessus");}
-  });}
   @JavascriptInterface public void exitApp(){runOnUiThread(()->{if(web!=null)web.stopLoading();finish();});}
   @JavascriptInterface public void call(String number){runOnUiThread(()->{
    try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number))));}
@@ -194,63 +183,29 @@ public class MainActivity extends Activity {
   });}
  }
  private void toggleHalfWindow(){
-  if(halfWindowOpen){restoreHalfWindow();return;}
-  // Une fenêtre réellement flottante requiert SYSTEM_ALERT_WINDOW.
-  if(!Settings.canDrawOverlays(this)){
-   toast("Fenêtre flottante non autorisée. Active-la dans Paramètres Nautic.");
+  // Le mode pop-up natif appartient au gestionnaire de fenêtres du constructeur.
+  // Nautic est redimensionnable, mais Android peut refuser une ouverture libre.
+  if(android.os.Build.VERSION.SDK_INT<24){toast("Mode fenêtre Android indisponible");return;}
+  if(isInMultiWindowMode()){
+   // L'agrandissement est géré par les commandes de la fenêtre système.
+   toast("Pour agrandir, utilise le contrôle plein écran de la fenêtre Android.");
    return;
   }
   try{
-   android.view.ViewGroup parent=(android.view.ViewGroup)web.getParent();
-   if(parent!=null)parent.removeView(web);
-   overlayManager=(WindowManager)getSystemService(WINDOW_SERVICE);
    android.util.DisplayMetrics dm=getResources().getDisplayMetrics();
-   WindowManager.LayoutParams lp=new WindowManager.LayoutParams(
-    dm.widthPixels/2,dm.heightPixels/2,
-    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-    PixelFormat.TRANSLUCENT);
-   lp.gravity=Gravity.TOP|Gravity.LEFT;lp.x=0;lp.y=0;
-   overlayManager.addView(web,lp);
-   halfWindowOpen=true;
-   // Le contenu garde son échelle : c'est la fenêtre Android qui change de taille.
-   moveTaskToBack(true);
+   android.graphics.Rect bounds=new android.graphics.Rect(0,0,Math.max(300,dm.widthPixels/2),Math.max(400,dm.heightPixels/2));
+   android.app.ActivityOptions opts=android.app.ActivityOptions.makeBasic();
+   opts.setLaunchBounds(bounds);
+   Intent i=new Intent(this,MainActivity.class);
+   i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+   startActivity(i,opts.toBundle());
+   toast("Si Android reste en plein écran, ouvre Nautic en fenêtre flottante depuis les applications récentes.");
   }catch(Exception e){
-   halfWindowOpen=false;
-   try{if(web.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)web.getParent()).removeView(web);}catch(Exception ignored){}
-   setContentView(web);
-   toast("Fenêtre flottante impossible : "+e.getClass().getSimpleName());
+   toast("Utilise Applications récentes > Nautic > Fenêtre flottante.");
   }
- }
- private void restoreHalfWindow(){
-  if(!halfWindowOpen)return;
-  try{if(overlayManager!=null)overlayManager.removeView(web);}catch(Exception ignored){}
-  halfWindowOpen=false;
-  setContentView(web);
-  Intent intent=new Intent(this,MainActivity.class);
-  intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT|Intent.FLAG_ACTIVITY_SINGLE_TOP);
-  startActivity(intent);
- }
- private void minimizeToAnchor(){
-  // Même chemin natif que l'application de test, sans faux mode réduit WebView.
-  try{
-   AnchorService.overlayVisible=false;
-   Intent service=new Intent(this,AnchorService.class);
-   if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(service);else startService(service);
-   // Ne jamais cacher Nautic si le système n'a pas réellement créé l'ancre.
-   web.postDelayed(()->{
-    if(AnchorService.overlayVisible){
-     // Aucun rétrécissement de la WebView : elle doit simplement passer derrière l'ancre.
-     moveTaskToBack(true);
-    }else toast("Ancre système non créée : Nautic reste ouvert");
-   },450);
-  }catch(Exception e){toast("Réduction impossible : "+e.getClass().getSimpleName());}
  }
  @Override protected void onResume(){
   super.onResume();
-  if(web!=null){web.animate().cancel();web.setAlpha(1f);web.setScaleX(1f);web.setScaleY(1f);}
-  if(overlayRequested){overlayRequested=false;if(Settings.canDrawOverlays(this))toast("Autorisation accordée : touche l'ancre pour réduire");}
-  // Ne pas détruire l'ancre sur un simple onResume : seul son clic la ferme.
  }
  private void sendRecentCalls(){
   JSONArray out=new JSONArray();
