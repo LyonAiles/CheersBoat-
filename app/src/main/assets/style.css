@@ -268,3 +268,7 @@ body.nautic-mini-mode > #clock{display:none!important}
 
 /* L'ancre est cliquable, mais aucune réduction CSS : taille gérée par Android. */
 #nauticAnchor{display:inline-block;cursor:pointer;touch-action:manipulation}
+
+/* Horloge : dans le bandeau supérieur, plus sur les cartes GPS/carburant. */
+body > #clock{top:8px!important;left:50%!important;transform:translateX(-50%)!important;height:40px!important;line-height:40px!important;z-index:9999!important}
+@media(orientation:portrait){body > #clock{top:8px!important}}
