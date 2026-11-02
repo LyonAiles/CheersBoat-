@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
  <uses-permission android:name="android.permission.INTERNET"/>
- <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
- <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
@@ -14,8 +12,8 @@
   <package android:name="com.tuya.smart"/>
   <package android:name="fr.scssentinel.iscssentinel"/>
  </queries>
- <application android:label="Nautic" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="true">
-  <activity android:name=".MainActivity" android:exported="true">
+ <application android:resizeableActivity="true" android:label="Nautic" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="true">
+  <activity android:name=".MainActivity" android:exported="true" android:resizeableActivity="true" android:supportsPictureInPicture="false">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
   </activity>
   <service android:name=".AnchorService" android:exported="false"/>
