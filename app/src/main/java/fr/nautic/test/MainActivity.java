@@ -194,10 +194,7 @@ public class MainActivity extends Activity {
  }
  private void minimizeToAnchor(){
   // Même chemin natif que l'application de test, sans faux mode réduit WebView.
-  if(android.os.Build.VERSION.SDK_INT>=23&&!Settings.canDrawOverlays(this)){
-   overlayRequested=true;
-   toast("Autorise l'affichage par-dessus, puis reviens à Nautic");
-   try{startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}
+  try{startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}
    catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}
    return;
   }
