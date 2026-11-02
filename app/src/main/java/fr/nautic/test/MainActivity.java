@@ -182,11 +182,30 @@ public class MainActivity extends Activity {
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);startActivity(i);
   });}
  }
+ private boolean nativeHalfWindow=false;
  private void toggleHalfWindow(){
-  // Ne jamais relancer MainActivity : NEW_TASK + MULTIPLE_TASK
-  // créait des copies de Nautic dans les applications récentes.
-  // Le mode pop-up Xiaomi ne peut pas être imposé depuis une Activity.
-  toast("Pour la fenêtre flottante : ouvre les applications récentes, puis choisis Fenêtre flottante sur Nautic.");
+  // Dernier essai sans créer d'Activity, de service ni de fenêtre overlay.
+  // Android/Xiaomi reste seul maître des limites d'une fenêtre pop-up.
+  if(android.os.Build.VERSION.SDK_INT<24 || !isInMultiWindowMode()){
+   toast("Ouvre d'abord Nautic en fenêtre flottante depuis les applications récentes.");
+   return;
+  }
+  try{
+   WindowManager.LayoutParams lp=getWindow().getAttributes();
+   if(!nativeHalfWindow){
+    android.util.DisplayMetrics dm=getResources().getDisplayMetrics();
+    lp.width=Math.max(240,dm.widthPixels/2);
+    lp.height=Math.max(320,dm.heightPixels/2);
+    lp.gravity=Gravity.TOP|Gravity.LEFT;
+    lp.x=0;lp.y=0;
+   }else{
+    lp.width=WindowManager.LayoutParams.MATCH_PARENT;
+    lp.height=WindowManager.LayoutParams.MATCH_PARENT;
+    lp.gravity=Gravity.CENTER;
+   }
+   getWindow().setAttributes(lp);
+   nativeHalfWindow=!nativeHalfWindow;
+  }catch(Exception e){toast("Xiaomi contrôle la taille de cette fenêtre.");}
  }
  @Override protected void onResume(){
   super.onResume();
