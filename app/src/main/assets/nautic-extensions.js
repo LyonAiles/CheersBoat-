@@ -375,7 +375,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  const permissionGranted=()=>{try{return !!(native&&typeof native.anchorPermissionGranted==='function'&&native.anchorPermissionGranted())}catch(e){return false}};
  permissionStatus.textContent=permissionGranted()?'✓ Affichage par-dessus autorisé':'⚠ Affichage par-dessus non autorisé';
  get('settingAnchorPermission').onclick=()=>{if(!nativeCall('openAnchorPermissionSettings'))alert('Ouvre les paramètres Android de Nautic et autorise l’affichage par-dessus les autres applications.');};
- get('settingFloatAnchor').onclick=()=>{if(!permissionGranted()){permissionStatus.textContent='⚠ Autorise d’abord l’affichage par-dessus avec le bouton précédent.';return;}dialog.close();if(!nativeCall('minimizeNautic'))alert('Fonction disponible uniquement dans l’application Android.');};
+ get('settingFloatAnchor').onclick=()=>{dialog.close();if(!nativeCall('minimizeNautic'))alert('Fonction disponible uniquement dans l’application Android.');};
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
  top.insertBefore(saveButton,get('dialogClose'));
