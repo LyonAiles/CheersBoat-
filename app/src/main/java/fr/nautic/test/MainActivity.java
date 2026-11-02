@@ -194,10 +194,6 @@ public class MainActivity extends Activity {
  }
  private void minimizeToAnchor(){
   // Même chemin natif que l'application de test, sans faux mode réduit WebView.
-  try{startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName())));}
-   catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}
-   return;
-  }
   try{
    AnchorService.overlayVisible=false;
    Intent service=new Intent(this,AnchorService.class);
