@@ -183,26 +183,10 @@ public class MainActivity extends Activity {
   });}
  }
  private void toggleHalfWindow(){
-  // Le mode pop-up natif appartient au gestionnaire de fenêtres du constructeur.
-  // Nautic est redimensionnable, mais Android peut refuser une ouverture libre.
-  if(android.os.Build.VERSION.SDK_INT<24){toast("Mode fenêtre Android indisponible");return;}
-  if(isInMultiWindowMode()){
-   // L'agrandissement est géré par les commandes de la fenêtre système.
-   toast("Pour agrandir, utilise le contrôle plein écran de la fenêtre Android.");
-   return;
-  }
-  try{
-   android.util.DisplayMetrics dm=getResources().getDisplayMetrics();
-   android.graphics.Rect bounds=new android.graphics.Rect(0,0,Math.max(300,dm.widthPixels/2),Math.max(400,dm.heightPixels/2));
-   android.app.ActivityOptions opts=android.app.ActivityOptions.makeBasic();
-   opts.setLaunchBounds(bounds);
-   Intent i=new Intent(this,MainActivity.class);
-   i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
-   startActivity(i,opts.toBundle());
-   toast("Si Android reste en plein écran, ouvre Nautic en fenêtre flottante depuis les applications récentes.");
-  }catch(Exception e){
-   toast("Utilise Applications récentes > Nautic > Fenêtre flottante.");
-  }
+  // Ne jamais relancer MainActivity : NEW_TASK + MULTIPLE_TASK
+  // créait des copies de Nautic dans les applications récentes.
+  // Le mode pop-up Xiaomi ne peut pas être imposé depuis une Activity.
+  toast("Pour la fenêtre flottante : ouvre les applications récentes, puis choisis Fenêtre flottante sur Nautic.");
  }
  @Override protected void onResume(){
   super.onResume();
