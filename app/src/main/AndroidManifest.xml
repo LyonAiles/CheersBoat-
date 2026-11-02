@@ -16,7 +16,6 @@
   <activity android:name=".MainActivity" android:exported="true" android:resizeableActivity="true" android:supportsPictureInPicture="false">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
   </activity>
-  <service android:name=".AnchorService" android:exported="false"/>
   <activity android:name=".BoatActivity" android:exported="false"/>
   <activity android:name=".CameraActivity" android:exported="false"/>
  </application>
