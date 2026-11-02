@@ -373,7 +373,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  const floatPanel=document.createElement('section');
  floatPanel.id='nauticFloatingPermissionPanel';
  floatPanel.style.cssText='border:1px solid #45b9dc;border-radius:12px;padding:12px;margin:8px 0 18px;background:#103449';
- floatPanel.innerHTML='<strong>⚓ Fenêtre flottante Android</strong><p id="anchorPermissionStatus" class="muted">Vérification…</p><button type="button" id="settingAnchorPermission" style="width:100%;padding:12px">⚙ Ouvrir l’autorisation Android</button><p class="muted">Autorise « Afficher par-dessus les autres applications » pour Nautic. Ensuite, touche l’ancre du bandeau pour réduire.</p>';
+ floatPanel.innerHTML='<strong>⚓ Fenêtre flottante Android</strong><p id="anchorPermissionStatus" class="muted">Vérification…</p><button type="button" id="settingAnchorPermission" style="width:100%;padding:12px">⚙ Autoriser les fenêtres flottantes de Nautic</button><p class="muted">Autorise « Afficher par-dessus les autres applications » pour Nautic. Ensuite, touche l’ancre du bandeau pour réduire.</p>';
  const dialogTop=dialog.querySelector('.dialogTop');
  if(dialogTop)dialogTop.insertAdjacentElement('afterend',floatPanel);
 
