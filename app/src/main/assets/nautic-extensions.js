@@ -338,7 +338,7 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 applyAppearance();
 
 function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Quitter'],['nauticContactsButton','26 · Bouton Derniers appels'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
- openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet. Le 35 peut être masqué dans Tableau de bord.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><p class="muted">L'ancre du bandeau réduit ou agrandit Nautic. Le réglage Android est indépendant.</p><h3>Apparence et disposition</h3>
+ openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet. Le 35 peut être masqué dans Tableau de bord.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><p class="muted">Nautic accepte le redimensionnement Android. Le mode fenêtre flottante dépend du téléphone.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
  <label>Thème<select class="nautic-select" id="settingTheme"><option value="nautic">Nautic bleu</option><option value="day">Jour clair</option><option value="night">Nuit rouge</option><option value="contrast">Contraste élevé</option><option value="custom">Couleurs personnalisées</option></select></label>
@@ -369,21 +369,8 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type].join(' ; ')).join('\n'))}</textarea>
  <div class="dialogActions"><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
  dialog.classList.add('nautic-settings');
- // Autorisation flottante toujours visible en tête des paramètres, même sur petit écran.
- const floatPanel=document.createElement('section');
- floatPanel.id='nauticFloatingPermissionPanel';
- floatPanel.style.cssText='border:1px solid #45b9dc;border-radius:12px;padding:12px;margin:8px 0 18px;background:#103449';
- floatPanel.innerHTML='<strong>⚓ Fenêtre flottante Android</strong><p id="anchorPermissionStatus" class="muted">Vérification…</p><button type="button" id="settingAnchorPermission" style="width:100%;padding:12px">⚙ Autoriser les fenêtres flottantes de Nautic</button><p class="muted">Autorise « Afficher par-dessus les autres applications » pour Nautic. Ensuite, touche l’ancre du bandeau pour réduire.</p>';
- const dialogTop=dialog.querySelector('.dialogTop');
- if(dialogTop)dialogTop.insertAdjacentElement('afterend',floatPanel);
-
  get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
  applyObjectNumbers();
- const permissionStatus=get('anchorPermissionStatus');
- const permissionGranted=()=>{try{return !!(native&&typeof native.anchorPermissionGranted==='function'&&native.anchorPermissionGranted())}catch(e){return false}};
- permissionStatus.textContent=permissionGranted()?'✓ Affichage par-dessus autorisé':'⚠ Affichage par-dessus non autorisé';
- get('settingAnchorPermission').onclick=()=>{if(!nativeCall('openAnchorPermissionSettings'))alert('Ouvre les paramètres Android de Nautic et autorise l’affichage par-dessus les autres applications.');};
- 
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
  top.insertBefore(saveButton,get('dialogClose'));
