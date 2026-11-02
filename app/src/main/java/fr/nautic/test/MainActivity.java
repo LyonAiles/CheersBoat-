@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
  private WindowManager overlayManager;
  private View anchorOverlay;
  private boolean overlayRequested=false;
+ private boolean halfWindowOpen=false;
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -104,7 +105,7 @@ public class MainActivity extends Activity {
    try{return getPackageManager().getPackageInfo(getPackageName(),0).versionName;}
    catch(Exception e){return "?";}
   }
-  @JavascriptInterface public void minimizeNautic(){runOnUiThread(()->minimizeToAnchor());}
+  @JavascriptInterface public void minimizeNautic(){runOnUiThread(()->toggleHalfWindow());}
   @JavascriptInterface public boolean anchorPermissionGranted(){return Settings.canDrawOverlays(MainActivity.this);}
   @JavascriptInterface public void openAnchorPermissionSettings(){runOnUiThread(()->{
    try{
@@ -191,6 +192,44 @@ public class MainActivity extends Activity {
    if(!address.toLowerCase().startsWith("rtsp://")){toast("Adresse RTSP invalide");return;}
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);startActivity(i);
   });}
+ }
+ private void toggleHalfWindow(){
+  if(halfWindowOpen){restoreHalfWindow();return;}
+  // Une fenêtre réellement flottante requiert SYSTEM_ALERT_WINDOW.
+  if(!Settings.canDrawOverlays(this)){
+   toast("Fenêtre flottante non autorisée. Active-la dans Paramètres Nautic.");
+   return;
+  }
+  try{
+   android.view.ViewGroup parent=(android.view.ViewGroup)web.getParent();
+   if(parent!=null)parent.removeView(web);
+   overlayManager=(WindowManager)getSystemService(WINDOW_SERVICE);
+   android.util.DisplayMetrics dm=getResources().getDisplayMetrics();
+   WindowManager.LayoutParams lp=new WindowManager.LayoutParams(
+    dm.widthPixels/2,dm.heightPixels/2,
+    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+    PixelFormat.TRANSLUCENT);
+   lp.gravity=Gravity.TOP|Gravity.LEFT;lp.x=0;lp.y=0;
+   overlayManager.addView(web,lp);
+   halfWindowOpen=true;
+   // Le contenu garde son échelle : c'est la fenêtre Android qui change de taille.
+   moveTaskToBack(true);
+  }catch(Exception e){
+   halfWindowOpen=false;
+   try{if(web.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)web.getParent()).removeView(web);}catch(Exception ignored){}
+   setContentView(web);
+   toast("Fenêtre flottante impossible : "+e.getClass().getSimpleName());
+  }
+ }
+ private void restoreHalfWindow(){
+  if(!halfWindowOpen)return;
+  try{if(overlayManager!=null)overlayManager.removeView(web);}catch(Exception ignored){}
+  halfWindowOpen=false;
+  setContentView(web);
+  Intent intent=new Intent(this,MainActivity.class);
+  intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+  startActivity(intent);
  }
  private void minimizeToAnchor(){
   // Même chemin natif que l'application de test, sans faux mode réduit WebView.
