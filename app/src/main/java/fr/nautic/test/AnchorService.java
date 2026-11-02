@@ -24,7 +24,7 @@ public class AnchorService extends Service {
    int size=(int)(38*getResources().getDisplayMetrics().density);
    WindowManager.LayoutParams p=new WindowManager.LayoutParams(size,size,Build.VERSION.SDK_INT>=26?WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY:WindowManager.LayoutParams.TYPE_PHONE,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,PixelFormat.TRANSLUCENT);
    p.gravity=Gravity.TOP|Gravity.START;p.x=(int)(6*getResources().getDisplayMetrics().density);p.y=(int)(6*getResources().getDisplayMetrics().density);
-   b.setAlpha(0f);b.setScaleX(.35f);b.setScaleY(.35f);wm.addView(b,p);anchor=b;overlayVisible=true;
+   wm.addView(b,p);anchor=b;overlayVisible=true;
    final float[] down={0,0};final int[] start={0,0};final boolean[] moved={false};
    b.setOnTouchListener((v,e)->{
     if(e.getAction()==MotionEvent.ACTION_DOWN){down[0]=e.getRawX();down[1]=e.getRawY();start[0]=p.x;start[1]=p.y;moved[0]=false;return true;}
@@ -32,7 +32,7 @@ public class AnchorService extends Service {
     if(e.getAction()==MotionEvent.ACTION_UP){if(!moved[0]){startActivity(open);stopSelf();}return true;}
     return true;
    });
-   b.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(320).start();
+   // Affichage immédiat, sans animation ni période invisible.
   }catch(Exception e){overlayVisible=false;android.util.Log.e("NauticAnchor","Impossible de créer l'ancre flottante",e);stopSelf();}
   return START_STICKY;
  }
