@@ -209,7 +209,25 @@ function updateCameras(){
   body.style.backgroundImage=c.image?'linear-gradient(#001b2a33,#001b2a55),url("'+c.image.replaceAll('"','%22')+'")':'';
   body.style.backgroundSize='cover';body.style.backgroundPosition='center';
   card.onclick=()=>{
-   if(c.app==='tapo'){if(!nativeCall('openTapo'))alert('Tapo indisponible');}
+   if(i===1 && c.app==='tapo'){
+    // TC47 : propose les deux objectifs locaux sans exposer les identifiants.
+    const configured=(cfg.cam1||'').trim();
+    openModal('Roof — Tapo TC47',`<h3>Objectifs de la TC47</h3>
+      <div class="choiceGrid"><button id="tc47Fixed">📷 Objectif fixe</button><button id="tc47Pt">🎥 Objectif orientable</button><button id="tc47Tapo">☁ Application Tapo</button></div>
+      <p class="muted">Les deux premiers boutons utilisent le Wi-Fi local. Configure l’adresse RTSP complète de l’objectif fixe dans Paramètres → Caméra Roof. L’application Tapo permet la consultation à distance lorsque Internet est disponible.</p>`,true);
+    const play=(suffix)=>{
+      if(!/^rtsp:\\/\\//i.test(configured)){alert('Renseigne d’abord l’adresse RTSP de Roof dans Paramètres.');return;}
+      let address;
+      try{const u=new URL(configured);u.pathname='/stream'+suffix;u.search='';u.hash='';address=u.toString();}
+      catch(e){alert('Adresse RTSP invalide');return;}
+      dialog.close();
+      if(!nativeCall('openRtsp',address))alert('Lecteur RTSP Android indisponible');
+    };
+    get('tc47Fixed').onclick=()=>play(1);
+    get('tc47Pt').onclick=()=>play(6);
+    get('tc47Tapo').onclick=()=>{dialog.close();if(!nativeCall('openTapo'))alert('Tapo indisponible');};
+   }
+   else if(c.app==='tapo'){if(!nativeCall('openTapo'))alert('Tapo indisponible');}
    else if(c.app==='stream')cameraDialogNative(i);
    else if(c.app==='other'){if(!nativeCall('openCameraApp',c.package,c.scheme))alert('Application caméra indisponible');}
   };
