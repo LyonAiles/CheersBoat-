@@ -13,6 +13,8 @@ const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveTh
 // L'horloge reste affichée, indépendamment des anciens réglages de visibilité.
 state.buttons.clock=true;
 if(!readSetting('nautic-object-numbers-v2')){state.objectNumbers=true;try{localStorage.setItem('nautic-object-numbers-v2','1')}catch(e){}}
+const plugDefaults=[{label:'Prise 1',ip:'192.168.1.102'},{label:'Prise 2',ip:'192.168.1.103'},{label:'Prise 3',ip:'192.168.1.105'}];
+state.smartPlugs=plugDefaults.map((d,i)=>({...d,...(Array.isArray(state.smartPlugs)?state.smartPlugs[i]||{}:{})}));
 const persist=()=>{try{
  const value=JSON.stringify(state);
  if(native&&typeof native.writeSetting==='function'){
@@ -51,6 +53,11 @@ function callNumber(n){if(!nativeCall('call',n))location.href='tel:'+n.replace(/
 function smsNumber(n,msg){if(!nativeCall('sms',n,msg))location.href='sms:'+n.replace(/[^+0-9]/g,'')+'?body='+encodeURIComponent(msg)}
 const head=document.querySelector('header');const headerControls=document.createElement('div');headerControls.id='nauticHeaderControls';head.appendChild(headerControls);const settingsButton=document.createElement('button');
 settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';headerControls.append(settingsButton);const exitButton=document.createElement('button');exitButton.id='nauticExitButton';exitButton.textContent='Quitter';exitButton.title='Fermer Nautic';headerControls.append(exitButton);exitButton.onclick=()=>{if(!confirm('Quitter Nautic ? Le suivi GPS et le journal seront interrompus.'))return;if(!nativeCall('exitApp'))alert('La fermeture est disponible dans l’application Android.');};
+const plugsButton=document.createElement('button');plugsButton.id='nauticPlugsButton';plugsButton.textContent='🔌 Prises';plugsButton.title='Prises intelligentes';headerControls.append(plugsButton);
+function plugsDialog(){
+ openModal('Prises intelligentes',`<p class="muted">Équipements Tuya sur le réseau local. Commandes désactivées tant que le protocole et les clés locales ne sont pas vérifiés.</p>${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>🔌 ${esc(p.label)}</h3><p class="muted">Adresse locale : ${esc(p.ip)}</p><button type="button" disabled>État non disponible — commande non connectée</button></section>`).join('')}`,true);
+}
+plugsButton.onclick=plugsDialog;
 const mapWrap=get('mapWrap');
 const recenter=document.createElement('button');recenter.id='mapRecenter';recenter.textContent='⌖';recenter.title='Recentrer';mapWrap.append(recenter);
 recenter.onclick=()=>{if(map&&latest){gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};map.setView([latest.lat,latest.lon],map.getZoom())}};
@@ -192,7 +199,7 @@ tapoCam.onclick=()=>{if(!nativeCall('openTapo'))alert('Application Tapo indispon
 // One journal, one recenter button; no obsolete Nautic footer control.
 get('routeCard').style.display='none';get('miniMap').style.display='none';let branding=document.querySelector('.branding');if(branding)branding.style.display='none';
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
-function applyVisibility(){const ids=['nauticSettingsButton','nauticExitButton','nauticContactsButton','nauticCallsSlot','mapWrap','gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
+function applyVisibility(){const ids=['nauticSettingsButton','nauticExitButton','nauticPlugsButton','nauticContactsButton','nauticCallsSlot','mapWrap','gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
 
 const cameraDefaults=[
  {name:'Roof',app:'tapo',package:'com.tplink.iot',scheme:'',image:''},
@@ -341,7 +348,7 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 
 applyAppearance();
 
-function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Quitter'],['nauticContactsButton','26 · Bouton Derniers appels'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
+function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Quitter'],['nauticPlugsButton','22 · Prises'],['nauticContactsButton','26 · Bouton Derniers appels'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
  openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet. Le 35 peut être masqué dans Tableau de bord.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><p class="muted">Nautic accepte le redimensionnement Android. Le mode fenêtre flottante dépend du téléphone.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
@@ -357,6 +364,9 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
  <p class="muted">Mode TEST : tous les appels et SMS vers ${testNumber}. Mode réel : coordonnées vérifiées uniquement.</p>
+ <h3>Prises intelligentes — libellés et adresses</h3>
+ ${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>Prise ${i+1}</h3>${field('Libellé','settingPlug'+i+'Label',p.label)}${field('Adresse IP locale','settingPlug'+i+'Ip',p.ip)}</section>`).join('')}
+ <p class="muted">Ces paramètres préparent la connexion locale Tuya. Les interrupteurs ne seront activés qu'après validation du protocole de commande.</p>
  <h3>Caméras — réglages indépendants</h3>\n <button type="button" id="tc47Credentials">Identifiants locaux de la TC47</button>\n <p class="muted">Roof : objectif fixe et orientable en direct, sans ouvrir Tapo. Appuie sur une image pour relancer le flux ; en paysage, touche le médaillon pour inverser les vues.</p>
  ${[1,2,3].map(i=>`<section class="emPanel"><h3>Caméra ${i}</h3>
  ${field('Nom du panneau','settingCam'+i+'Name',state['camera'+i].name)}
@@ -419,6 +429,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
   state.moveThreshold=Math.max(3,Number(get('settingMove').value)||8);
   state.stopMinutes=Math.max(1,Number(get('settingStop').value)||20);
   state.boatName=get('settingBoat').value.trim();
+  state.smartPlugs=state.smartPlugs.map((p,i)=>({...p,label:get('settingPlug'+i+'Label').value.trim()||'Prise '+(i+1),ip:get('settingPlug'+i+'Ip').value.trim()}));
   state.contactPhone=get('settingContactPhone').value.trim();
   state.contacts=get('contactList').value.split('\n').map(x=>x.split(';').map(v=>v.trim())).filter(a=>a.length>=2&&a[0]).map(a=>({label:a[0],phone:a[1],type:a[2]||'Assistance',mode:'call'}));
   for(let i=1;i<=3;i++)cfg['cam'+i]=get('settingCam'+i).value.trim();
