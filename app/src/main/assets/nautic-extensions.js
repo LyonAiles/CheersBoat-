@@ -209,25 +209,11 @@ function updateCameras(){
   body.style.backgroundImage=c.image?'linear-gradient(#001b2a33,#001b2a55),url("'+c.image.replaceAll('"','%22')+'")':'';
   body.style.backgroundSize='cover';body.style.backgroundPosition='center';
   card.onclick=()=>{
-   if(i===1 && c.app==='tapo'){
-    // TC47 : propose les deux objectifs locaux sans exposer les identifiants.
-    const configured=(cfg.cam1||'').trim();
-    openModal('Roof — Tapo TC47',`<h3>Objectifs de la TC47</h3>
-      <div class="choiceGrid"><button id="tc47Fixed">📷 Objectif fixe</button><button id="tc47Pt">🎥 Objectif orientable</button><button id="tc47Tapo">☁ Application Tapo</button></div>
-      <p class="muted">Les deux premiers boutons utilisent le Wi-Fi local. Configure l’adresse RTSP complète de l’objectif fixe dans Paramètres → Caméra Roof. L’application Tapo permet la consultation à distance lorsque Internet est disponible.</p>`,true);
-    const play=(suffix)=>{
-      if(!/^rtsp:\/\//i.test(configured)){alert('Renseigne d’abord l’adresse RTSP de Roof dans Paramètres.');return;}
-      let address;
-      try{const u=new URL(configured);u.pathname='/stream'+suffix;u.search='';u.hash='';address=u.toString();}
-      catch(e){alert('Adresse RTSP invalide');return;}
-      dialog.close();
-      if(!nativeCall('openRtsp',address))alert('Lecteur RTSP Android indisponible');
-    };
-    get('tc47Fixed').onclick=()=>play(1);
-    get('tc47Pt').onclick=()=>play(6);
-    get('tc47Tapo').onclick=()=>{dialog.close();if(!nativeCall('openTapo'))alert('Tapo indisponible');};
+   if(i===1){
+    const address=(cfg.cam1||'rtsp://192.168.1.108:554/stream1').trim();
+    if(!/^rtsp:\/\//i.test(address)){alert('Configure une adresse RTSP pour Roof dans Paramètres.');return;}
+    if(!nativeCall('openRtsp',address))alert('Lecteur RTSP Android indisponible');
    }
-   else if(c.app==='tapo'){if(!nativeCall('openTapo'))alert('Tapo indisponible');}
    else if(c.app==='stream')cameraDialogNative(i);
    else if(c.app==='other'){if(!nativeCall('openCameraApp',c.package,c.scheme))alert('Application caméra indisponible');}
   };
@@ -371,7 +357,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
  <p class="muted">Mode TEST : tous les appels et SMS vers ${testNumber}. Mode réel : coordonnées vérifiées uniquement.</p>
- <h3>Caméras — réglages indépendants</h3>
+ <h3>Caméras — réglages indépendants</h3>\n <button type="button" id="tc47Credentials">Identifiants locaux de la TC47</button>\n <p class="muted">Roof : objectif fixe et orientable en direct, sans ouvrir Tapo. Appuie sur une image pour relancer le flux ; en paysage, touche le médaillon pour inverser les vues.</p>
  ${[1,2,3].map(i=>`<section class="emPanel"><h3>Caméra ${i}</h3>
  ${field('Nom du panneau','settingCam'+i+'Name',state['camera'+i].name)}
  <label>Application<select class="nautic-select" id="settingCam${i}App"><option value="tapo">Tapo</option><option value="stream">Flux réseau</option><option value="other">Autre application Android</option></select></label>
@@ -382,13 +368,14 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <button type="button" id="settingCam${i}Scan">🔎 Tester les activités Android</button>
  <div id="settingCam${i}ScanResults" class="muted"></div>
  </section>`).join('')}
- <p class="muted">Le choix de Tapo ouvre son application. La sélection d’un objectif précis ou de la double vue dépend des fonctions accessibles de Tapo.</p>
+
  <h3>Contacts locaux et personnels</h3><p class="muted">Une ligne par contact : nom ; numéro ; motif. Contacts personnels : appels téléphoniques uniquement.</p>
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type].join(' ; ')).join('\n'))}</textarea>
  <div class="dialogActions"><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
  dialog.classList.add('nautic-settings');
  get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
  applyObjectNumbers();
+ get('tc47Credentials').onclick=()=>nativeCall('configureRtsp');
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
  top.insertBefore(saveButton,get('dialogClose'));
