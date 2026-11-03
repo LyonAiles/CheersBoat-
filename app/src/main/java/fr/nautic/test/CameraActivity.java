@@ -15,6 +15,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.rtsp.RtspMediaSource;
 import androidx.media3.ui.PlayerView;
 
@@ -35,7 +36,6 @@ public class CameraActivity extends Activity {
   Button credentials=new Button(this);credentials.setText("Identifiants caméra");credentials.setOnClickListener(v->askCredentials());root.addView(credentials);
   view=new PlayerView(this);view.setUseController(false);root.addView(view,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
   if(cameraUrl==null||!cameraUrl.toLowerCase().startsWith("rtsp://")){status.setText("Adresse RTSP invalide");return;}
-  String user=getPreferences(0).getString("unused","");
   String saved=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
   if(saved.isEmpty())askCredentials();else play();
  }
@@ -62,7 +62,9 @@ public class CameraActivity extends Activity {
    String address="rtsp://"+auth+"@"+host+(original.getPort()>0?":"+original.getPort():"")+
      (original.getEncodedPath()==null?"/stream1":original.getEncodedPath());
    status.setText("Connexion locale…");
-   player=new ExoPlayer.Builder(this).build();
+   // If the first hardware codec cannot start, try other Android decoders (including software codecs when available).
+   DefaultRenderersFactory renderers=new DefaultRenderersFactory(this).setEnableDecoderFallback(true);
+   player=new ExoPlayer.Builder(this,renderers).build();
    view.setPlayer(player);
    player.addListener(new Player.Listener(){
     @Override public void onPlaybackStateChanged(int state){
@@ -70,7 +72,7 @@ public class CameraActivity extends Activity {
      else if(state==Player.STATE_BUFFERING)status.setText("Chargement de la vidéo…");
     }
     @Override public void onPlayerError(PlaybackException error){
-     status.setText("Échec RTSP : "+error.getErrorCodeName()+". Vérifie le compte caméra ou réessaie ses identifiants.");
+     status.setText("Échec vidéo : "+error.getErrorCodeName()+". Décodeur indisponible ou incompatible. Essayer le flux secondaire /stream2 ou /stream7, et le mode H.264 dans Tapo si disponible.");
     }
    });
    RtspMediaSource.Factory factory=new RtspMediaSource.Factory().setForceUseRtpTcp(true);
