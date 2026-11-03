@@ -216,7 +216,7 @@ function updateCameras(){
       <div class="choiceGrid"><button id="tc47Fixed">📷 Objectif fixe</button><button id="tc47Pt">🎥 Objectif orientable</button><button id="tc47Tapo">☁ Application Tapo</button></div>
       <p class="muted">Les deux premiers boutons utilisent le Wi-Fi local. Configure l’adresse RTSP complète de l’objectif fixe dans Paramètres → Caméra Roof. L’application Tapo permet la consultation à distance lorsque Internet est disponible.</p>`,true);
     const play=(suffix)=>{
-      if(!/^rtsp:\\/\\//i.test(configured)){alert('Renseigne d’abord l’adresse RTSP de Roof dans Paramètres.');return;}
+      if(!/^rtsp:\/\//i.test(configured)){alert('Renseigne d’abord l’adresse RTSP de Roof dans Paramètres.');return;}
       let address;
       try{const u=new URL(configured);u.pathname='/stream'+suffix;u.search='';u.hash='';address=u.toString();}
       catch(e){alert('Adresse RTSP invalide');return;}
