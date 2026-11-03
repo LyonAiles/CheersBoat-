@@ -58,7 +58,7 @@ public class CameraActivity extends Activity {
    String password=getSharedPreferences(PREF,MODE_PRIVATE).getString("password","");
    // Les identifiants restent dans Android ; ils ne sont ni publiés dans GitHub ni injectés dans la page Web.
    String host=original.getHost();if(host==null)throw new IllegalArgumentException("Hôte manquant");
-   String auth=Uri.encode(username)+"%3A"+Uri.encode(password);
+   String auth=Uri.encode(username)+":"+Uri.encode(password);
    String address="rtsp://"+auth+"@"+host+(original.getPort()>0?":"+original.getPort():"")+
      (original.getEncodedPath()==null?"/stream1":original.getEncodedPath());
    status.setText("Connexion locale…");
