@@ -176,6 +176,9 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void openBoat(){runOnUiThread(()->{
    Intent i=new Intent(MainActivity.this,BoatActivity.class);startActivity(i);
   });}
+  @JavascriptInterface public void configureRtsp(){runOnUiThread(()->{
+   Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("settings",true);startActivity(i);
+  });}
   @JavascriptInterface public void openRtsp(String address){runOnUiThread(()->{
    if(!address.toLowerCase().startsWith("rtsp://")){toast("Adresse RTSP invalide");return;}
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);startActivity(i);
