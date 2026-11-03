@@ -25,6 +25,8 @@ public class CameraActivity extends Activity {
  private TextView status;
  private PlayerView view;
  private String cameraUrl;
+ private int retryCount=0;
+ private boolean renderedFrame=false;
  private static final String PREF="nautic_camera_private";
  @Override public void onCreate(Bundle state) {
   super.onCreate(state);
@@ -33,6 +35,7 @@ public class CameraActivity extends Activity {
   LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(0xff000000);
   Button close=new Button(this);close.setText("✕ FERMER LA CAMÉRA");close.setOnClickListener(v->finish());root.addView(close);
   status=new TextView(this);status.setTextColor(-1);status.setPadding(12,8,12,8);status.setText("Connexion RTSP…");root.addView(status);
+  Button reconnect=new Button(this);reconnect.setText("↻ RELANCER LA VIDÉO");reconnect.setOnClickListener(v->{retryCount=0;play();});root.addView(reconnect);
   Button credentials=new Button(this);credentials.setText("Identifiants caméra");credentials.setOnClickListener(v->askCredentials());root.addView(credentials);
   view=new PlayerView(this);view.setUseController(false);root.addView(view,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
   if(cameraUrl==null||!cameraUrl.toLowerCase().startsWith("rtsp://")){status.setText("Adresse RTSP invalide");return;}
@@ -51,7 +54,7 @@ public class CameraActivity extends Activity {
    }).setNegativeButton("Annuler",null).show();
  }
  private void play(){
-  release();
+  release();renderedFrame=false;
   try{
    Uri original=Uri.parse(cameraUrl);
    String username=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
@@ -68,11 +71,16 @@ public class CameraActivity extends Activity {
    view.setPlayer(player);
    player.addListener(new Player.Listener(){
     @Override public void onPlaybackStateChanged(int state){
-     if(state==Player.STATE_READY)status.setText("Vidéo locale connectée");
+     if(state==Player.STATE_READY)status.setText("Flux reçu — attente de la première image…");
      else if(state==Player.STATE_BUFFERING)status.setText("Chargement de la vidéo…");
     }
+    @Override public void onRenderedFirstFrame(){renderedFrame=true;retryCount=0;status.setText("Vidéo locale affichée");}
     @Override public void onPlayerError(PlaybackException error){
-     status.setText("Échec vidéo : "+error.getErrorCodeName()+". Décodeur indisponible ou incompatible. Essayer le flux secondaire /stream2 ou /stream7, et le mode H.264 dans Tapo si disponible.");
+     if(!renderedFrame && retryCount<1){
+      retryCount++;
+      status.setText("Premier décodage échoué — nouvelle tentative…");
+      view.postDelayed(()->{if(!isFinishing())play();},1200);
+     }else status.setText("Échec vidéo : "+error.getErrorCodeName()+". Appuie sur RELANCER LA VIDÉO.");
     }
    });
    RtspMediaSource.Factory factory=new RtspMediaSource.Factory().setForceUseRtpTcp(true);
