@@ -136,19 +136,18 @@ public class CameraActivity extends Activity {
  }
  private void showDiscovery(){
   if(discovering)return;
-  discovering=true;release();
-  root.removeAllViews();
+  discovering=true;release();root.removeAllViews();
   LinearLayout column=new LinearLayout(this);column.setOrientation(LinearLayout.VERTICAL);
   column.setPadding(dp(8),dp(12),dp(8),dp(8));column.setBackgroundColor(0xff091c2b);
   root.addView(column,new FrameLayout.LayoutParams(-1,-1));
-  TextView heading=new TextView(this);heading.setText("Recherche des équipements — Wi-Fi local");
+  TextView heading=new TextView(this);heading.setText("Analyse des équipements — Wi-Fi local");
   heading.setTextColor(Color.WHITE);heading.setTextSize(18);heading.setPadding(dp(4),dp(8),dp(4),dp(12));column.addView(heading);
-  TextView progress=new TextView(this);progress.setText("Recherche des adresses disponibles…");
+  TextView progress=new TextView(this);progress.setText("Préparation de 20 adresses consécutives…");
   progress.setTextColor(Color.WHITE);column.addView(progress);
   android.widget.GridLayout grid=new android.widget.GridLayout(this);grid.setColumnCount(5);
   column.addView(grid,new LinearLayout.LayoutParams(-1,-2));
-  TextView[] cells=new TextView[10];
-  for(int n=0;n<10;n++){
+  TextView[] cells=new TextView[20];
+  for(int n=0;n<cells.length;n++){
    TextView cell=new TextView(this);cells[n]=cell;cell.setText("·");cell.setTextColor(0xffb9d9ee);
    cell.setTextSize(22);cell.setGravity(Gravity.CENTER);cell.setBackgroundColor(0xff142f43);
    android.widget.GridLayout.LayoutParams lp=new android.widget.GridLayout.LayoutParams();
@@ -159,52 +158,51 @@ public class CameraActivity extends Activity {
   close.setTextSize(18);close.setPadding(dp(12),dp(16),dp(12),dp(16));
   close.setOnClickListener(v->finish());column.addView(close);
   new Thread(()->{
+   android.net.wifi.WifiManager wifi=(android.net.wifi.WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
+   int ip=wifi==null?0:wifi.getConnectionInfo().getIpAddress();
+   String prefix=ip!=0?(ip&255)+"."+((ip>>8)&255)+"."+((ip>>16)&255)+".":null;
+   if(prefix==null&&baseUrl!=null&&Uri.parse(baseUrl).getHost()!=null){
+    String host=Uri.parse(baseUrl).getHost();
+    if(host.contains("."))prefix=host.substring(0,host.lastIndexOf('.')+1);
+   }
+   if(prefix==null){runOnUiThread(()->progress.setText("Wi-Fi local indisponible"));return;}
+   final String subnet=prefix;
    java.util.ArrayList<String> hosts=new java.util.ArrayList<>();
-   try{
-    android.net.wifi.WifiManager wifi=(android.net.wifi.WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
-    int ip=wifi==null?0:wifi.getConnectionInfo().getIpAddress();
-    String prefix=ip!=0?(ip&255)+"."+((ip>>8)&255)+"."+((ip>>16)&255)+".":null;
-    if(prefix==null&&baseUrl!=null&&Uri.parse(baseUrl).getHost()!=null){
-     String host=Uri.parse(baseUrl).getHost();prefix=host.substring(0,host.lastIndexOf('.')+1);
-    }
-    if(prefix==null){runOnUiThread(()->progress.setText("Wi-Fi local indisponible"));return;}
-    java.util.concurrent.ExecutorService pool=java.util.concurrent.Executors.newFixedThreadPool(24);
-    java.util.List<java.util.concurrent.Future<?>> tasks=new java.util.ArrayList<>();
-    final String subnet=prefix;
-    for(int n=1;n<255;n++){
-     final String host=subnet+n;
-     tasks.add(pool.submit(()->{
-      for(int port:new int[]{554,6668,6667,80,443}){
-       try(java.net.Socket socket=new java.net.Socket()){
-        socket.connect(new java.net.InetSocketAddress(host,port),350);
-        synchronized(hosts){if(!hosts.contains(host))hosts.add(host);}
-        break;
-       }catch(Exception ignored){}
-      }
-     }));
-    }
-    for(java.util.concurrent.Future<?> task:tasks)try{task.get(15,java.util.concurrent.TimeUnit.SECONDS);}catch(Exception ignored){}
-    pool.shutdownNow();
-   }catch(Exception e){runOnUiThread(()->progress.setText("Erreur Wi-Fi : "+e.getClass().getSimpleName()));}
-   java.util.Collections.sort(hosts,(a,b)->Integer.compare(Integer.parseInt(a.substring(a.lastIndexOf('.')+1)),Integer.parseInt(b.substring(b.lastIndexOf('.')+1))));
-   try{org.json.JSONArray report=new org.json.JSONArray();for(String host:hosts)report.put(host);getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-last",report.toString()).apply();}catch(Exception ignored){}
+   for(int n=101;n<=120;n++)hosts.add(subnet+n);
+   try{org.json.JSONArray report=new org.json.JSONArray();for(String host:hosts)report.put(host);
+    getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-last",report.toString()).apply();
+   }catch(Exception ignored){}
    runOnUiThread(()->{
-    if(isFinishing()||!discovering)return;
-    progress.setText(hosts.isEmpty()?"Aucun équipement répondant sur les ports testés.":"Vérification de "+hosts.size()+" adresse(s) ayant répondu…");
-    if(hosts.isEmpty())for(TextView cell:cells){cell.setText("✕");cell.setTextColor(0xffff5555);}
-    scanPreviewInOrder(cells,hosts,0);
+    if(!discovering||isFinishing())return;
+    progress.setText("Analyse progressive : "+subnet+"101 à "+subnet+"120");
+    scanPreviewInOrder(cells,hosts,0,progress);
    });
   }).start();
  }
- private void scanPreviewInOrder(TextView[] cells,java.util.ArrayList<String> hosts,int index){
-  if(!discovering||isFinishing())return;
-  if(index>=cells.length)return;
-  if(index>=hosts.size()){
-   cells[index].setText("✕");cells[index].setTextColor(0xffff5555);
-   scanPreviewInOrder(cells,hosts,index+1);return;
-  }
+ private void scanPreviewInOrder(TextView[] cells,java.util.ArrayList<String> hosts,int index,TextView progress){
+  if(!discovering||isFinishing()||index>=cells.length)return;
+  String host=hosts.get(index);
+  progress.setText("Test "+(index+1)+"/"+cells.length+" — "+host);
   final int next=index+1;
-  previewTile(cells[index],hosts.get(index),()->scanPreviewInOrder(cells,hosts,next));
+  TextView cell=cells[index];
+  cell.setText("◌");
+  new Thread(()->{
+   boolean responding=false;
+   for(int port:new int[]{554,6668,6667,80,443}){
+    try(java.net.Socket socket=new java.net.Socket()){
+     socket.connect(new java.net.InetSocketAddress(host,port),350);
+     responding=true;break;
+    }catch(Exception ignored){}
+   }
+   final boolean found=responding;
+   runOnUiThread(()->{
+    if(!discovering||isFinishing())return;
+    if(!found){
+     cell.setText("✕");cell.setTextColor(0xffff5555);
+     scanPreviewInOrder(cells,hosts,next,progress);
+    }else previewTile(cell,host,()->scanPreviewInOrder(cells,hosts,next,progress));
+   });
+  }).start();
  }
  private void previewTile(TextView cell,String host,Runnable next){
   String user=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
