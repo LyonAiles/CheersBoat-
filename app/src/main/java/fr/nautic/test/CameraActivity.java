@@ -187,6 +187,7 @@ public class CameraActivity extends Activity {
     pool.shutdownNow();
    }catch(Exception e){runOnUiThread(()->progress.setText("Erreur Wi-Fi : "+e.getClass().getSimpleName()));}
    java.util.Collections.sort(hosts,(a,b)->Integer.compare(Integer.parseInt(a.substring(a.lastIndexOf('.')+1)),Integer.parseInt(b.substring(b.lastIndexOf('.')+1))));
+   try{org.json.JSONArray report=new org.json.JSONArray();for(String host:hosts)report.put(host);getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-last",report.toString()).apply();}catch(Exception ignored){}
    runOnUiThread(()->{
     if(isFinishing()||!discovering)return;
     progress.setText(hosts.isEmpty()?"Aucun équipement répondant sur les ports testés.":"Vérification de "+hosts.size()+" adresse(s) ayant répondu…");
