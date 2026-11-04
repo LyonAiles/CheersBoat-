@@ -86,26 +86,56 @@ public class CameraActivity extends Activity {
   PlayerView pv=new PlayerView(this);pv.setUseController(false);pv.setKeepScreenOn(true);
   pv.setBackgroundColor(Color.TRANSPARENT);pv.setShutterBackgroundColor(Color.TRANSPARENT);
   pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
-  final float[] zoom={1f};
-  final boolean[] pinching={false};
+  final float[] zoom={1f},lastX={0f},lastY={0f};
+  final boolean[] pinching={false},dragging={false};
+  Runnable clamp=()->{
+   float maxX=Math.max(0f,(zoom[0]-1f)*pv.getWidth()/2f);
+   float maxY=Math.max(0f,(zoom[0]-1f)*pv.getHeight()/2f);
+   pv.setTranslationX(Math.max(-maxX,Math.min(maxX,pv.getTranslationX())));
+   pv.setTranslationY(Math.max(-maxY,Math.min(maxY,pv.getTranslationY())));
+  };
   ScaleGestureDetector scale=new ScaleGestureDetector(this,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
-   @Override public boolean onScaleBegin(ScaleGestureDetector d){pinching[0]=true;return true;}
+   @Override public boolean onScaleBegin(ScaleGestureDetector d){pinching[0]=true;dragging[0]=false;return true;}
    @Override public boolean onScale(ScaleGestureDetector d){
     zoom[0]=Math.max(1f,Math.min(4f,zoom[0]*d.getScaleFactor()));
-    pv.setScaleX(zoom[0]);pv.setScaleY(zoom[0]);return true;
+    pv.setScaleX(zoom[0]);pv.setScaleY(zoom[0]);clamp.run();return true;
    }
    @Override public void onScaleEnd(ScaleGestureDetector d){pv.postDelayed(()->pinching[0]=false,180);}
   });
   GestureDetector taps=new GestureDetector(this,new GestureDetector.SimpleOnGestureListener(){
    @Override public boolean onDown(MotionEvent e){return true;}
-   @Override public boolean onDoubleTap(MotionEvent e){if(!pinching[0])restart(lens,true);return true;}
+   @Override public boolean onDoubleTap(MotionEvent e){if(!pinching[0]&&!dragging[0])restart(lens,true);return true;}
    @Override public boolean onSingleTapConfirmed(MotionEvent e){
-    if(!pinching[0]&&getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE
-      &&((swapped?0:1)==lens)){swapped=!swapped;buildViews();}
+    if(!pinching[0]&&!dragging[0]&&zoom[0]<=1.01f
+       &&getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE
+       &&((swapped?0:1)==lens)){swapped=!swapped;buildViews();}
     return true;
    }
   });
-  pv.setOnTouchListener((v,event)->{scale.onTouchEvent(event);if(!scale.isInProgress())taps.onTouchEvent(event);return true;});
+  pv.setOnTouchListener((v,event)->{
+   scale.onTouchEvent(event);
+   if(event.getPointerCount()>1){dragging[0]=false;return true;}
+   switch(event.getActionMasked()){
+    case MotionEvent.ACTION_DOWN:
+     lastX[0]=event.getX();lastY[0]=event.getY();dragging[0]=false;break;
+    case MotionEvent.ACTION_MOVE:
+     if(zoom[0]>1.01f&&!pinching[0]){
+      float dx=event.getX()-lastX[0],dy=event.getY()-lastY[0];
+      if(Math.abs(dx)+Math.abs(dy)>0.5f){
+       dragging[0]=true;
+       pv.setTranslationX(pv.getTranslationX()+dx);
+       pv.setTranslationY(pv.getTranslationY()+dy);clamp.run();
+      }
+     }
+     lastX[0]=event.getX();lastY[0]=event.getY();break;
+    case MotionEvent.ACTION_UP:
+     if(!dragging[0]&&!pinching[0])taps.onTouchEvent(event);
+     dragging[0]=false;return true;
+    case MotionEvent.ACTION_CANCEL:dragging[0]=false;return true;
+   }
+   if(event.getActionMasked()==MotionEvent.ACTION_DOWN&&!pinching[0])taps.onTouchEvent(event);
+   return true;
+  });
   FrameLayout frame=new FrameLayout(this);
   frame.setBackgroundColor(Color.TRANSPARENT);
   frame.setClipChildren(true);frame.setClipToPadding(true);
