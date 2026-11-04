@@ -104,7 +104,7 @@ function networkAddressReport(){
  let addresses=[];try{addresses=JSON.parse(readSetting('nautic-network-last')||'[]')}catch(e){}
  const numeric=ip=>ip.split('.').reduce((a,v)=>a*256+(Number(v)||0),0);
  addresses=[...new Set(addresses)].sort((a,b)=>numeric(a)-numeric(b));
- return addresses.length?'<p class="muted">Dernière analyse locale — adresses ayant répondu (type non confirmé) :</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px">'+addresses.map(ip=>'<div class="emPanel">🔌 '+esc(ip)+'</div>').join('')+'</div>':'<p class="muted">Aucune analyse enregistrée.</p>';
+ return addresses.length?'<p class="muted">Dernière plage analysée — adresses testées (réponse non garantie) :</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px">'+addresses.map(ip=>'<div class="emPanel">🔌 '+esc(ip)+'</div>').join('')+'</div>':'<p class="muted">Aucune analyse enregistrée.</p>';
 }
 function plugsDialog(){equipmentDialog()}
 plugsButton.onclick=plugsDialog;
