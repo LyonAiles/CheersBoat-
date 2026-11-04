@@ -364,7 +364,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
  <p class="muted">Mode TEST : tous les appels et SMS vers ${testNumber}. Mode réel : coordonnées vérifiées uniquement.</p>
- <h3>Prises intelligentes — libellés et adresses</h3>
+ <h3>Découverte réseau</h3><button type="button" id="settingDiscoverDevices">🔎 Rechercher les équipements Wi-Fi</button><div id="settingDiscoverResults" class="muted">Aucune adresse ne sera remplacée sans validation.</div><h3>Prises intelligentes — libellés et adresses</h3>
  ${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>Prise ${i+1}</h3>${field('Libellé','settingPlug'+i+'Label',p.label)}${field('Adresse IP locale','settingPlug'+i+'Ip',p.ip)}</section>`).join('')}
  <p class="muted">Ces paramètres préparent la connexion locale Tuya. Les interrupteurs ne seront activés qu'après validation du protocole de commande.</p>
  <h3>Caméras — réglages indépendants</h3>\n <button type="button" id="tc47Credentials">Identifiants locaux de la TC47</button>\n <p class="muted">Roof : objectif fixe et orientable en direct, sans ouvrir Tapo. Appuie sur une image pour relancer le flux ; en paysage, touche le médaillon pour inverser les vues.</p>
@@ -385,6 +385,39 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  dialog.classList.add('nautic-settings');
  get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
  applyObjectNumbers();
+
+ get('settingDiscoverDevices').onclick=()=>{
+  const box=get('settingDiscoverResults');box.textContent='Balayage en cours…';
+  window.nauticNetworkScanResult=json=>{
+   if(!box.isConnected)return;
+   let rows=[];try{rows=JSON.parse(json)}catch(e){}
+   box.replaceChildren();
+   if(!rows.length){box.textContent='Aucun service RTSP ou Tuya trouvé sur le Wi-Fi.';return}
+   const note=document.createElement('p');note.textContent='Services détectés (identité à confirmer avant association) :';box.append(note);
+   rows.sort((a,b)=>Number(a.ip.split('.').pop())-Number(b.ip.split('.').pop()));
+   rows.forEach(d=>{
+    const panel=document.createElement('section');panel.className='emPanel';
+    const heading=document.createElement('p');heading.textContent=d.ip+' — '+(d.rtsp?'RTSP ':'')+(d.tuya?'Tuya':'');panel.append(heading);
+    if(d.rtsp){
+     const select=document.createElement('select');
+     select.innerHTML='<option value="">Choisir une caméra…</option><option value="1">Caméra 1</option><option value="2">Caméra 2</option><option value="3">Caméra 3</option>';
+     const btn=document.createElement('button');btn.type='button';btn.textContent='Préparer cette adresse';
+     btn.onclick=()=>{
+      const i=Number(select.value);if(!i)return alert('Choisis une caméra.');
+      const field=get('settingCam'+i),old=field.value;
+      const suffix=(old.match(/^rtsp:\/\/[^/]+(\/.*)$/i)||[])[1]||'/stream1';
+      const next='rtsp://'+d.ip+suffix;
+      if(!confirm('Associer cette adresse à la caméra '+i+' ? Vérifie son identité.'))return;
+      field.value=next;field.dispatchEvent(new Event('input',{bubbles:true}));
+      btn.textContent='Prêt — appuie sur Enregistrer';
+     };panel.append(select,btn);
+    }
+    if(d.tuya){const p=document.createElement('p');p.className='muted';p.textContent='Service Tuya : identification et clé locale nécessaires avant commande.';panel.append(p)}
+    box.append(panel);
+   });
+  };
+  if(!nativeCall('scanLocalDevices'))box.textContent='Disponible dans la nouvelle APK.';
+ };
  get('tc47Credentials').onclick=()=>nativeCall('configureRtsp');
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
