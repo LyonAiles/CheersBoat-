@@ -199,7 +199,7 @@ public class CameraActivity extends Activity {
    runOnUiThread(()->{
     if(!discovering||isFinishing())return;
     if(!found){
-     cell.setText("✕");cell.setTextColor(0xffff5555);saveScanStatus(host,"offline");
+     cell.setText("✕");cell.setTextColor(0xffff5555);rememberScanState(host,"offline");saveScanStatus(host,"offline");
      scanPreviewInOrder(cells,hosts,next,progress);
     }else previewTile(cell,host,()->scanPreviewInOrder(cells,hosts,next,progress));
    });
@@ -238,7 +238,7 @@ public class CameraActivity extends Activity {
   player.addListener(new Player.Listener(){
    @Override public void onRenderedFirstFrame(){
     if(completed[0]||!discovering||isFinishing())return;
-    completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.GONE);saveScanStatus(host,"camera");
+    completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.GONE);rememberScanState(host,"camera");saveScanStatus(host,"camera");
     tile.setOnClickListener(v->confirmCamera(host));
     pv.setOnClickListener(v->confirmCamera(host));
     next.run();
@@ -250,6 +250,14 @@ public class CameraActivity extends Activity {
    player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));
    player.prepare();player.play();
   }catch(Exception ignored){unknown.run();}
+ }
+ private void rememberScanState(String host,String type){
+  try{
+   android.content.SharedPreferences prefs=getSharedPreferences("nautic_settings",MODE_PRIVATE);
+   org.json.JSONObject states=new org.json.JSONObject(prefs.getString("nautic-network-states","{}"));
+   states.put(host,type);
+   prefs.edit().putString("nautic-network-states",states.toString()).apply();
+  }catch(Exception ignored){}
  }
  private void confirmCamera(String host){
   new AlertDialog.Builder(this).setTitle("Mémoriser cette caméra ?")
