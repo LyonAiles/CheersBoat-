@@ -54,9 +54,47 @@ function smsNumber(n,msg){if(!nativeCall('sms',n,msg))location.href='sms:'+n.rep
 const head=document.querySelector('header');const headerControls=document.createElement('div');headerControls.id='nauticHeaderControls';head.appendChild(headerControls);const settingsButton=document.createElement('button');
 settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';headerControls.append(settingsButton);const exitButton=document.createElement('button');exitButton.id='nauticExitButton';exitButton.textContent='Quitter';exitButton.title='Fermer Nautic';headerControls.append(exitButton);exitButton.onclick=()=>{if(!confirm('Quitter Nautic ? Le suivi GPS et le journal seront interrompus.'))return;if(!nativeCall('exitApp'))alert('La fermeture est disponible dans l’application Android.');};
 const plugsButton=document.createElement('button');plugsButton.id='nauticPlugsButton';plugsButton.textContent='🔌 Prises';plugsButton.title='Prises intelligentes';headerControls.append(plugsButton);
-function plugsDialog(){
- openModal('Prises intelligentes',`<p class="muted">Équipements Tuya sur le réseau local. Commandes désactivées tant que le protocole et les clés locales ne sont pas vérifiés.</p>${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>🔌 ${esc(p.label)}</h3><p class="muted">Adresse locale : ${esc(p.ip)}</p><button type="button" disabled>État non disponible — commande non connectée</button></section>`).join('')}`,true);
+function equipmentDialog(camera=0){
+ openModal('Équipements Nautic',`<p class="muted">10 emplacements · recherche sur demande · commandes Tuya non activées</p><div id="equipmentGrid" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px"></div><button id="equipmentSearch">🔎 Rechercher les équipements</button><div id="equipmentResults" class="muted"></div>`,true);
+ const grid=get('equipmentGrid');
+ for(let n=0;n<10;n++){
+  const b=document.createElement('button');b.style.cssText='min-height:80px;min-width:0;padding:4px;font-size:12px;overflow-wrap:anywhere';
+  if(n<3){const i=n+1;b.textContent='📷 '+(state['camera'+i]?.name||'Caméra '+i);b.onclick=()=>{dialog.close();cameraDialogNative(i)}}
+  else if(n<6){b.textContent='🔌 '+state.smartPlugs[n-3].label;b.onclick=()=>alert('Commande Tuya non encore opérationnelle.')}
+  else{b.textContent='＋ Libre '+(n+1);b.onclick=()=>settingsDialog()}
+  grid.append(b);
+ }
+ get('equipmentSearch').onclick=()=>scanEquipment(get('equipmentResults'),camera);
 }
+function scanEquipment(box,camera=0){
+ box.textContent='Balayage du réseau Wi-Fi…';
+ window.nauticNetworkScanResult=json=>{
+  if(!box.isConnected)return;
+  let rows=[];try{rows=JSON.parse(json)}catch(e){}
+  box.replaceChildren();
+  if(!rows.length){box.textContent='Aucun service RTSP ou Tuya détecté.';return}
+  rows.sort((a,b)=>Number(a.ip.split('.').pop())-Number(b.ip.split('.').pop()));
+  for(const d of rows){
+   const p=document.createElement('section');p.className='emPanel';
+   const title=document.createElement('p');title.textContent=d.ip+' — '+(d.rtsp?'RTSP ':'')+(d.tuya?'Tuya':'');p.append(title);
+   if(d.rtsp){
+    const select=document.createElement('select');select.innerHTML='<option value="">Caméra à associer…</option><option value="1">Caméra 1</option><option value="2">Caméra 2</option><option value="3">Caméra 3</option>';if(camera)select.value=String(camera);
+    const b=document.createElement('button');b.textContent='Mémoriser cette adresse';b.onclick=()=>{
+     const i=Number(select.value);if(!i)return alert('Choisis une caméra.');
+     const old=cfg['cam'+i]||'',suffix=(old.match(/^rtsp:\/\/[^/]+(\/.*)$/i)||[])[1]||'/stream1',next='rtsp://'+d.ip+':554'+suffix;
+     if(!confirm('Confirmer que '+d.ip+' correspond à la caméra '+i+' ?'))return;
+     cfg['cam'+i]=next;
+     try{saveCfg();if(JSON.parse(readSetting(KEY)||'{}')['cam'+i]!==next)throw Error('Écriture non confirmée');b.textContent='✓ Adresse mémorisée'}
+     catch(e){cfg['cam'+i]=old;alert('Échec de sauvegarde : '+e.message)}
+    };p.append(select,b);
+   }
+   if(d.tuya){const n=document.createElement('p');n.className='muted';n.textContent='Tuya : identification et clé locale nécessaires.';p.append(n)}
+   box.append(p);
+  }
+ };
+ if(!nativeCall('scanLocalDevices'))box.textContent='Balayage indisponible dans cette APK.';
+}
+function plugsDialog(){equipmentDialog()}
 plugsButton.onclick=plugsDialog;
 const mapWrap=get('mapWrap');
 const recenter=document.createElement('button');recenter.id='mapRecenter';recenter.textContent='⌖';recenter.title='Recentrer';mapWrap.append(recenter);
@@ -215,7 +253,9 @@ function updateCameras(){
   body.innerHTML='<span>📷 '+esc(c.name||'Caméra '+i)+'</span>';
   body.style.backgroundImage=c.image?'linear-gradient(#001b2a33,#001b2a55),url("'+c.image.replaceAll('"','%22')+'")':'';
   body.style.backgroundSize='cover';body.style.backgroundPosition='center';
+  card.oncontextmenu=e=>{e.preventDefault();equipmentDialog(i)};
   card.onclick=()=>{
+   if(!cfg['cam'+i] || !/^rtsp:\/\//i.test(cfg['cam'+i])){equipmentDialog(i);return;}
    if(i===1){
     const address=(cfg.cam1||'rtsp://192.168.1.108:554/stream1').trim();
     if(!/^rtsp:\/\//i.test(address)){alert('Configure une adresse RTSP pour Roof dans Paramètres.');return;}
@@ -386,38 +426,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
  applyObjectNumbers();
 
- get('settingDiscoverDevices').onclick=()=>{
-  const box=get('settingDiscoverResults');box.textContent='Balayage en cours…';
-  window.nauticNetworkScanResult=json=>{
-   if(!box.isConnected)return;
-   let rows=[];try{rows=JSON.parse(json)}catch(e){}
-   box.replaceChildren();
-   if(!rows.length){box.textContent='Aucun service RTSP ou Tuya trouvé sur le Wi-Fi.';return}
-   const note=document.createElement('p');note.textContent='Services détectés (identité à confirmer avant association) :';box.append(note);
-   rows.sort((a,b)=>Number(a.ip.split('.').pop())-Number(b.ip.split('.').pop()));
-   rows.forEach(d=>{
-    const panel=document.createElement('section');panel.className='emPanel';
-    const heading=document.createElement('p');heading.textContent=d.ip+' — '+(d.rtsp?'RTSP ':'')+(d.tuya?'Tuya':'');panel.append(heading);
-    if(d.rtsp){
-     const select=document.createElement('select');
-     select.innerHTML='<option value="">Choisir une caméra…</option><option value="1">Caméra 1</option><option value="2">Caméra 2</option><option value="3">Caméra 3</option>';
-     const btn=document.createElement('button');btn.type='button';btn.textContent='Préparer cette adresse';
-     btn.onclick=()=>{
-      const i=Number(select.value);if(!i)return alert('Choisis une caméra.');
-      const field=get('settingCam'+i),old=field.value;
-      const suffix=(old.match(/^rtsp:\/\/[^/]+(\/.*)$/i)||[])[1]||'/stream1';
-      const next='rtsp://'+d.ip+suffix;
-      if(!confirm('Associer cette adresse à la caméra '+i+' ? Vérifie son identité.'))return;
-      field.value=next;field.dispatchEvent(new Event('input',{bubbles:true}));
-      btn.textContent='Prêt — appuie sur Enregistrer';
-     };panel.append(select,btn);
-    }
-    if(d.tuya){const p=document.createElement('p');p.className='muted';p.textContent='Service Tuya : identification et clé locale nécessaires avant commande.';panel.append(p)}
-    box.append(panel);
-   });
-  };
-  if(!nativeCall('scanLocalDevices'))box.textContent='Disponible dans la nouvelle APK.';
- };
+ get('settingDiscoverDevices').onclick=()=>scanEquipment(get('settingDiscoverResults'));
  get('tc47Credentials').onclick=()=>nativeCall('configureRtsp');
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
