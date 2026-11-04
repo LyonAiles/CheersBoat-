@@ -231,6 +231,8 @@ public class MainActivity extends Activity {
  }
  @Override protected void onResume(){
   super.onResume();
+  String saved=getSharedPreferences("nautic_settings",MODE_PRIVATE).getString("nautic-v04","");
+  if(!saved.isEmpty())js("nauticCameraAddressSync",saved);
  }
  private void sendRecentCalls(){
   JSONArray out=new JSONArray();
