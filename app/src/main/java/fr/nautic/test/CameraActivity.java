@@ -54,7 +54,7 @@ public class CameraActivity extends Activity {
   EditText user=new EditText(this);user.setSingleLine(true);user.setHint("Identifiant du compte caméra");
   user.setText(getSharedPreferences(PREF,MODE_PRIVATE).getString("username",""));form.addView(user);
   EditText pass=new EditText(this);pass.setSingleLine(true);pass.setHint("Mot de passe caméra");
-  pass.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);form.addView(pass);
+  pass.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);pass.setText(getSharedPreferences(PREF,MODE_PRIVATE).getString("password",""));form.addView(pass);
   new AlertDialog.Builder(this).setTitle("Paramètres — caméra TC47").setView(form)
    .setPositiveButton("Enregistrer",(d,w)->{
     String u=user.getText().toString().trim(),p=pass.getText().toString();
