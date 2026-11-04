@@ -174,10 +174,13 @@ public class CameraActivity extends Activity {
     for(int n=1;n<255;n++){
      final String host=subnet+n;
      tasks.add(pool.submit(()->{
-      try(java.net.Socket socket=new java.net.Socket()){
-       socket.connect(new java.net.InetSocketAddress(host,554),350);
-       synchronized(hosts){hosts.add(host);}
-      }catch(Exception ignored){}
+      for(int port:new int[]{554,6668,6667,80,443}){
+       try(java.net.Socket socket=new java.net.Socket()){
+        socket.connect(new java.net.InetSocketAddress(host,port),350);
+        synchronized(hosts){if(!hosts.contains(host))hosts.add(host);}
+        break;
+       }catch(Exception ignored){}
+      }
      }));
     }
     for(java.util.concurrent.Future<?> task:tasks)try{task.get(15,java.util.concurrent.TimeUnit.SECONDS);}catch(Exception ignored){}
@@ -186,16 +189,17 @@ public class CameraActivity extends Activity {
    java.util.Collections.sort(hosts,(a,b)->Integer.compare(Integer.parseInt(a.substring(a.lastIndexOf('.')+1)),Integer.parseInt(b.substring(b.lastIndexOf('.')+1))));
    runOnUiThread(()->{
     if(isFinishing()||!discovering)return;
-    progress.setText(hosts.isEmpty()?"Aucun flux RTSP accessible.":"Vérification des images : "+hosts.size()+" adresse(s) RTSP…");
+    progress.setText(hosts.isEmpty()?"Aucun équipement répondant sur les ports testés.":"Vérification de "+hosts.size()+" adresse(s) ayant répondu…");
     if(hosts.isEmpty())for(TextView cell:cells){cell.setText("✕");cell.setTextColor(0xffff5555);}
     for(int n=0;n<Math.min(10,hosts.size());n++)previewTile(cells[n],hosts.get(n));
+    for(int n=Math.min(10,hosts.size());n<10;n++){cells[n].setText("✕");cells[n].setTextColor(0xffff5555);}
    });
   }).start();
  }
  private void previewTile(TextView cell,String host){
   String user=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
   String pass=getSharedPreferences(PREF,MODE_PRIVATE).getString("password","");
-  if(user.isEmpty()){cell.setText("✕");cell.setTextColor(0xffff5555);return;}
+  if(user.isEmpty()){cell.setText("🔌");cell.setTextColor(0xffb9d9ee);return;}
   String uri="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+host+":554/stream2";
   android.view.ViewGroup parent=(android.view.ViewGroup)cell.getParent();
   int index=parent.indexOfChild(cell);
@@ -207,8 +211,8 @@ public class CameraActivity extends Activity {
   android.widget.ProgressBar waiting=new android.widget.ProgressBar(this);
   FrameLayout.LayoutParams waitLayout=new FrameLayout.LayoutParams(dp(32),dp(32),Gravity.CENTER);
   tile.addView(waiting,waitLayout);
-  TextView mark=new TextView(this);mark.setText("✕");mark.setTextSize(22);
-  mark.setTextColor(0xffff5555);mark.setGravity(Gravity.CENTER);mark.setVisibility(View.GONE);
+  TextView mark=new TextView(this);mark.setText("🔌");mark.setTextSize(22);
+  mark.setTextColor(0xffb9d9ee);mark.setGravity(Gravity.CENTER);mark.setVisibility(View.GONE);
   tile.addView(mark,new FrameLayout.LayoutParams(-1,-1));
   final boolean[] completed={false};
   Runnable fail=()->{if(!completed[0]&&!isFinishing()){completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.VISIBLE);}};
