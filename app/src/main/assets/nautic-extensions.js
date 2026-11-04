@@ -59,7 +59,7 @@ window.nauticCameraAddressSync=raw=>{
   for(let i=1;i<=3;i++)if(typeof saved['cam'+i]==='string'&&saved['cam'+i])cfg['cam'+i]=saved['cam'+i];
  }catch(e){}
 };
-const plugsButton=document.createElement('button');plugsButton.id='nauticPlugsButton';plugsButton.textContent='🔌 Prises';plugsButton.title='Prises intelligentes';headerControls.append(plugsButton);
+const plugsButton=document.createElement('button');plugsButton.id='nauticPlugsButton';plugsButton.textContent='🔌 Prises';plugsButton.title='Prises intelligentes';
 function equipmentDialog(camera=0){
  openModal('Équipements Nautic',`<p class="muted">10 emplacements · recherche sur demande · commandes Tuya non activées</p><div id="equipmentGrid" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px"></div><button id="equipmentSearch">🔎 Rechercher les équipements</button><div id="equipmentResults" class="muted"></div>`,true);
  const grid=get('equipmentGrid');
@@ -78,11 +78,12 @@ function scanEquipment(box,camera=0){
   if(!box.isConnected)return;
   let rows=[];try{rows=JSON.parse(json)}catch(e){}
   box.replaceChildren();
-  if(!rows.length){box.textContent='Aucun service RTSP ou Tuya détecté.';return}
+  if(!rows.length){box.textContent='Aucune réponse détectée.';return}
   rows.sort((a,b)=>Number(a.ip.split('.').pop())-Number(b.ip.split('.').pop()));
+  try{native.writeSetting('nautic-network-results',JSON.stringify(rows));const report=get('settingNetworkReport');if(report)report.innerHTML=networkAddressReport()}catch(e){}
   for(const d of rows){
    const p=document.createElement('section');p.className='emPanel';
-   const title=document.createElement('p');title.textContent=d.ip+' — '+(d.rtsp?'RTSP ':'')+(d.tuya?'Tuya':'');p.append(title);
+   const title=document.createElement('p');title.textContent=d.ip+' — '+(d.rtsp?'RTSP possible':d.tuya?'Tuya possible':d.responding?'Équipement indéfini':'Aucune réponse');p.append(title);
    if(d.rtsp){
     const select=document.createElement('select');select.innerHTML='<option value="">Caméra à associer…</option><option value="1">Caméra 1</option><option value="2">Caméra 2</option><option value="3">Caméra 3</option>';if(camera)select.value=String(camera);
     const b=document.createElement('button');b.textContent='Mémoriser cette adresse';b.onclick=()=>{
@@ -101,10 +102,16 @@ function scanEquipment(box,camera=0){
  if(!nativeCall('scanLocalDevices'))box.textContent='Balayage indisponible dans cette APK.';
 }
 function networkAddressReport(){
- let addresses=[];try{addresses=JSON.parse(readSetting('nautic-network-last')||'[]')}catch(e){}
- const numeric=ip=>ip.split('.').reduce((a,v)=>a*256+(Number(v)||0),0);
- addresses=[...new Set(addresses)].sort((a,b)=>numeric(a)-numeric(b));
- return addresses.length?'<p class="muted">Dernière plage analysée — adresses testées (réponse non garantie) :</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px">'+addresses.map(ip=>'<div class="emPanel">🔌 '+esc(ip)+'</div>').join('')+'</div>':'<p class="muted">Aucune analyse enregistrée.</p>';
+ let rows=[],states={};
+ try{rows=JSON.parse(readSetting('nautic-network-results')||'[]')}catch(e){}
+ try{states=JSON.parse(readSetting('nautic-network-states')||'{}')}catch(e){}
+ if(!rows.length){try{rows=JSON.parse(readSetting('nautic-network-last')||'[]').map(ip=>({ip}))}catch(e){}}
+ rows.sort((a,b)=>Number(a.ip.split('.').pop())-Number(b.ip.split('.').pop()));
+ return rows.length?'<p class="muted">Dernière analyse mémorisée (🔌 = réponse sans vidéo confirmée) :</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px">'+rows.map(d=>{
+ const kind=states[d.ip]||(d.responding===false?'offline':d.rtsp?'unknown':d.responding?'unknown':'pending');
+ const symbol=kind==='camera'?'📷':kind==='offline'?'❌':kind==='unknown'?'🔌':'◌';
+ return '<div class="emPanel">'+symbol+' '+esc(d.ip)+'</div>';
+ }).join('')+'</div>':'<p class="muted">Aucune analyse enregistrée.</p>';
 }
 function plugsDialog(){equipmentDialog()}
 plugsButton.onclick=plugsDialog;
@@ -412,7 +419,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
  <p class="muted">Mode TEST : tous les appels et SMS vers ${testNumber}. Mode réel : coordonnées vérifiées uniquement.</p>
- <h3>Analyse du réseau local</h3><button type="button" id="settingDiscoverDevices">🔎 Analyser le réseau Wi-Fi</button><div id="settingNetworkReport">${networkAddressReport()}</div><div id="settingDiscoverResults" class="muted">Aucune adresse ne sera remplacée sans validation.</div><h3>Prises intelligentes — libellés et adresses</h3>
+ <h3>Analyse du réseau local</h3><button type="button" id="settingPlugsButton">🔌 Prises</button><button type="button" id="settingDiscoverDevices">🔎 Analyser le réseau Wi-Fi</button><div id="settingNetworkReport">${networkAddressReport()}</div><div id="settingDiscoverResults" class="muted">Aucune adresse ne sera remplacée sans validation.</div><h3>Prises intelligentes — libellés et adresses</h3>
  ${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>Prise ${i+1}</h3>${field('Libellé','settingPlug'+i+'Label',p.label)}${field('Adresse IP locale','settingPlug'+i+'Ip',p.ip)}</section>`).join('')}
  <p class="muted">Ces paramètres préparent la connexion locale Tuya. Les interrupteurs ne seront activés qu'après validation du protocole de commande.</p>
  <h3>Caméras — réglages indépendants</h3>\n <button type="button" id="tc47Credentials">Identifiants locaux de la TC47</button>\n <p class="muted">Roof : objectif fixe et orientable en direct, sans ouvrir Tapo. Appuie sur une image pour relancer le flux ; en paysage, touche le médaillon pour inverser les vues.</p>
@@ -434,7 +441,9 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
  applyObjectNumbers();
 
+ get('settingPlugsButton').onclick=()=>equipmentDialog();
  get('settingDiscoverDevices').onclick=()=>scanEquipment(get('settingDiscoverResults'));
+ get('settingNetworkReport').innerHTML=networkAddressReport();
  get('tc47Credentials').onclick=()=>nativeCall('configureRtsp');
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
