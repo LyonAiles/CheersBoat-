@@ -255,14 +255,19 @@ function updateCameras(){
   body.style.backgroundSize='cover';body.style.backgroundPosition='center';
   card.oncontextmenu=e=>{e.preventDefault();equipmentDialog(i)};
   card.onclick=()=>{
-   if(!cfg['cam'+i] || !/^rtsp:\/\//i.test(cfg['cam'+i])){equipmentDialog(i);return;}
-   if(i===1){
+   openModal('Caméra '+i,`<p class="muted">Choisis une action pour ${esc(c.name||'Caméra '+i)}.</p><div class="choiceGrid"><button id="cameraViewNow">▶ Voir la caméra</button><button id="cameraFindNow">🔎 Rechercher son adresse</button><button id="cameraAllNow">▦ Équipements Nautic</button></div>`);
+   get('cameraFindNow').onclick=()=>{equipmentDialog(i);get('equipmentSearch').click()};
+   get('cameraAllNow').onclick=()=>equipmentDialog(i);
+   get('cameraViewNow').onclick=()=>{
+    dialog.close();
+    if(i===1){
     const address=(cfg.cam1||'rtsp://192.168.1.108:554/stream1').trim();
     if(!/^rtsp:\/\//i.test(address)){alert('Configure une adresse RTSP pour Roof dans Paramètres.');return;}
     if(!nativeCall('openRtsp',address))alert('Lecteur RTSP Android indisponible');
    }
    else if(c.app==='stream')cameraDialogNative(i);
    else if(c.app==='other'){if(!nativeCall('openCameraApp',c.package,c.scheme))alert('Application caméra indisponible');}
+   };
   };
  }
 }
