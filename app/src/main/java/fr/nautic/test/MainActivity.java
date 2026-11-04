@@ -215,6 +215,15 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void configureRtsp(){runOnUiThread(()->{
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("settings",true);startActivity(i);
   });}
+  @JavascriptInterface public void openRtspForCamera(String address,int index){runOnUiThread(()->{
+   if(address==null||!address.startsWith("rtsp://")){discoverForCamera(index);return;}
+   Intent i=new Intent(MainActivity.this,CameraActivity.class);
+   i.putExtra("url",address);i.putExtra("cameraIndex",index);startActivity(i);
+  });}
+  @JavascriptInterface public void discoverForCamera(int index){runOnUiThread(()->{
+   Intent i=new Intent(MainActivity.this,CameraActivity.class);
+   i.putExtra("discover",true);i.putExtra("cameraIndex",index);startActivity(i);
+  });}
   @JavascriptInterface public void openRtsp(String address){runOnUiThread(()->{
    if(!address.toLowerCase().startsWith("rtsp://")){toast("Adresse RTSP invalide");return;}
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);startActivity(i);
