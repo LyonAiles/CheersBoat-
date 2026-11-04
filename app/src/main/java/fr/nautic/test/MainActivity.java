@@ -180,36 +180,27 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void scanLocalDevices(){
    new Thread(()->{
     org.json.JSONArray found=new org.json.JSONArray();
-    java.util.concurrent.ExecutorService pool=java.util.concurrent.Executors.newFixedThreadPool(24);
-    java.util.List<java.util.concurrent.Future<?>> jobs=new java.util.ArrayList<>();
     try{
      android.net.wifi.WifiManager wifi=(android.net.wifi.WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
      android.net.wifi.WifiInfo info=wifi==null?null:wifi.getConnectionInfo();
      int ip=info==null?0:info.getIpAddress();
      if(ip==0){js("nauticNetworkScanResult","[]");return;}
      String prefix=(ip&255)+"."+((ip>>8)&255)+"."+((ip>>16)&255)+".";
-     for(int n=1;n<255;n++){
-      final String host=prefix+n;
-      jobs.add(pool.submit(()->{
-       boolean rtsp=false,tuya=false;
-       for(int port:new int[]{554,6668,6667}){
-        try(java.net.Socket socket=new java.net.Socket()){
-         socket.connect(new java.net.InetSocketAddress(host,port),280);
-         if(port==554)rtsp=true;else tuya=true;
-        }catch(Exception ignored){}
-       }
-       if(rtsp||tuya){
-        org.json.JSONObject row=new org.json.JSONObject();
-        try{row.put("ip",host);row.put("rtsp",rtsp);row.put("tuya",tuya);
-         synchronized(found){found.put(row);}
-        }catch(Exception ignored){}
-       }
-      }));
+     for(int n=101;n<=120;n++){
+      String host=prefix+n;boolean rtsp=false,tuya=false,other=false;
+      for(int port:new int[]{554,6668,6667,80,443}){
+       try(java.net.Socket socket=new java.net.Socket()){
+        socket.connect(new java.net.InetSocketAddress(host,port),350);
+        if(port==554)rtsp=true;else if(port==6668||port==6667)tuya=true;else other=true;
+       }catch(Exception ignored){}
+      }
+      org.json.JSONObject row=new org.json.JSONObject();
+      row.put("ip",host);row.put("rtsp",rtsp);row.put("tuya",tuya);row.put("responding",rtsp||tuya||other);
+      found.put(row);
      }
-     for(java.util.concurrent.Future<?> job:jobs)try{job.get(14,java.util.concurrent.TimeUnit.SECONDS);}catch(Exception ignored){}
+     getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-results",found.toString()).apply();
      js("nauticNetworkScanResult",found.toString());
     }catch(Exception e){js("nauticNetworkScanResult","[]");}
-    finally{pool.shutdownNow();}
    }).start();
   }
   @JavascriptInterface public void configureRtsp(){runOnUiThread(()->{
