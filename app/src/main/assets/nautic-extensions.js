@@ -276,7 +276,7 @@ function updateCameras(){
   card.onclick=()=>{
    const address=(cfg['cam'+i]||(i===1?'rtsp://192.168.1.101:554/stream1':'')).trim();
    if(/^rtsp:\/\//i.test(address)){if(!nativeCall('openRtspForCamera',address,i))nativeCall('openRtsp',address);}
-   else if(c.app==='other')nativeCall('openCameraApp',c.package,c.scheme);
+   else if(c.app==='other'&&c.package.trim())nativeCall('openCameraApp',c.package.trim(),c.scheme);
    else if(!nativeCall('discoverForCamera',i))equipmentDialog(i);
   };
  }
