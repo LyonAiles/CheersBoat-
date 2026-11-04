@@ -35,6 +35,9 @@ public class CameraActivity extends Activity {
  private String baseUrl;
  private boolean swapped=false;
  private boolean settingsOnly=false;
+ private boolean discovering=false;
+ private int cameraIndex=1;
+ private final java.util.ArrayList<ExoPlayer> previewPlayers=new java.util.ArrayList<>();
  private static final String PREF="nautic_camera_private";
  private int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+0.5f);}
  private GradientDrawable bubble(){GradientDrawable d=new GradientDrawable();d.setColor(0x77000000);d.setCornerRadius(dp(24));return d;}
@@ -43,6 +46,8 @@ public class CameraActivity extends Activity {
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
   baseUrl=getIntent().getStringExtra("url");
   settingsOnly=getIntent().getBooleanExtra("settings",false);
+  cameraIndex=Math.max(1,Math.min(3,getIntent().getIntExtra("cameraIndex",1)));
+  if(getIntent().getBooleanExtra("discover",false)){root=new FrameLayout(this);setContentView(root);showDiscovery();return;}
   if(settingsOnly){configure();return;}
   if(baseUrl==null||!baseUrl.startsWith("rtsp://")){finish();return;}
   root=new FrameLayout(this);root.setBackgroundColor(Color.BLACK);setContentView(root);
@@ -121,7 +126,7 @@ public class CameraActivity extends Activity {
       retries[index]++;
       status.setText("Relance objectif "+(index==0?"fixe":"orientable")+"…");
       root.postDelayed(()->{if(!isFinishing()&&players[index]==p)restart(index,false);},1200);
-     }else status.setText("Objectif "+(index==0?"fixe":"orientable")+" : "+e.getErrorCodeName()+" — toucher l’image pour réessayer");
+     }else{status.setText("Objectif "+(index==0?"fixe":"orientable")+" : "+e.getErrorCodeName());if(index==0&&!frames[0]&&!discovering)root.postDelayed(()->{if(!isFinishing()&&!frames[0])showDiscovery();},1000);}
     }
    });
    RtspMediaSource.Factory source=new RtspMediaSource.Factory().setForceUseRtpTcp(true);
@@ -129,7 +134,106 @@ public class CameraActivity extends Activity {
    p.prepare();p.play();
   }catch(Exception e){status.setText("RTSP : "+e.getClass().getSimpleName());}
  }
+ private void showDiscovery(){
+  if(discovering)return;
+  discovering=true;release();
+  root.removeAllViews();
+  LinearLayout column=new LinearLayout(this);column.setOrientation(LinearLayout.VERTICAL);
+  column.setPadding(dp(8),dp(12),dp(8),dp(8));column.setBackgroundColor(0xff091c2b);
+  root.addView(column,new FrameLayout.LayoutParams(-1,-1));
+  TextView heading=new TextView(this);heading.setText("Recherche des équipements — Wi-Fi local");
+  heading.setTextColor(Color.WHITE);heading.setTextSize(18);heading.setPadding(dp(4),dp(8),dp(4),dp(12));column.addView(heading);
+  TextView progress=new TextView(this);progress.setText("Recherche des adresses disponibles…");
+  progress.setTextColor(Color.WHITE);column.addView(progress);
+  android.widget.GridLayout grid=new android.widget.GridLayout(this);grid.setColumnCount(5);
+  column.addView(grid,new LinearLayout.LayoutParams(-1,-2));
+  TextView[] cells=new TextView[10];
+  for(int n=0;n<10;n++){
+   TextView cell=new TextView(this);cells[n]=cell;cell.setText("✕");cell.setTextColor(0xffff5555);
+   cell.setTextSize(22);cell.setGravity(Gravity.CENTER);cell.setBackgroundColor(0xff142f43);
+   android.widget.GridLayout.LayoutParams lp=new android.widget.GridLayout.LayoutParams();
+   lp.width=0;lp.height=dp(90);lp.columnSpec=android.widget.GridLayout.spec(n%5,1f);
+   lp.rowSpec=android.widget.GridLayout.spec(n/5);lp.setMargins(dp(2),dp(2),dp(2),dp(2));grid.addView(cell,lp);
+  }
+  TextView close=new TextView(this);close.setText("Fermer ✕");close.setTextColor(Color.WHITE);
+  close.setTextSize(18);close.setPadding(dp(12),dp(16),dp(12),dp(16));
+  close.setOnClickListener(v->finish());column.addView(close);
+  new Thread(()->{
+   java.util.ArrayList<String> hosts=new java.util.ArrayList<>();
+   try{
+    android.net.wifi.WifiManager wifi=(android.net.wifi.WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
+    int ip=wifi==null?0:wifi.getConnectionInfo().getIpAddress();
+    String prefix=ip!=0?(ip&255)+"."+((ip>>8)&255)+"."+((ip>>16)&255)+".":null;
+    if(prefix==null&&baseUrl!=null&&Uri.parse(baseUrl).getHost()!=null){
+     String host=Uri.parse(baseUrl).getHost();prefix=host.substring(0,host.lastIndexOf('.')+1);
+    }
+    if(prefix==null){runOnUiThread(()->progress.setText("Wi-Fi local indisponible"));return;}
+    java.util.concurrent.ExecutorService pool=java.util.concurrent.Executors.newFixedThreadPool(24);
+    java.util.List<java.util.concurrent.Future<?>> tasks=new java.util.ArrayList<>();
+    final String subnet=prefix;
+    for(int n=1;n<255;n++){
+     final String host=subnet+n;
+     tasks.add(pool.submit(()->{
+      try(java.net.Socket socket=new java.net.Socket()){
+       socket.connect(new java.net.InetSocketAddress(host,554),350);
+       synchronized(hosts){hosts.add(host);}
+      }catch(Exception ignored){}
+     }));
+    }
+    for(java.util.concurrent.Future<?> task:tasks)try{task.get(15,java.util.concurrent.TimeUnit.SECONDS);}catch(Exception ignored){}
+    pool.shutdownNow();
+   }catch(Exception e){runOnUiThread(()->progress.setText("Erreur Wi-Fi : "+e.getClass().getSimpleName()));}
+   java.util.Collections.sort(hosts,(a,b)->Integer.compare(Integer.parseInt(a.substring(a.lastIndexOf('.')+1)),Integer.parseInt(b.substring(b.lastIndexOf('.')+1))));
+   runOnUiThread(()->{
+    if(isFinishing()||!discovering)return;
+    progress.setText(hosts.isEmpty()?"Aucun flux RTSP accessible. Croix rouges = pas d'image vérifiée.":hosts.size()+" adresse(s) RTSP : vérification des images…");
+    for(int n=0;n<Math.min(10,hosts.size());n++)previewTile(cells[n],hosts.get(n));
+   });
+  }).start();
+ }
+ private void previewTile(TextView cell,String host){
+  String user=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
+  String pass=getSharedPreferences(PREF,MODE_PRIVATE).getString("password","");
+  if(user.isEmpty()){cell.setText("✕");return;}
+  String uri="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+host+":554/stream2";
+  ExoPlayer player=new ExoPlayer.Builder(this).build();previewPlayers.add(player);
+  player.addListener(new Player.Listener(){
+   @Override public void onRenderedFirstFrame(){
+    if(!discovering||isFinishing())return;
+    // Afficher le vrai flux vidéo, pas seulement un port ouvert.
+    android.view.ViewGroup parent=(android.view.ViewGroup)cell.getParent();
+    int index=parent.indexOfChild(cell);
+    PlayerView pv=new PlayerView(CameraActivity.this);pv.setUseController(false);
+    pv.setPlayer(player);
+    parent.removeViewAt(index);parent.addView(pv,index,cell.getLayoutParams());
+    pv.setOnClickListener(v->confirmCamera(host));
+   }
+   @Override public void onPlayerError(PlaybackException e){cell.setText("✕");}
+  });
+  try{
+   player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));
+   player.prepare();player.play();
+  }catch(Exception ignored){cell.setText("✕");}
+ }
+ private void confirmCamera(String host){
+  new AlertDialog.Builder(this).setTitle("Mémoriser cette caméra ?")
+   .setMessage("Adresse "+host+" — caméra "+cameraIndex)
+   .setPositiveButton("Mémoriser et ouvrir",(d,w)->{
+    String key="cam"+cameraIndex;
+    android.content.SharedPreferences prefs=getSharedPreferences("nautic_settings",MODE_PRIVATE);
+    try{
+     org.json.JSONObject cfg=new org.json.JSONObject(prefs.getString("nautic-v04","{}"));
+     String old=cfg.optString(key,"");
+     String path="/stream1";
+     if(old.startsWith("rtsp://")){String p=Uri.parse(old).getPath();if(p!=null&&!p.isEmpty())path=p;}
+     baseUrl="rtsp://"+host+":554"+path;
+     cfg.put(key,baseUrl);prefs.edit().putString("nautic-v04",cfg.toString()).commit();
+     discovering=false;releasePreviews();buildViews();
+    }catch(Exception e){android.widget.Toast.makeText(this,"Sauvegarde impossible",android.widget.Toast.LENGTH_LONG).show();}
+   }).setNegativeButton("Annuler",null).show();
+ }
+ private void releasePreviews(){for(ExoPlayer p:previewPlayers)p.release();previewPlayers.clear();}
  private void release(){for(int i=0;i<2;i++)if(players[i]!=null){views[i].setPlayer(null);players[i].release();players[i]=null;}}
  @Override public void onConfigurationChanged(Configuration config){super.onConfigurationChanged(config);if(!settingsOnly&&root!=null&&views[0]!=null)buildViews();}
- @Override protected void onStop(){release();super.onStop();}
+ @Override protected void onStop(){release();releasePreviews();super.onStop();}
 }
