@@ -194,26 +194,32 @@ public class CameraActivity extends Activity {
  private void previewTile(TextView cell,String host){
   String user=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
   String pass=getSharedPreferences(PREF,MODE_PRIVATE).getString("password","");
-  if(user.isEmpty()){cell.setText("✕");return;}
+  if(user.isEmpty())return;
   String uri="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+host+":554/stream2";
+  android.view.ViewGroup parent=(android.view.ViewGroup)cell.getParent();
+  int index=parent.indexOfChild(cell);
+  android.view.ViewGroup.LayoutParams layout=cell.getLayoutParams();
+  FrameLayout tile=new FrameLayout(this);tile.setBackgroundColor(0xff142f43);
+  parent.removeViewAt(index);parent.addView(tile,index,layout);
+  PlayerView pv=new PlayerView(this);pv.setUseController(false);
+  tile.addView(pv,new FrameLayout.LayoutParams(-1,-1));
+  TextView mark=new TextView(this);mark.setText("✕");mark.setTextSize(22);
+  mark.setTextColor(0xffff5555);mark.setGravity(Gravity.CENTER);
+  tile.addView(mark,new FrameLayout.LayoutParams(-1,-1));
   ExoPlayer player=new ExoPlayer.Builder(this).build();previewPlayers.add(player);
+  pv.setPlayer(player);
   player.addListener(new Player.Listener(){
    @Override public void onRenderedFirstFrame(){
     if(!discovering||isFinishing())return;
-    // Afficher le vrai flux vidéo, pas seulement un port ouvert.
-    android.view.ViewGroup parent=(android.view.ViewGroup)cell.getParent();
-    int index=parent.indexOfChild(cell);
-    PlayerView pv=new PlayerView(CameraActivity.this);pv.setUseController(false);
-    pv.setPlayer(player);
-    parent.removeViewAt(index);parent.addView(pv,index,cell.getLayoutParams());
-    pv.setOnClickListener(v->confirmCamera(host));
+    mark.setVisibility(View.GONE);
+    tile.setOnClickListener(v->confirmCamera(host));
    }
-   @Override public void onPlayerError(PlaybackException e){cell.setText("✕");}
+   @Override public void onPlayerError(PlaybackException e){mark.setVisibility(View.VISIBLE);}
   });
   try{
    player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));
    player.prepare();player.play();
-  }catch(Exception ignored){cell.setText("✕");}
+  }catch(Exception ignored){mark.setVisibility(View.VISIBLE);}
  }
  private void confirmCamera(String host){
   new AlertDialog.Builder(this).setTitle("Mémoriser cette caméra ?")
