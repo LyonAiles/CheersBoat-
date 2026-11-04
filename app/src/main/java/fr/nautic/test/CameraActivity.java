@@ -211,7 +211,7 @@ public class CameraActivity extends Activity {
   mark.setTextColor(0xffff5555);mark.setGravity(Gravity.CENTER);mark.setVisibility(View.GONE);
   tile.addView(mark,new FrameLayout.LayoutParams(-1,-1));
   final boolean[] completed={false};
-  Runnable fail=()->{if(!completed[0]&&!isFinishing()){completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.VISIBLE);playerStopSafe(tile);}};
+  Runnable fail=()->{if(!completed[0]&&!isFinishing()){completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.VISIBLE);}};
   tile.postDelayed(fail,9000);
   ExoPlayer player=new ExoPlayer.Builder(this).build();previewPlayers.add(player);
   pv.setPlayer(player);
