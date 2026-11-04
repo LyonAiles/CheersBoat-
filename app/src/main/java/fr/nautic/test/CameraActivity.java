@@ -31,6 +31,7 @@ import androidx.media3.ui.PlayerView;
 public class CameraActivity extends Activity {
  private final ExoPlayer[] players=new ExoPlayer[2];
  private final PlayerView[] views=new PlayerView[2];
+ private final FrameLayout[] cameraFrames=new FrameLayout[2];
  private final int[] retries=new int[2];
  private final boolean[] frames=new boolean[2];
  private FrameLayout root;
@@ -83,7 +84,8 @@ public class CameraActivity extends Activity {
  }
  private PlayerView makeView(int lens){
   PlayerView pv=new PlayerView(this);pv.setUseController(false);pv.setKeepScreenOn(true);
-  pv.setBackgroundColor(Color.BLACK);pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
+  pv.setBackgroundColor(Color.TRANSPARENT);pv.setShutterBackgroundColor(Color.TRANSPARENT);
+  pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
   final float[] zoom={1f};
   final boolean[] pinching={false};
   ScaleGestureDetector scale=new ScaleGestureDetector(this,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
@@ -104,6 +106,11 @@ public class CameraActivity extends Activity {
    }
   });
   pv.setOnTouchListener((v,event)->{scale.onTouchEvent(event);if(!scale.isInProgress())taps.onTouchEvent(event);return true;});
+  FrameLayout frame=new FrameLayout(this);
+  frame.setBackgroundColor(Color.TRANSPARENT);
+  frame.setClipChildren(true);frame.setClipToPadding(true);
+  frame.addView(pv,new FrameLayout.LayoutParams(-1,-1));
+  cameraFrames[lens]=frame;
   views[lens]=pv;return pv;
  }
  private void buildViews(){
@@ -112,15 +119,15 @@ public class CameraActivity extends Activity {
   boolean landscape=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
   if(landscape){
    int large=swapped?1:0,small=1-large;
-   root.addView(views[large],new FrameLayout.LayoutParams(-1,-1));
+   root.addView(cameraFrames[large],new FrameLayout.LayoutParams(-1,-1));
    FrameLayout.LayoutParams inset=new FrameLayout.LayoutParams(dp(180),dp(110),Gravity.RIGHT|Gravity.BOTTOM);
-   inset.setMargins(0,0,dp(12),dp(12));root.addView(views[small],inset);
+   inset.setMargins(0,0,dp(12),dp(12));root.addView(cameraFrames[small],inset);
    // Single tap on the inset swaps lenses; double tap refreshes either stream.
   }else{
    LinearLayout stack=new LinearLayout(this);stack.setOrientation(LinearLayout.VERTICAL);
    root.addView(stack,new FrameLayout.LayoutParams(-1,-1));
-   stack.addView(views[0],new LinearLayout.LayoutParams(-1,0,1));
-   stack.addView(views[1],new LinearLayout.LayoutParams(-1,0,1));
+   stack.addView(cameraFrames[0],new LinearLayout.LayoutParams(-1,0,1));
+   stack.addView(cameraFrames[1],new LinearLayout.LayoutParams(-1,0,1));
   }
   TextView close=new TextView(this);close.setText("✕");close.setTextColor(Color.WHITE);close.setTextSize(23);
   close.setGravity(Gravity.CENTER);close.setBackground(bubble());
