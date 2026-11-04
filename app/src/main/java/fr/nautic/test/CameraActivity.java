@@ -37,6 +37,7 @@ public class CameraActivity extends Activity {
  private boolean settingsOnly=false;
  private boolean discovering=false;
  private int cameraIndex=1;
+ private final org.json.JSONObject scanStatuses=new org.json.JSONObject();
  private final java.util.ArrayList<ExoPlayer> previewPlayers=new java.util.ArrayList<>();
  private static final String PREF="nautic_camera_private";
  private int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+0.5f);}
@@ -169,8 +170,8 @@ public class CameraActivity extends Activity {
    final String subnet=prefix;
    java.util.ArrayList<String> hosts=new java.util.ArrayList<>();
    for(int n=101;n<=120;n++)hosts.add(subnet+n);
-   try{org.json.JSONArray report=new org.json.JSONArray();for(String host:hosts)report.put(host);
-    getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-last",report.toString()).apply();
+   try{org.json.JSONArray report=new org.json.JSONArray();for(String host:hosts){report.put(host);scanStatuses.put(host,"pending");}
+    getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-last",report.toString()).putString("nautic-network-status",scanStatuses.toString()).apply();
    }catch(Exception ignored){}
    runOnUiThread(()->{
     if(!discovering||isFinishing())return;
@@ -198,11 +199,14 @@ public class CameraActivity extends Activity {
    runOnUiThread(()->{
     if(!discovering||isFinishing())return;
     if(!found){
-     cell.setText("✕");cell.setTextColor(0xffff5555);
+     cell.setText("✕");cell.setTextColor(0xffff5555);saveScanStatus(host,"offline");
      scanPreviewInOrder(cells,hosts,next,progress);
     }else previewTile(cell,host,()->scanPreviewInOrder(cells,hosts,next,progress));
    });
   }).start();
+ }
+ private void saveScanStatus(String host,String status){
+  try{scanStatuses.put(host,status);getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-status",scanStatuses.toString()).apply();}catch(Exception ignored){}
  }
  private void previewTile(TextView cell,String host,Runnable next){
   String user=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
@@ -225,7 +229,7 @@ public class CameraActivity extends Activity {
   final boolean[] completed={false};
   Runnable unknown=()->{
    if(completed[0]||!discovering||isFinishing())return;
-   completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.VISIBLE);next.run();
+   completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.VISIBLE);saveScanStatus(host,"unknown");next.run();
   };
   if(user.isEmpty()){tile.postDelayed(unknown,300);return;}
   String uri="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+host+":554/stream2";
@@ -234,7 +238,7 @@ public class CameraActivity extends Activity {
   player.addListener(new Player.Listener(){
    @Override public void onRenderedFirstFrame(){
     if(completed[0]||!discovering||isFinishing())return;
-    completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.GONE);
+    completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.GONE);saveScanStatus(host,"camera");
     tile.setOnClickListener(v->confirmCamera(host));
     pv.setOnClickListener(v->confirmCamera(host));
     next.run();
