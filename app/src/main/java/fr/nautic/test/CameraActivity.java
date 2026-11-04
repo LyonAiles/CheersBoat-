@@ -149,7 +149,7 @@ public class CameraActivity extends Activity {
   column.addView(grid,new LinearLayout.LayoutParams(-1,-2));
   TextView[] cells=new TextView[10];
   for(int n=0;n<10;n++){
-   TextView cell=new TextView(this);cells[n]=cell;cell.setText("✕");cell.setTextColor(0xffff5555);
+   TextView cell=new TextView(this);cells[n]=cell;cell.setText("◌");cell.setTextColor(0xffb9d9ee);
    cell.setTextSize(22);cell.setGravity(Gravity.CENTER);cell.setBackgroundColor(0xff142f43);
    android.widget.GridLayout.LayoutParams lp=new android.widget.GridLayout.LayoutParams();
    lp.width=0;lp.height=dp(90);lp.columnSpec=android.widget.GridLayout.spec(n%5,1f);
@@ -186,7 +186,8 @@ public class CameraActivity extends Activity {
    java.util.Collections.sort(hosts,(a,b)->Integer.compare(Integer.parseInt(a.substring(a.lastIndexOf('.')+1)),Integer.parseInt(b.substring(b.lastIndexOf('.')+1))));
    runOnUiThread(()->{
     if(isFinishing()||!discovering)return;
-    progress.setText(hosts.isEmpty()?"Aucun flux RTSP accessible. Croix rouges = pas d'image vérifiée.":hosts.size()+" adresse(s) RTSP : vérification des images…");
+    progress.setText(hosts.isEmpty()?"Aucun flux RTSP accessible.":"Vérification des images : "+hosts.size()+" adresse(s) RTSP…");
+    if(hosts.isEmpty())for(TextView cell:cells){cell.setText("✕");cell.setTextColor(0xffff5555);}
     for(int n=0;n<Math.min(10,hosts.size());n++)previewTile(cells[n],hosts.get(n));
    });
   }).start();
@@ -194,7 +195,7 @@ public class CameraActivity extends Activity {
  private void previewTile(TextView cell,String host){
   String user=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
   String pass=getSharedPreferences(PREF,MODE_PRIVATE).getString("password","");
-  if(user.isEmpty())return;
+  if(user.isEmpty()){cell.setText("✕");cell.setTextColor(0xffff5555);return;}
   String uri="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+host+":554/stream2";
   android.view.ViewGroup parent=(android.view.ViewGroup)cell.getParent();
   int index=parent.indexOfChild(cell);
@@ -203,23 +204,29 @@ public class CameraActivity extends Activity {
   parent.removeViewAt(index);parent.addView(tile,index,layout);
   PlayerView pv=new PlayerView(this);pv.setUseController(false);
   tile.addView(pv,new FrameLayout.LayoutParams(-1,-1));
+  android.widget.ProgressBar waiting=new android.widget.ProgressBar(this);
+  FrameLayout.LayoutParams waitLayout=new FrameLayout.LayoutParams(dp(32),dp(32),Gravity.CENTER);
+  tile.addView(waiting,waitLayout);
   TextView mark=new TextView(this);mark.setText("✕");mark.setTextSize(22);
-  mark.setTextColor(0xffff5555);mark.setGravity(Gravity.CENTER);
+  mark.setTextColor(0xffff5555);mark.setGravity(Gravity.CENTER);mark.setVisibility(View.GONE);
   tile.addView(mark,new FrameLayout.LayoutParams(-1,-1));
+  final boolean[] completed={false};
+  Runnable fail=()->{if(!completed[0]&&!isFinishing()){completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.VISIBLE);playerStopSafe(tile);}};
+  tile.postDelayed(fail,9000);
   ExoPlayer player=new ExoPlayer.Builder(this).build();previewPlayers.add(player);
   pv.setPlayer(player);
   player.addListener(new Player.Listener(){
    @Override public void onRenderedFirstFrame(){
     if(!discovering||isFinishing())return;
-    mark.setVisibility(View.GONE);
+    completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.GONE);
     tile.setOnClickListener(v->confirmCamera(host));
    }
-   @Override public void onPlayerError(PlaybackException e){mark.setVisibility(View.VISIBLE);}
+   @Override public void onPlayerError(PlaybackException e){fail.run();}
   });
   try{
    player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));
    player.prepare();player.play();
-  }catch(Exception ignored){mark.setVisibility(View.VISIBLE);}
+  }catch(Exception ignored){fail.run();}
  }
  private void confirmCamera(String host){
   new AlertDialog.Builder(this).setTitle("Mémoriser cette caméra ?")
@@ -233,7 +240,8 @@ public class CameraActivity extends Activity {
      String path="/stream1";
      if(old.startsWith("rtsp://")){String p=Uri.parse(old).getPath();if(p!=null&&!p.isEmpty())path=p;}
      baseUrl="rtsp://"+host+":554"+path;
-     cfg.put(key,baseUrl);prefs.edit().putString("nautic-v04",cfg.toString()).commit();
+     cfg.put(key,baseUrl);
+      if(!prefs.edit().putString("nautic-v04",cfg.toString()).commit())throw new IllegalStateException("Enregistrement non confirmé");
      discovering=false;releasePreviews();buildViews();
     }catch(Exception e){android.widget.Toast.makeText(this,"Sauvegarde impossible",android.widget.Toast.LENGTH_LONG).show();}
    }).setNegativeButton("Annuler",null).show();
