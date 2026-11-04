@@ -100,6 +100,12 @@ function scanEquipment(box,camera=0){
  };
  if(!nativeCall('scanLocalDevices'))box.textContent='Balayage indisponible dans cette APK.';
 }
+function networkAddressReport(){
+ let addresses=[];try{addresses=JSON.parse(readSetting('nautic-network-last')||'[]')}catch(e){}
+ const numeric=ip=>ip.split('.').reduce((a,v)=>a*256+(Number(v)||0),0);
+ addresses=[...new Set(addresses)].sort((a,b)=>numeric(a)-numeric(b));
+ return addresses.length?'<p class="muted">Dernière analyse locale — adresses ayant répondu (type non confirmé) :</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px">'+addresses.map(ip=>'<div class="emPanel">🔌 '+esc(ip)+'</div>').join('')+'</div>':'<p class="muted">Aucune analyse enregistrée.</p>';
+}
 function plugsDialog(){equipmentDialog()}
 plugsButton.onclick=plugsDialog;
 const mapWrap=get('mapWrap');
@@ -406,7 +412,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
  <p class="muted">Mode TEST : tous les appels et SMS vers ${testNumber}. Mode réel : coordonnées vérifiées uniquement.</p>
- <h3>Découverte réseau</h3><button type="button" id="settingDiscoverDevices">🔎 Rechercher les équipements Wi-Fi</button><div id="settingDiscoverResults" class="muted">Aucune adresse ne sera remplacée sans validation.</div><h3>Prises intelligentes — libellés et adresses</h3>
+ <h3>Analyse du réseau local</h3><button type="button" id="settingDiscoverDevices">🔎 Analyser le réseau Wi-Fi</button><div id="settingNetworkReport">${networkAddressReport()}</div><div id="settingDiscoverResults" class="muted">Aucune adresse ne sera remplacée sans validation.</div><h3>Prises intelligentes — libellés et adresses</h3>
  ${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>Prise ${i+1}</h3>${field('Libellé','settingPlug'+i+'Label',p.label)}${field('Adresse IP locale','settingPlug'+i+'Ip',p.ip)}</section>`).join('')}
  <p class="muted">Ces paramètres préparent la connexion locale Tuya. Les interrupteurs ne seront activés qu'après validation du protocole de commande.</p>
  <h3>Caméras — réglages indépendants</h3>\n <button type="button" id="tc47Credentials">Identifiants locaux de la TC47</button>\n <p class="muted">Roof : objectif fixe et orientable en direct, sans ouvrir Tapo. Appuie sur une image pour relancer le flux ; en paysage, touche le médaillon pour inverser les vues.</p>
