@@ -203,8 +203,8 @@ public class MainActivity extends Activity {
     }catch(Exception e){js("nauticNetworkScanResult","[]");}
    }).start();
   }
-  @JavascriptInterface public void configureRtsp(){runOnUiThread(()->{
-   Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("settings",true);startActivity(i);
+  @JavascriptInterface public void configureRtsp(int index){runOnUiThread(()->{
+   Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("settings",true);i.putExtra("cameraIndex",index);startActivity(i);
   });}
   @JavascriptInterface public void openRtspForCamera(String address,int index){runOnUiThread(()->{
    if(address==null||!address.startsWith("rtsp://")){discoverForCamera(index);return;}

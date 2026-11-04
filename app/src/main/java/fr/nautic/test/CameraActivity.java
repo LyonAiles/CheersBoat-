@@ -52,33 +52,41 @@ public class CameraActivity extends Activity {
   baseUrl=getIntent().getStringExtra("url");
   settingsOnly=getIntent().getBooleanExtra("settings",false);
   cameraIndex=Math.max(1,Math.min(3,getIntent().getIntExtra("cameraIndex",1)));
-  if(getIntent().getBooleanExtra("discover",false)){root=new FrameLayout(this);setContentView(root);showDiscovery();return;}
+  boolean discover=getIntent().getBooleanExtra("discover",false);
   if(settingsOnly){configure();return;}
-  if(baseUrl==null||!baseUrl.startsWith("rtsp://")){finish();return;}
+  if(!discover&&(baseUrl==null||!baseUrl.startsWith("rtsp://"))){finish();return;}
   root=new FrameLayout(this);root.setBackgroundColor(Color.BLACK);setContentView(root);
-  if(getSharedPreferences(PREF,MODE_PRIVATE).getString("username","").isEmpty()){configure();return;}
-  buildViews();
+  if(!discover&&credential("username").isEmpty()){configure();return;}
+  openCamera();
+ }
+ private void openCamera(){
+  if(getIntent().getBooleanExtra("discover",false))showDiscovery();
+  else buildViews();
+ }
+ private String credential(String key){
+  android.content.SharedPreferences prefs=getSharedPreferences(PREF,MODE_PRIVATE);
+  return prefs.getString(key+cameraIndex,prefs.getString(key,""));
  }
  private void configure(){
   LinearLayout form=new LinearLayout(this);form.setPadding(dp(24),dp(8),dp(24),0);form.setOrientation(LinearLayout.VERTICAL);
   EditText user=new EditText(this);user.setSingleLine(true);user.setHint("Identifiant du compte caméra");
-  user.setText(getSharedPreferences(PREF,MODE_PRIVATE).getString("username",""));form.addView(user);
+  user.setText(credential("username"));form.addView(user);
   EditText pass=new EditText(this);pass.setSingleLine(true);pass.setHint("Mot de passe caméra");
-  pass.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);pass.setText(getSharedPreferences(PREF,MODE_PRIVATE).getString("password",""));form.addView(pass);
-  new AlertDialog.Builder(this).setTitle("Paramètres — caméra TC47").setView(form)
+  pass.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);pass.setText(credential("password"));form.addView(pass);
+  new AlertDialog.Builder(this).setTitle("Identifiants locaux — caméra "+cameraIndex).setView(form)
    .setPositiveButton("Enregistrer",(d,w)->{
     String u=user.getText().toString().trim(),p=pass.getText().toString();
     if(!u.isEmpty()){
      android.content.SharedPreferences old=getSharedPreferences(PREF,MODE_PRIVATE);
-     old.edit().putString("username",u).putString("password",p.isEmpty()?old.getString("password",""):p).apply();
+     old.edit().putString("username"+cameraIndex,u).putString("password"+cameraIndex,p.isEmpty()?credential("password"):p).apply();
     }
-    if(settingsOnly)finish();else buildViews();
+    if(settingsOnly)finish();else openCamera();
    }).setNegativeButton("Annuler",(d,w)->{if(settingsOnly||views[0]==null)finish();}).show();
  }
  private String stream(int lens){
   Uri uri=Uri.parse(baseUrl);
-  String username=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
-  String password=getSharedPreferences(PREF,MODE_PRIVATE).getString("password","");
+  String username=credential("username");
+  String password=credential("password");
   String auth=Uri.encode(username)+":"+Uri.encode(password);
   return "rtsp://"+auth+"@"+uri.getHost()+(uri.getPort()>0?":"+uri.getPort():"")+(lens==0?"/stream1":"/stream6");
  }
@@ -267,8 +275,8 @@ public class CameraActivity extends Activity {
   try{scanStatuses.put(host,status);getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-status",scanStatuses.toString()).apply();}catch(Exception ignored){}
  }
  private void previewTile(TextView cell,String host,Runnable next){
-  String user=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
-  String pass=getSharedPreferences(PREF,MODE_PRIVATE).getString("password","");
+  String user=credential("username");
+  String pass=credential("password");
   android.view.ViewGroup parent=(android.view.ViewGroup)cell.getParent();
   int index=parent.indexOfChild(cell);
   android.view.ViewGroup.LayoutParams layout=cell.getLayoutParams();

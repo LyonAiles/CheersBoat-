@@ -422,13 +422,15 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <h3>Analyse du réseau local</h3><button type="button" id="settingPlugsButton">🔌 Prises</button><button type="button" id="settingDiscoverDevices">🔎 Analyser le réseau Wi-Fi</button><div id="settingNetworkReport">${networkAddressReport()}</div><div id="settingDiscoverResults" class="muted">Aucune adresse ne sera remplacée sans validation.</div><h3>Prises intelligentes — libellés et adresses</h3>
  ${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>Prise ${i+1}</h3>${field('Libellé','settingPlug'+i+'Label',p.label)}${field('Adresse IP locale','settingPlug'+i+'Ip',p.ip)}</section>`).join('')}
  <p class="muted">Ces paramètres préparent la connexion locale Tuya. Les interrupteurs ne seront activés qu'après validation du protocole de commande.</p>
- <h3>Caméras — réglages indépendants</h3>\n <button type="button" id="tc47Credentials">Identifiants locaux de la TC47</button>\n <p class="muted">Roof : objectif fixe et orientable en direct, sans ouvrir Tapo. Appuie sur une image pour relancer le flux ; en paysage, touche le médaillon pour inverser les vues.</p>
+ <h3>Caméras — réglages indépendants</h3>
+ <p class="muted">Double-touche une vidéo pour la relancer. Pince pour zoomer, puis glisse pour déplacer l’image. En paysage, touche le médaillon pour inverser les vues.</p>
  ${[1,2,3].map(i=>`<section class="emPanel"><h3>Caméra ${i}</h3>
  ${field('Nom du panneau','settingCam'+i+'Name',state['camera'+i].name)}
  <label>Application<select class="nautic-select" id="settingCam${i}App"><option value="tapo">Tapo</option><option value="stream">Flux réseau</option><option value="other">Autre application Android</option></select></label>
  ${field('Paquet Android','settingCam'+i+'Package',state['camera'+i].package)}
  ${field('Lien profond (facultatif)','settingCam'+i+'Scheme',state['camera'+i].scheme)}
  ${field('Adresse RTSP / MJPEG / HTTP','settingCam'+i,cfg['cam'+i])}
+ <button type="button" id="settingCam${i}Credentials">Identifiants locaux RTSP</button>
  <button type="button" id="settingCam${i}Photo">🖼 Image du panneau</button>
  <button type="button" id="settingCam${i}Scan">🔎 Tester les activités Android</button>
  <div id="settingCam${i}ScanResults" class="muted"></div>
@@ -444,12 +446,12 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('settingPlugsButton').onclick=()=>equipmentDialog();
  get('settingDiscoverDevices').onclick=()=>scanEquipment(get('settingDiscoverResults'));
  get('settingNetworkReport').innerHTML=networkAddressReport();
- get('tc47Credentials').onclick=()=>nativeCall('configureRtsp');
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
  top.insertBefore(saveButton,get('dialogClose'));
  for(let i=1;i<=3;i++){
   get('settingCam'+i+'App').value=state['camera'+i].app;
+  get('settingCam'+i+'Credentials').onclick=()=>nativeCall('configureRtsp',i);
   get('settingCam'+i+'Photo').onclick=()=>{window.nauticCameraPhotoPending=i;nativeCall('pickImage')};
   get('settingCam'+i+'Scan').onclick=()=>{
    const pkg=get('settingCam'+i+'Package').value.trim()||(get('settingCam'+i+'App').value==='tapo'?'com.tplink.iot':'');
