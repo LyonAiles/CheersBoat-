@@ -53,6 +53,12 @@ function callNumber(n){if(!nativeCall('call',n))location.href='tel:'+n.replace(/
 function smsNumber(n,msg){if(!nativeCall('sms',n,msg))location.href='sms:'+n.replace(/[^+0-9]/g,'')+'?body='+encodeURIComponent(msg)}
 const head=document.querySelector('header');const headerControls=document.createElement('div');headerControls.id='nauticHeaderControls';head.appendChild(headerControls);const settingsButton=document.createElement('button');
 settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';headerControls.append(settingsButton);const exitButton=document.createElement('button');exitButton.id='nauticExitButton';exitButton.textContent='Quitter';exitButton.title='Fermer Nautic';headerControls.append(exitButton);exitButton.onclick=()=>{if(!confirm('Quitter Nautic ? Le suivi GPS et le journal seront interrompus.'))return;if(!nativeCall('exitApp'))alert('La fermeture est disponible dans l’application Android.');};
+window.nauticCameraAddressSync=raw=>{
+ try{
+  const saved=JSON.parse(raw);
+  for(let i=1;i<=3;i++)if(typeof saved['cam'+i]==='string'&&saved['cam'+i])cfg['cam'+i]=saved['cam'+i];
+ }catch(e){}
+};
 const plugsButton=document.createElement('button');plugsButton.id='nauticPlugsButton';plugsButton.textContent='🔌 Prises';plugsButton.title='Prises intelligentes';headerControls.append(plugsButton);
 function equipmentDialog(camera=0){
  openModal('Équipements Nautic',`<p class="muted">10 emplacements · recherche sur demande · commandes Tuya non activées</p><div id="equipmentGrid" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px"></div><button id="equipmentSearch">🔎 Rechercher les équipements</button><div id="equipmentResults" class="muted"></div>`,true);
