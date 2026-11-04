@@ -149,7 +149,7 @@ public class CameraActivity extends Activity {
   column.addView(grid,new LinearLayout.LayoutParams(-1,-2));
   TextView[] cells=new TextView[10];
   for(int n=0;n<10;n++){
-   TextView cell=new TextView(this);cells[n]=cell;cell.setText("◌");cell.setTextColor(0xffb9d9ee);
+   TextView cell=new TextView(this);cells[n]=cell;cell.setText("·");cell.setTextColor(0xffb9d9ee);
    cell.setTextSize(22);cell.setGravity(Gravity.CENTER);cell.setBackgroundColor(0xff142f43);
    android.widget.GridLayout.LayoutParams lp=new android.widget.GridLayout.LayoutParams();
    lp.width=0;lp.height=dp(90);lp.columnSpec=android.widget.GridLayout.spec(n%5,1f);
@@ -192,16 +192,23 @@ public class CameraActivity extends Activity {
     if(isFinishing()||!discovering)return;
     progress.setText(hosts.isEmpty()?"Aucun équipement répondant sur les ports testés.":"Vérification de "+hosts.size()+" adresse(s) ayant répondu…");
     if(hosts.isEmpty())for(TextView cell:cells){cell.setText("✕");cell.setTextColor(0xffff5555);}
-    for(int n=0;n<Math.min(10,hosts.size());n++)previewTile(cells[n],hosts.get(n));
-    for(int n=Math.min(10,hosts.size());n<10;n++){cells[n].setText("✕");cells[n].setTextColor(0xffff5555);}
+    scanPreviewInOrder(cells,hosts,0);
    });
   }).start();
  }
- private void previewTile(TextView cell,String host){
+ private void scanPreviewInOrder(TextView[] cells,java.util.ArrayList<String> hosts,int index){
+  if(!discovering||isFinishing())return;
+  if(index>=cells.length)return;
+  if(index>=hosts.size()){
+   cells[index].setText("✕");cells[index].setTextColor(0xffff5555);
+   scanPreviewInOrder(cells,hosts,index+1);return;
+  }
+  final int next=index+1;
+  previewTile(cells[index],hosts.get(index),()->scanPreviewInOrder(cells,hosts,next));
+ }
+ private void previewTile(TextView cell,String host,Runnable next){
   String user=getSharedPreferences(PREF,MODE_PRIVATE).getString("username","");
   String pass=getSharedPreferences(PREF,MODE_PRIVATE).getString("password","");
-  if(user.isEmpty()){cell.setText("🔌");cell.setTextColor(0xffb9d9ee);return;}
-  String uri="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+host+":554/stream2";
   android.view.ViewGroup parent=(android.view.ViewGroup)cell.getParent();
   int index=parent.indexOfChild(cell);
   android.view.ViewGroup.LayoutParams layout=cell.getLayoutParams();
@@ -210,28 +217,37 @@ public class CameraActivity extends Activity {
   PlayerView pv=new PlayerView(this);pv.setUseController(false);
   tile.addView(pv,new FrameLayout.LayoutParams(-1,-1));
   android.widget.ProgressBar waiting=new android.widget.ProgressBar(this);
-  FrameLayout.LayoutParams waitLayout=new FrameLayout.LayoutParams(dp(32),dp(32),Gravity.CENTER);
-  tile.addView(waiting,waitLayout);
+  tile.addView(waiting,new FrameLayout.LayoutParams(dp(32),dp(32),Gravity.CENTER));
   TextView mark=new TextView(this);mark.setText("🔌");mark.setTextSize(22);
   mark.setTextColor(0xffb9d9ee);mark.setGravity(Gravity.CENTER);mark.setVisibility(View.GONE);
   tile.addView(mark,new FrameLayout.LayoutParams(-1,-1));
+  TextView address=new TextView(this);address.setText(host);address.setTextColor(Color.WHITE);
+  address.setTextSize(10);address.setGravity(Gravity.CENTER);address.setBackgroundColor(0x99000000);
+  tile.addView(address,new FrameLayout.LayoutParams(-1,dp(18),Gravity.BOTTOM));
   final boolean[] completed={false};
-  Runnable fail=()->{if(!completed[0]&&!isFinishing()){completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.VISIBLE);}};
-  tile.postDelayed(fail,9000);
+  Runnable unknown=()->{
+   if(completed[0]||!discovering||isFinishing())return;
+   completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.VISIBLE);next.run();
+  };
+  if(user.isEmpty()){tile.postDelayed(unknown,300);return;}
+  String uri="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+host+":554/stream2";
   ExoPlayer player=new ExoPlayer.Builder(this).build();previewPlayers.add(player);
   pv.setPlayer(player);
   player.addListener(new Player.Listener(){
    @Override public void onRenderedFirstFrame(){
-    if(!discovering||isFinishing())return;
+    if(completed[0]||!discovering||isFinishing())return;
     completed[0]=true;waiting.setVisibility(View.GONE);mark.setVisibility(View.GONE);
     tile.setOnClickListener(v->confirmCamera(host));
+    pv.setOnClickListener(v->confirmCamera(host));
+    next.run();
    }
-   @Override public void onPlayerError(PlaybackException e){fail.run();}
+   @Override public void onPlayerError(PlaybackException e){unknown.run();}
   });
+  tile.postDelayed(unknown,9000);
   try{
    player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));
    player.prepare();player.play();
-  }catch(Exception ignored){fail.run();}
+  }catch(Exception ignored){unknown.run();}
  }
  private void confirmCamera(String host){
   new AlertDialog.Builder(this).setTitle("Mémoriser cette caméra ?")
