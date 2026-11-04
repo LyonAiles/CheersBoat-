@@ -9,6 +9,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -81,7 +84,26 @@ public class CameraActivity extends Activity {
  private PlayerView makeView(int lens){
   PlayerView pv=new PlayerView(this);pv.setUseController(false);pv.setKeepScreenOn(true);
   pv.setBackgroundColor(Color.BLACK);pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
-  pv.setOnClickListener(v->restart(lens,true));
+  final float[] zoom={1f};
+  final boolean[] pinching={false};
+  ScaleGestureDetector scale=new ScaleGestureDetector(this,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
+   @Override public boolean onScaleBegin(ScaleGestureDetector d){pinching[0]=true;return true;}
+   @Override public boolean onScale(ScaleGestureDetector d){
+    zoom[0]=Math.max(1f,Math.min(4f,zoom[0]*d.getScaleFactor()));
+    pv.setScaleX(zoom[0]);pv.setScaleY(zoom[0]);return true;
+   }
+   @Override public void onScaleEnd(ScaleGestureDetector d){pv.postDelayed(()->pinching[0]=false,180);}
+  });
+  GestureDetector taps=new GestureDetector(this,new GestureDetector.SimpleOnGestureListener(){
+   @Override public boolean onDown(MotionEvent e){return true;}
+   @Override public boolean onDoubleTap(MotionEvent e){if(!pinching[0])restart(lens,true);return true;}
+   @Override public boolean onSingleTapConfirmed(MotionEvent e){
+    if(!pinching[0]&&getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE
+      &&((swapped?0:1)==lens)){swapped=!swapped;buildViews();}
+    return true;
+   }
+  });
+  pv.setOnTouchListener((v,event)->{scale.onTouchEvent(event);if(!scale.isInProgress())taps.onTouchEvent(event);return true;});
   views[lens]=pv;return pv;
  }
  private void buildViews(){
@@ -93,8 +115,7 @@ public class CameraActivity extends Activity {
    root.addView(views[large],new FrameLayout.LayoutParams(-1,-1));
    FrameLayout.LayoutParams inset=new FrameLayout.LayoutParams(dp(180),dp(110),Gravity.RIGHT|Gravity.BOTTOM);
    inset.setMargins(0,0,dp(12),dp(12));root.addView(views[small],inset);
-   // Tapping the inset swaps the two cameras; tapping the large image refreshes it.
-   views[small].setOnClickListener(v->{swapped=!swapped;buildViews();});
+   // Single tap on the inset swaps lenses; double tap refreshes either stream.
   }else{
    LinearLayout stack=new LinearLayout(this);stack.setOrientation(LinearLayout.VERTICAL);
    root.addView(stack,new FrameLayout.LayoutParams(-1,-1));
