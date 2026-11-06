@@ -24,8 +24,8 @@
   if(Number(s.alertTime)>lastAlert){lastAlert=Number(s.alertTime);if(Date.now()-lastAlert<30000)alarmUntil=lastAlert+30000;}
   activationUntil=Number(s.activationTime||0)+4000;
   trematage.classList.toggle('trematage-alert',Date.now()<alarmUntil||(s.active&&Date.now()<activationUntil));
-  $('trematageState').textContent=pending?'Positionnement…':Date.now()<alarmUntil?(s.alert||'⚠'):Date.now()<resultUntil?resultText:s.active?'↶ Revenir':'▶ Activer';
-  trematage.setAttribute('aria-label',s.active?'Revenir à la position précédente':'Activer la position Trématage');
+  $('trematageState').textContent=pending?'Positionnement…':Date.now()<alarmUntil?(s.alert||'⚠'):Date.now()<resultUntil?resultText:s.active?'↶ BASE':'▶ Activer';
+  trematage.setAttribute('aria-label',s.active?'Revenir à BASE':'Activer la position Trématage');
   trematage.title=(s.active?'Trématage actif':'Trématage inactif')+' · '+(s.status||'appui long pour régler');
  }catch(e){}}
  trematage.onclick=()=>{if(pending)return;if(!bridge){$('trematageState').textContent='Application Android requise';return;}pending=true;refresh();call('toggleTrematage');};

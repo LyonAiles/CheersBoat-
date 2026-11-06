@@ -4,12 +4,17 @@ import android.content.Context;
 import android.media.*;
 import android.os.*;
 
+/** A distinct three-pulse warning, shared by activation and camera alerts. */
 final class TrematageFeedback {
+ private static final Handler handler=new Handler(Looper.getMainLooper());
+ private static ToneGenerator tone;
  static void activated(Context context){
-  Context app=context.getApplicationContext();TrematageAccess.prefs(app).edit().putLong("activationTime",System.currentTimeMillis()).apply();
-  new Handler(Looper.getMainLooper()).post(()->{try{
-   Ringtone sound=RingtoneManager.getRingtone(app,RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION));
-   if(sound!=null){sound.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());sound.play();new Handler(Looper.getMainLooper()).postDelayed(sound::stop,2000);}
-  }catch(Exception ignored){}});
+  TrematageAccess.prefs(context).edit().putLong("activationTime",System.currentTimeMillis()).apply();playAlert();
  }
+ static void playAlert(){handler.post(()->{try{
+  if(tone!=null){tone.release();tone=null;}
+  ToneGenerator current=new ToneGenerator(AudioManager.STREAM_ALARM,85);tone=current;
+  for(int i=0;i<3;i++)handler.postDelayed(()->{if(tone==current)current.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD,600);},i*800L);
+  handler.postDelayed(()->{if(tone==current){current.release();tone=null;}},2400);
+ }catch(Exception ignored){}});}
 }

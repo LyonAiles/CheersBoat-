@@ -140,7 +140,7 @@ final class CameraControls {
   Runnable bindShortcut=()->prefs.edit().putInt("shortcutIndex",cameraIndex).putString("shortcutProfile",p.getAttribute("token")).putString("shortcutKey",key).apply();
   add(target,"Mémoriser cette orientation : Trématage",()->ui(()->new AlertDialog.Builder(activity).setTitle("Position Trématage").setMessage("Mémoriser l’orientation actuelle de l’objectif pour la veille arrière ?").setPositiveButton("Mémoriser",(d,w)->task(()->{session.remember();bindShortcut.run();},"Position Trématage mémorisée")).setNegativeButton("Annuler",null).show()));
   Button toggle=new Button(activity);target.addView(toggle);
-  Runnable refresh=()->toggle.setText(store.armed()?"Désactiver Trématage · revenir":"Activer Trématage");refresh.run();
+  Runnable refresh=()->toggle.setText(store.armed()?"Désactiver Trématage · BASE":"Activer Trématage");refresh.run();
   toggle.setOnClickListener(v->{
    toggle.setEnabled(false);
    task(()->{

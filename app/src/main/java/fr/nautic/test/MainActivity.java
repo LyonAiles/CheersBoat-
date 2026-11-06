@@ -49,6 +49,7 @@ public class MainActivity extends Activity {
  private PermissionRequest pendingCamera;
  private android.content.BroadcastReceiver trematageReceiver;
  @Override protected void onStart(){super.onStart();dashboardVisible=true;trematageReceiver=TrematageAlerts.attach(this);}
+ @Override protected void onPause(){dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}super.onPause();}
  @Override protected void onStop(){dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
@@ -210,7 +211,9 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void openRtspForCamera(String address,int index){runOnUiThread(()->{
    if(address==null||!address.startsWith("rtsp://")){discoverForCamera(index);return;}
    Intent i=new Intent(MainActivity.this,CameraActivity.class);
-   i.putExtra("url",address);i.putExtra("cameraIndex",index);startActivity(i);
+   i.putExtra("url",address);i.putExtra("cameraIndex",index);
+   boolean dual=index==1;try{dual=dual||java.util.Objects.equals(Uri.parse(address).getHost(),Uri.parse(TrematageAccess.address(MainActivity.this,TrematageAccess.index(MainActivity.this))).getHost());}catch(Exception ignored){}
+   i.putExtra("singleCamera",!dual);startActivity(i);
   });}
   @JavascriptInterface public void discoverForCamera(int index){runOnUiThread(()->{
    Intent i=new Intent(MainActivity.this,CameraActivity.class);
@@ -222,7 +225,7 @@ public class MainActivity extends Activity {
   });}
  }
  @Override protected void onResume(){
-  super.onResume();
+  super.onResume();dashboardVisible=true;
   if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}
   js("nauticDashboardResume","");
   String saved=getSharedPreferences("nautic_settings",MODE_PRIVATE).getString("nautic-v04","");

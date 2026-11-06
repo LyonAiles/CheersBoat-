@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 /** Explicitly activated foreground watch; independent of the video and its control dialog. */
 public class TrematageService extends Service {
  static final String ACTION="fr.nautic.test.TREMATAGE_EVENT";
- private static final String STATUS="nautic_trematage_status", ALERTS="nautic_trematage_alerts";
+ private static final String STATUS="nautic_trematage_status", ALERTS="nautic_trematage_alerts_v2";
  private volatile boolean running;
  private volatile long generation=0;
  private ExecutorService worker;
@@ -30,7 +30,7 @@ public class TrematageService extends Service {
   if(Build.VERSION.SDK_INT>=26){
    NotificationManager n=getSystemService(NotificationManager.class);
    n.createNotificationChannel(new NotificationChannel(STATUS,"Veille Trématage",NotificationManager.IMPORTANCE_LOW));
-   n.createNotificationChannel(new NotificationChannel(ALERTS,"Alertes Trématage",NotificationManager.IMPORTANCE_HIGH));
+   NotificationChannel alerts=new NotificationChannel(ALERTS,"Alertes Trématage",NotificationManager.IMPORTANCE_HIGH);alerts.setSound(null,null);alerts.enableVibration(true);n.createNotificationChannel(alerts);
   }
  }
  private Notification notification(String channel,String title,String message,boolean ongoing){
@@ -38,7 +38,7 @@ public class TrematageService extends Service {
   Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP|Intent.FLAG_ACTIVITY_CLEAR_TOP);
   PendingIntent pending=PendingIntent.getActivity(this,71,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   b.setSmallIcon(android.R.drawable.ic_menu_view).setContentTitle(title).setContentText(message).setStyle(new Notification.BigTextStyle().bigText(message)).setContentIntent(pending).setOngoing(ongoing);
-  if(!ongoing)b.setDefaults(Notification.DEFAULT_SOUND|Notification.DEFAULT_VIBRATE).setAutoCancel(true);
+  if(!ongoing)b.setDefaults(Notification.DEFAULT_VIBRATE).setAutoCancel(true);
   return b.build();
  }
  private void status(String text){
@@ -97,6 +97,7 @@ public class TrematageService extends Service {
   if("mouvement générique".equals(e.category))message="Trématage · mouvement détecté (catégorie non fournie)";
   p.edit().putString("lastAlert",message).putLong("lastAlertTime",now).apply();
   ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(1102,notification(ALERTS,message,"Alerte caméra · vérifier la vue arrière",false));
+  TrematageFeedback.playAlert();
   sendBroadcast(new Intent(ACTION).setPackage(getPackageName()).putExtra("message",message));
  }
  @Override public void onDestroy(){

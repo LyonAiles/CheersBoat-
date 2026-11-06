@@ -29,7 +29,7 @@ final class TrematageAccess {
   if(profile==null)throw new java.io.IOException("Objectif mobile non accessible par ONVIF");
   String key=host+"|"+profile.getAttribute("token");TrematageSession.Store store=store(c,key);TrematageSession session=new TrematageSession(camera,profile,store);
   prefs(c).edit().putString("shortcutKey",key).putString("shortcutProfile",profile.getAttribute("token")).apply();
-  if(store.armed()){session.deactivate();TrematageService.stop(c,key);return "Trématage désactivé · retour demandé";}
+  if(store.armed()){session.deactivate();TrematageService.stop(c,key);return "Trématage désactivé · retour BASE demandé";}
   String other=prefs(c).getString("watchKey","");
   if(!other.isEmpty()&&!TrematageProfiles.sameCamera(other,key)&&prefs(c).getBoolean(other+".active",false))throw new java.io.IOException("Une position de retour est encore conservée pour "+other.substring(0,other.indexOf('|'))+" ; revenir depuis ses commandes");
   session.activate();prefs(c).edit().putString("shortcutKey",key).putString("shortcutProfile",profile.getAttribute("token")).apply();

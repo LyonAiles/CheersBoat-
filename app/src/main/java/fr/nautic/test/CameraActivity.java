@@ -44,7 +44,7 @@ public class CameraActivity extends Activity {
  private CameraControls controls;
  private android.content.BroadcastReceiver trematageReceiver;
  private boolean mobileAudio=false;
- private boolean mobileOnly=false;
+ private boolean mobileOnly=false,singleCamera=false;
  void toggleMobileAudio(){mobileAudio=!mobileAudio;if(players[1]!=null)players[1].setVolume(mobileAudio?1f:0f);}
  private final org.json.JSONObject scanStatuses=new org.json.JSONObject();
  private final java.util.ArrayList<ExoPlayer> previewPlayers=new java.util.ArrayList<>();
@@ -56,7 +56,7 @@ public class CameraActivity extends Activity {
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
   baseUrl=getIntent().getStringExtra("url");
   settingsOnly=getIntent().getBooleanExtra("settings",false);
-  mobileOnly=getIntent().getBooleanExtra("mobileOnly",false);
+  mobileOnly=getIntent().getBooleanExtra("mobileOnly",false);singleCamera=getIntent().getBooleanExtra("singleCamera",false);
   cameraIndex=Math.max(1,Math.min(3,getIntent().getIntExtra("cameraIndex",1)));
   boolean discover=getIntent().getBooleanExtra("discover",false);
   if(settingsOnly){configure();return;}
@@ -94,7 +94,7 @@ public class CameraActivity extends Activity {
   String username=credential("username");
   String password=credential("password");
   String auth=Uri.encode(username)+":"+Uri.encode(password);
-  return "rtsp://"+auth+"@"+uri.getHost()+(uri.getPort()>0?":"+uri.getPort():"")+(lens==0?"/stream1":"/stream6");
+  return "rtsp://"+auth+"@"+uri.getHost()+(uri.getPort()>0?":"+uri.getPort():"")+(singleCamera?(uri.getPath()==null||uri.getPath().isEmpty()?"/stream1":uri.getPath()):(lens==0?"/stream1":"/stream6"));
  }
  private PlayerView makeView(int lens){
   PlayerView pv=new PlayerView(this);pv.setUseController(false);pv.setKeepScreenOn(true);
@@ -142,7 +142,7 @@ public class CameraActivity extends Activity {
    @Override public boolean onDoubleTap(MotionEvent e){restart(lens,true);return true;}
    @Override public boolean onSingleTapConfirmed(MotionEvent e){
     if(zoom[0]>1.01f){resetZoom.run();return true;}
-    if(!mobileOnly&&getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE
+    if(!mobileOnly&&!singleCamera&&getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE
        &&((swapped?0:1)==lens)){swapped=!swapped;buildViews();}
     return true;
    }
@@ -189,6 +189,7 @@ public class CameraActivity extends Activity {
   makeView(0);makeView(1);
   boolean landscape=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
   if(mobileOnly){root.addView(cameraFrames[1],new FrameLayout.LayoutParams(-1,-1));}
+  else if(singleCamera){root.addView(cameraFrames[0],new FrameLayout.LayoutParams(-1,-1));}
   else if(landscape){
    int large=swapped?1:0,small=1-large;
    root.addView(cameraFrames[large],new FrameLayout.LayoutParams(-1,-1));
@@ -217,7 +218,7 @@ public class CameraActivity extends Activity {
    if(controls!=null)controls.close();
    controls=new CameraControls(this,Uri.parse(baseUrl).getHost(),credential("username"),credential("password"),cameraIndex);controls.show();
   });
-  for(int i=0;i<2;i++)if(!mobileOnly||i==1){retries[i]=0;restart(i,true);}
+  for(int i=0;i<2;i++)if((!mobileOnly||i==1)&&(!singleCamera||i==0)){retries[i]=0;restart(i,true);}
   if(getIntent().getBooleanExtra("autoControls",false)){getIntent().removeExtra("autoControls");commands.post(()->commands.performClick());}
  }
  private void restart(int lens,boolean reset){
@@ -237,7 +238,7 @@ public class CameraActivity extends Activity {
       retries[index]++;
       status.setText("Relance objectif "+(index==0?"fixe":"orientable")+"…");
       root.postDelayed(()->{if(!isFinishing()&&players[index]==p)restart(index,false);},1200);
-     }else{status.setText("Objectif "+(index==0?"fixe":"orientable")+" : "+e.getErrorCodeName());if(index==0&&!frames[0]&&!discovering)root.postDelayed(()->{if(!isFinishing()&&!frames[0])showDiscovery();},1000);}
+     }else{status.setText("Objectif "+(index==0?"fixe":"orientable")+" : "+e.getErrorCodeName());}
     }
    });
    RtspMediaSource.Factory source=new RtspMediaSource.Factory().setForceUseRtpTcp(true);

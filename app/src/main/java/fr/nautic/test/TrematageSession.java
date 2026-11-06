@@ -25,18 +25,15 @@ final class TrematageSession {
   if(store.armed())return; // Never replace the original return position on repeated activation.
   List<Element> list=presets();String target=destination(list);
   if(target.isEmpty())throw new IOException("Orienter l’objectif vers l’arrière puis mémoriser Trématage");
-  String backup=store.backup();boolean exists=false;
-  for(Element e:list)if(e.getAttribute("token").equals(backup))exists=true;
-  String name="Nautic retour "+profile.getAttribute("token");
-  Document saved=camera.ptz(profile,"SetPreset","<c:PresetName>"+OnvifCamera.xml(name)+"</c:PresetName>"+(exists?"<c:PresetToken>"+OnvifCamera.xml(backup)+"</c:PresetToken>":""));
-  String token=OnvifCamera.value(saved,"PresetToken");if(token.isEmpty())throw new IOException("La caméra n’a pas confirmé la position de retour");
-  if(token.equals(target))throw new IOException("Position de retour distincte non disponible");
-  store.save(token,true); // Retain recovery even if the following network request fails.
+  String base="";for(Element e:list)if("BASE".equalsIgnoreCase(OnvifCamera.value(e,"Name").trim())){base=e.getAttribute("token");break;}
+  if(base.isEmpty())throw new IOException("Position BASE introuvable : la mémoriser dans la caméra avant d’activer Trématage");
+  store.save(base,true);
   go(target);
  }}
  void deactivate()throws Exception{synchronized(TrematageSession.class){
   if(!store.armed())return;
-  if(store.backup().isEmpty())throw new IOException("Position de retour indisponible");
-  go(store.backup());store.save(store.backup(),false);
+  String base="";for(Element e:presets())if("BASE".equalsIgnoreCase(OnvifCamera.value(e,"Name").trim())){base=e.getAttribute("token");break;}
+  if(base.isEmpty())throw new IOException("Position BASE introuvable ; retour non exécuté");
+  go(base);store.save(base,false);
  }}
 }

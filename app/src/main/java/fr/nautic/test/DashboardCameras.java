@@ -15,10 +15,12 @@ final class DashboardCameras {
  final MainActivity activity;final FrameLayout layer;
  final Map<String,Tile> tiles=new LinkedHashMap<>();
  final Map<String,Source> sources=new LinkedHashMap<>();
+ final Map<String,Long> retryAt=new HashMap<>();
+ int decoderBudget=4;
  boolean stopped=false;
  class Tile{
   final String id;final FrameLayout frame;final ImageView mirror;final TextView message,banner,footer,beacon;
-  boolean alarm=false;
+  boolean alarm=false,active=false;
   int dp(float n){return (int)(n*activity.getResources().getDisplayMetrics().density+.5f);}
   TextView overlay(int size){TextView t=new TextView(activity);t.setTextColor(Color.WHITE);t.setTextSize(size);t.setGravity(Gravity.CENTER);t.setPadding(dp(4),dp(3),dp(4),dp(3));t.setBackgroundColor(0xb3075e9f);return t;}
   Tile(String id){this.id=id;frame=new FrameLayout(activity);frame.setBackgroundColor(Color.BLACK);
@@ -31,6 +33,7 @@ final class DashboardCameras {
    frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{activity.dashboardClick(id,true);return true;});layer.addView(frame);
   }
   void decorate(JSONObject data){
+   active=data.optBoolean("active",false);
    banner.setText(data.optString("label","📷"));footer.setText(data.optString("status",""));footer.setVisibility(footer.length()==0?View.GONE:View.VISIBLE);
    boolean next=data.optBoolean("alarm",false);
    if(next!=alarm){alarm=next;beacon.clearAnimation();beacon.setVisibility(alarm?View.VISIBLE:View.GONE);
@@ -44,11 +47,20 @@ final class DashboardCameras {
  class Source{
   final ExoPlayer player;final TextureView texture;final Tile owner;final List<Tile> mirrors=new ArrayList<>();
   Bitmap last;
+  volatile long lastFrame=0;
+  final long created=System.currentTimeMillis();
+  boolean failed=false;
   Source(String uri,Tile owner){this.owner=owner;texture=new TextureView(activity);owner.frame.addView(texture,0,new FrameLayout.LayoutParams(-1,-1));
+   owner.mirror.setImageDrawable(null);
    player=new ExoPlayer.Builder(activity,new DefaultRenderersFactory(activity).setEnableDecoderFallback(true)).build();player.setVolume(0);player.setVideoTextureView(texture);
+   player.setVideoFrameMetadataListener((presentationTimeUs,releaseTimeNs,format,mediaFormat)->lastFrame=System.currentTimeMillis());
    player.addListener(new Player.Listener(){
     @Override public void onRenderedFirstFrame(){owner.message.setText("");}
-    @Override public void onPlayerError(PlaybackException e){owner.message.setText("⚠ Flux indisponible");for(Tile t:mirrors)t.message.setText("⚠ Flux indisponible");}
+    @Override public void onPlayerError(PlaybackException e){
+     failed=true;retryAt.put(uri,System.currentTimeMillis()+4000);
+     if(e.getErrorCodeName().contains("DECOD"))decoderBudget=Math.max(1,Math.min(decoderBudget,sources.size()-1));
+     owner.message.setText("Relance · "+e.getErrorCodeName());for(Tile t:mirrors)t.message.setText(owner.message.getText());
+    }
     @Override public void onVideoSizeChanged(VideoSize size){texture.post(()->{
      if(size.width==0||size.height==0||texture.getWidth()==0||texture.getHeight()==0)return;
      float sourceRatio=(float)size.width*size.pixelWidthHeightRatio/size.height,viewRatio=(float)texture.getWidth()/texture.getHeight();
@@ -57,8 +69,11 @@ final class DashboardCameras {
    });
    player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));player.prepare();player.play();
   }
-  void close(){player.release();owner.frame.removeView(texture);for(Tile t:mirrors)t.mirror.setImageDrawable(null);if(last!=null)last.recycle();}
-  void copy(){if(mirrors.isEmpty()||!texture.isAvailable())return;Bitmap next=texture.getBitmap(240,150);if(next==null)return;for(Tile t:mirrors){t.mirror.setImageBitmap(next);t.message.setText(owner.message.getText());}Bitmap old=last;last=next;if(old!=null)old.recycle();}
+  void close(){
+   if(!stopped&&texture.isAvailable()&&lastFrame>0){Bitmap snapshot=texture.getBitmap(320,200);if(snapshot!=null){owner.mirror.setImageBitmap(snapshot);for(Tile t:mirrors)t.mirror.setImageBitmap(snapshot);owner.message.setText("Dernière image · actualisation…");}}
+   player.release();owner.frame.removeView(texture);last=null;
+  }
+  void copy(){if(mirrors.isEmpty()||!texture.isAvailable())return;Bitmap next=texture.getBitmap(320,200);if(next==null)return;for(Tile t:mirrors){t.mirror.setImageBitmap(next);t.message.setText(owner.message.getText());}last=next;}
  }
  DashboardCameras(MainActivity activity,FrameLayout layer){this.activity=activity;this.layer=layer;}
  void update(String json){
@@ -77,16 +92,30 @@ final class DashboardCameras {
     Uri uri=Uri.parse(url);android.content.SharedPreferences p=activity.getSharedPreferences("nautic_camera_private",0);
     String user=p.getString("username"+index,p.getString("username","")),pass=p.getString("password"+index,p.getString("password",""));
     if(user.isEmpty()){tile.message.setText("⚙ Identifiants caméra");continue;}
-    String path=mobile?"/stream6":uri.getPath();if(path==null||path.isEmpty())path="/stream1";
+    String tapoHost=Uri.parse(TrematageAccess.address(activity,TrematageAccess.index(activity))).getHost();
+    String path=CameraStreamPolicy.preview(uri.getPath(),mobile,index==1||java.util.Objects.equals(tapoHost,uri.getHost()));
     String stream="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+uri.getHost()+":"+(uri.getPort()>0?uri.getPort():554)+path;
     if(!grouped.containsKey(stream))grouped.put(stream,new ArrayList<>());grouped.get(stream).add(tile);
    }
    for(Tile t:tiles.values())if(!visible.contains(t.id))t.frame.setVisibility(View.GONE);
+   long now=System.currentTimeMillis();
+   List<String> eligible=new ArrayList<>();String priority=null;
+   for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
+    if(retryAt.containsKey(e.getKey())&&retryAt.get(e.getKey())>now)continue;
+    eligible.add(e.getKey());for(Tile tile:e.getValue())if(tile.id.equals("trematagePreview")&&tile.active)priority=e.getKey();
+   }
+   Set<String> selected=new HashSet<>();if(priority!=null){selected.add(priority);eligible.remove(priority);}
+   int start=eligible.isEmpty()?0:(int)((now/8000)%eligible.size());
+   for(int i=0;i<eligible.size()&&selected.size()<decoderBudget;i++)selected.add(eligible.get((start+i)%eligible.size()));
    Iterator<Map.Entry<String,Source>> iterator=sources.entrySet().iterator();while(iterator.hasNext()){
     Map.Entry<String,Source> entry=iterator.next();List<Tile> group=grouped.get(entry.getKey());
-    if(group==null||!group.contains(entry.getValue().owner)){entry.getValue().close();iterator.remove();}
+    Source source=entry.getValue();
+    boolean stalled=now-(source.lastFrame==0?source.created:source.lastFrame)>(source.lastFrame==0?14000:9000);
+    if(stalled)retryAt.put(entry.getKey(),now+2000);
+    if(group==null||!group.contains(source.owner)||!selected.contains(entry.getKey())||source.failed||stalled){source.close();iterator.remove();if(stalled||source.failed)selected.remove(entry.getKey());}
    }
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
+    if(!selected.contains(e.getKey()))continue;
     Source source=sources.get(e.getKey());if(source==null){Tile owner=e.getValue().get(0);owner.message.setText("◌");source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);}
     source.mirrors.clear();for(Tile t:e.getValue())if(t!=source.owner)source.mirrors.add(t);source.copy();
    }
