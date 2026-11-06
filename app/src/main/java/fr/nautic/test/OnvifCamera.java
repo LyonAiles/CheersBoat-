@@ -48,10 +48,14 @@ class OnvifCamera {
   URI u=new URI(address);if(!host.equalsIgnoreCase(u.getHost())||!("http".equals(u.getScheme())||"https".equals(u.getScheme())))throw new IOException("Adresse ONVIF différente de la caméra");
   return address;
  }
- Document call(String address,String ns,String operation,String body)throws Exception{
+ static String actionFor(String ns,String operation){
   String action=ns+"/"+operation;
-  if(EVENTS.equals(ns))action=ns+("PullMessages".equals(operation)?"/PullPointSubscription/PullMessagesRequest":"/"+operation+"Request");
+  if(EVENTS.equals(ns))action=ns+("PullMessages".equals(operation)?"/PullPointSubscription/PullMessagesRequest":"/EventPortType/"+operation+"Request");
   if("Unsubscribe".equals(operation))action=ns+"/UnsubscribeRequest";
+  return action;
+ }
+ Document call(String address,String ns,String operation,String body)throws Exception{
+  String action=actionFor(ns,operation);
   String envelope="<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope' xmlns:tt='http://www.onvif.org/ver10/schema' xmlns:wsa='http://www.w3.org/2005/08/addressing'><s:Header>"+security()+"<wsa:Action>"+xml(action)+"</wsa:Action><wsa:MessageID>urn:uuid:"+UUID.randomUUID()+"</wsa:MessageID><wsa:To>"+xml(address)+"</wsa:To></s:Header><s:Body><c:"+operation+" xmlns:c='"+ns+"'>"+body+"</c:"+operation+"></s:Body></s:Envelope>";
   HttpURLConnection c=(HttpURLConnection)new URL(endpoint(address)).openConnection();
   c.setConnectTimeout(3500);c.setReadTimeout(9000);c.setInstanceFollowRedirects(false);c.setRequestMethod("POST");c.setDoOutput(true);

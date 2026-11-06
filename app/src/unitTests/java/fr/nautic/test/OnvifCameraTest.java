@@ -30,4 +30,10 @@ public class OnvifCameraTest {
  @Test public void escapesPresetAndProfileValues(){
   assertEquals("A&amp;B&lt;&quot;&apos;",OnvifCamera.xml("A&B<\"'"));
  }
+ @Test public void eventActionsMatchOnvifWsdl(){
+  assertEquals(OnvifCamera.EVENTS+"/EventPortType/CreatePullPointSubscriptionRequest",OnvifCamera.actionFor(OnvifCamera.EVENTS,"CreatePullPointSubscription"));
+  assertEquals(OnvifCamera.EVENTS+"/EventPortType/GetEventPropertiesRequest",OnvifCamera.actionFor(OnvifCamera.EVENTS,"GetEventProperties"));
+  assertEquals(OnvifCamera.EVENTS+"/PullPointSubscription/PullMessagesRequest",OnvifCamera.actionFor(OnvifCamera.EVENTS,"PullMessages"));
+  assertEquals(OnvifCamera.PTZ+"/Stop",OnvifCamera.actionFor(OnvifCamera.PTZ,"Stop"));
+ }
 }
