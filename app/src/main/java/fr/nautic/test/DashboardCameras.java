@@ -34,7 +34,7 @@ final class DashboardCameras {
   }
   void decorate(JSONObject data){
    active=data.optBoolean("active",false);
-   banner.setText(data.optString("label","📷"));footer.setText(data.optString("status",""));footer.setVisibility(footer.length()==0?View.GONE:View.VISIBLE);
+   banner.setText((data.optString("number","").isEmpty()?"":data.optString("number")+" · ")+data.optString("label","📷"));footer.setText(data.optString("status",""));footer.setVisibility(footer.length()==0?View.GONE:View.VISIBLE);
    boolean next=data.optBoolean("alarm",false);
    if(next!=alarm){alarm=next;beacon.clearAnimation();beacon.setVisibility(alarm?View.VISIBLE:View.GONE);
     if(alarm){android.view.animation.AlphaAnimation blink=new android.view.animation.AlphaAnimation(1f,.12f);blink.setDuration(500);blink.setRepeatMode(android.view.animation.Animation.REVERSE);blink.setRepeatCount(android.view.animation.Animation.INFINITE);beacon.startAnimation(blink);}

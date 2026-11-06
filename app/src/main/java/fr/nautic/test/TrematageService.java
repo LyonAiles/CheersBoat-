@@ -67,7 +67,7 @@ public class TrematageService extends Service {
      try{
       camera.beginEvents();long renewed=System.currentTimeMillis();
       if(generation!=watchGeneration)break;
-      status("Écoute active · personne, véhicule et mouvement selon les signaux disponibles");
+      status("Écoute active · alertes véhicule uniquement");
       while(running&&generation==watchGeneration&&!Thread.currentThread().isInterrupted()){
        if(System.currentTimeMillis()-renewed>40000){camera.endEvents();camera.beginEvents();renewed=System.currentTimeMillis();}
        List<CameraEvent> messages=camera.readEvents();

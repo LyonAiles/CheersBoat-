@@ -393,7 +393,7 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 
 applyAppearance();
 
-function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Sortie'],['nauticPlugsButton','22 · Prises'],['nauticContactsButton','26 · Bouton Derniers appels'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
+function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Sortie'],['nauticPlugsButton','22 · Prises'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
  openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet. Le 35 peut être masqué dans Tableau de bord.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><p class="muted">Nautic accepte le redimensionnement Android. Le mode fenêtre flottante dépend du téléphone.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
@@ -531,24 +531,23 @@ if(brand){
  brand.appendChild(version);
 }
 function applyObjectNumbers(){
+ if(window.nauticNumberDashboard){window.nauticNumberDashboard();return;}
  document.querySelectorAll('.nautic-object-tag').forEach(e=>e.remove());
  if(!state.objectNumbers)return;
- const named=[['clock',10,'Horloge'],['nauticSettingsButton',20,'Paramètres'],['nauticExitButton',21,'Sortie'],['nauticContactsButton',26,'Derniers appels'],['gpsCard',31,'GPS'],['boatCard',32,'Mon bateau'],['logCard',33,'Journal'],['fuelCard',34,'Carburant'],['nauticCallsSlot',35,'Conteneur appels'],['speedCard',36,'Vitesse'],['weatherCard',37,'Météo'],['headingCard',38,'Cap'],['mapWrap',40,'Carte'],['cam1Card',41,'Caméra Roof'],['cam2Card',42,'Caméra Côté'],['cam3Card',43,'Caméra Fond']];
+ const named=[['clock',10,'Horloge'],['nauticSettingsButton',20,'Paramètres'],['nauticExitButton',21,'Sortie'],['gpsCard',31,'GPS'],['boatCard',32,'Mon bateau'],['logCard',33,'Journal'],['fuelCard',34,'Carburant'],['nauticCallsSlot',35,'Conteneur appels'],['speedCard',36,'Vitesse'],['weatherCard',37,'Météo'],['headingCard',38,'Cap'],['mapWrap',40,'Carte'],['cam1Card',41,'Caméra Roof'],['cam2Card',42,'Caméra Côté'],['cam3Card',43,'Caméra Fond']];
  const used=new Set(named.map(x=>x[0]));
  // Les commandes et les objets possédant un identifiant conservent un numéro stable.
  const extras=[...document.querySelectorAll('#app [id]')].filter(e=>!used.has(e.id)&&!e.closest('dialog')&&!e.closest('.leaflet-container')&&(/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(e.tagName)||e.classList.contains('mapWidget')));
  extras.forEach((el,i)=>named.push([el.id,String(50+i),el.title||el.textContent.trim().slice(0,35)||el.id]));
  const summary=get('nauticNumberDirectory');
- if(summary)summary.textContent=named.map(([id,n,label])=>n+' · '+label).join('  |  ')+'  |  27 · Texte Derniers appels';
+ if(summary)summary.textContent=named.map(([id,n,label])=>n+' · '+label).join('  |  ');
  named.forEach(([id,num])=>{const el=get(id);if(!el||el.hidden||el.closest('[hidden]'))return;
   if(getComputedStyle(el).position==='static')el.style.position='relative';
   const tag=document.createElement('span');tag.className='nautic-object-tag';tag.textContent=num;
   tag.style.cssText='position:absolute;top:1px;left:1px;z-index:500;background:#ffe24b;color:#111;font:bold 10px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';
   el.appendChild(tag);
  });
- const label=document.createElement('span');label.className='nautic-object-tag';label.textContent='27';
- label.style.cssText='position:absolute;right:1px;bottom:1px;background:#ffe24b;color:#111;font:bold 10px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';
- contactButton.appendChild(label);
+
 }
 
 applyObjectNumbers();

@@ -89,3 +89,15 @@
  #app .left>#fuelCard .fuelrow{font-size:8px!important;line-height:1!important;margin:0!important}
  #app .left>#fuelCard .fuelbar{height:4px!important}
 }
+/* Bandeau compact et repères stables. */
+#app{grid-template-rows:50px minmax(0,1fr) 0!important}
+#app header{height:50px!important;align-items:center!important;padding-top:0!important}
+body>#clock{top:7px!important;height:32px!important;line-height:32px!important;font-size:21px!important}
+#app header #nauticHeaderControls{top:7px!important}
+#app header #nauticHeaderControls #nauticExitButton{width:60px!important;min-width:60px!important}
+#windWidget small{display:none!important}
+#windWidget .windArrow{font-size:17px!important;line-height:1!important}
+#windWidget{gap:5px!important;padding:4px 6px!important}
+#app .mapFoot{display:none!important}
+#app .left>#fuelCard h3{text-align:center!important;align-self:center!important;display:block!important;width:100%!important}
+@media(max-width:520px){#nauticVersion{display:none!important}#app header .brand{font-size:16px!important}}
