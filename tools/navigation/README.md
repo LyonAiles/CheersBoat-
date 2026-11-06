@@ -120,3 +120,18 @@ au moteur lorsque seuls les rangs dans la liste ont changé.
 Les groupes sont dessinés comme des pastilles de 12 pixels de rayon avec compte,
 sans dépendre du chargement des images ; un petit repère sous chaque pictogramme
 assure aussi sa présence en cas de retard de chargement de l'icône.
+
+### Curseur et exploration libre
+
+La taille des pictogrammes se règle avec un curseur de 50 à 200 %, par pas de 5.
+Le réglage 120 % couvre désormais environ 12 à 22 pixels CSS selon le zoom, avec
+un plafond de 36 pixels CSS. L'aperçu de taille ne lance pas de nouvelle requête.
+La fermeture sans enregistrement restaure la préférence conservée. Les fonds des
+icônes ont des couleurs plus vives distinctes par catégorie.
+
+Le déplacement à un doigt est actif sur les deux moteurs. Un glissement suspend
+le suivi automatique jusqu'à Recentrer. Le bateau est projeté à ses coordonnées
+réelles dans la vue libre, plutôt que de rester artificiellement au centre.
+En carte classique, la rotation CSS est neutralisée pendant l'exploration libre
+pour conserver un geste de glissement cohérent. Recentrer rétablit le suivi et
+l'orientation. Le gel des aperçus pendant les gestes est conservé.

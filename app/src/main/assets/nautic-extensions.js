@@ -96,7 +96,7 @@ function plugsDialog(){equipmentDialog()}
 plugsButton.onclick=plugsDialog;
 const mapWrap=get('mapWrap');
 const recenter=document.createElement('button');recenter.id='mapRecenter';recenter.textContent='⌖';recenter.title='Recentrer';mapWrap.append(recenter);
-recenter.onclick=()=>{if(map&&latest){gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};manualRotationUntil=0;userMapRotation=0;map.setView([latest.lat,latest.lon],map.getZoom());rotateMap()}};
+recenter.onclick=()=>{window.nauticResumeMapFollow?.();if(map&&latest){gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};manualRotationUntil=0;userMapRotation=0;map.setView([latest.lat,latest.lon],map.getZoom());rotateMap()}};
 const layers=document.createElement('button');layers.id='mapLayers';layers.textContent='▤';layers.title='Fond de carte';mapWrap.append(layers);
 const layerDefs={osm:{label:'OpenStreetMap',url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:19,attr:'© OpenStreetMap'},topo:{label:'Topographique',url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',maxZoom:17,attr:'© OpenTopoMap'},sat:{label:'Satellite',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'© Esri'},
  streets:{label:'Routière Esri',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'Tiles © Esri · HERE · Garmin · contributeurs'},
@@ -411,7 +411,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <label>Moteur de carte<select class="nautic-select" id="settingMapEngine"><option value="vector" ${(state.mapEngine||'vector')==='vector'?'selected':''}>MapLibre · libellés horizontaux</option><option value="legacy" ${state.mapEngine==='legacy'?'selected':''}>Carte classique · retour arrière</option></select></label>
  <p class="muted">MapLibre utilise le fond vectoriel OpenFreeMap. Si le chargement ou WebGL échoue, retour automatique à la carte classique. Les réglages classiques sont conservés.</p>
  <label class="settingRow"><input type="checkbox" id="settingWaterwayWorks" ${state.waterwayWorks===false?'':'checked'}><span>Afficher les ouvrages fluviaux OpenStreetMap</span></label>
- <label>Taille des pictogrammes<select class="nautic-select" id="settingWaterwayIconSize">${[[60,'Mini'],[90,'Discrète'],[120,'Standard'],[150,'Grande'],[175,'Maximum limité']].map(([value,label])=>`<option value="${value}" ${(Number(state.waterwayIconSize)||120)===value?'selected':''}>${label}</option>`).join('')}</select></label>
+ <label>Taille des pictogrammes : <output id="settingWorkSizeValue">${Number(state.waterwayIconSize)||120}%</output><input type="range" id="settingWaterwayIconSize" min="50" max="200" step="5" value="${Number(state.waterwayIconSize)||120}"></label>
  <p>Ouvrages à positionner :</p>${[['lock','Écluses'],['port','Ports et marinas'],['halt','Haltes et amarrages'],['bridge','Ponts'],['dam','Barrages'],['weir','Seuils'],['tunnel','Tunnels'],['slipway','Cales de mise à l’eau']].map(([type,label])=>`<label class="settingRow"><input type="checkbox" data-waterway-type="${type}" ${state.waterwayTypes?.[type]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <label>Rayon d’affichage autour du bateau (km, de 1 à 100)<input id="settingWaterwayRadius" type="number" min="1" max="100" step="1" value="${Math.max(1,Math.min(100,(Number(state.waterwayRadius)||5000)/1000))}"></label>
  <p class="muted">Sélection autour du bateau, dans toutes les directions. Au-delà de 10 km, les points lointains utilisent des données allégées et des distances à vol d’oiseau. Actualisation après progression ; cache local. Les distances par le réseau ne désignent pas un itinéraire choisi : bifurcations à confirmer. Sans raccordement, distance à vol d’oiseau explicitement indiquée.</p>
@@ -461,6 +461,8 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
  applyObjectNumbers();
 
+ dialog.addEventListener('close',()=>window.nauticPreviewWorkSize?.(Number(state.waterwayIconSize)||120),{once:true});
+ get('settingWaterwayIconSize').oninput=e=>{get('settingWorkSizeValue').textContent=e.target.value+'%';window.nauticPreviewWorkSize?.(Number(e.target.value));};
  get('settingRemoteTwin').onclick=()=>nativeCall('openRemoteTwin');
  get('settingPlugsButton').onclick=()=>equipmentDialog();
  get('settingDiscoverDevices').onclick=()=>scanEquipment(get('settingDiscoverResults'));
