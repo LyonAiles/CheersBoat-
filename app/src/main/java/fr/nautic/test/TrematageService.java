@@ -97,7 +97,7 @@ public class TrematageService extends Service {
   if("mouvement générique".equals(e.category))message="Trématage · mouvement détecté (catégorie non fournie)";
   p.edit().putString("lastAlert",message).putLong("lastAlertTime",now).apply();
   ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(1102,notification(ALERTS,message,"Alerte caméra · vérifier la vue arrière",false));
-  TrematageFeedback.playAlert();
+  TrematageFeedback.playAlert(this);
   sendBroadcast(new Intent(ACTION).setPackage(getPackageName()).putExtra("message",message));
  }
  @Override public void onDestroy(){
