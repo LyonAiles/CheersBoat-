@@ -27,9 +27,12 @@ class OnvifCamera {
  }
  static String value(Node n,String name){List<Element> e=elements(n,name);return e.isEmpty()?"":e.get(0).getTextContent();}
  static Document parse(byte[] bytes)throws Exception{
+  String source=new String(bytes,StandardCharsets.UTF_8);
+  if(java.util.regex.Pattern.compile("<!\\s*(DOCTYPE|ENTITY)",java.util.regex.Pattern.CASE_INSENSITIVE).matcher(source).find())throw new org.xml.sax.SAXException("DTD interdite");
   DocumentBuilderFactory f=DocumentBuilderFactory.newInstance();f.setNamespaceAware(true);
-  f.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
-  return f.newDocumentBuilder().parse(new ByteArrayInputStream(bytes));
+  javax.xml.parsers.DocumentBuilder builder=f.newDocumentBuilder();
+  builder.setEntityResolver((publicId,systemId)->{throw new org.xml.sax.SAXException("Entité externe interdite");});
+  return builder.parse(new ByteArrayInputStream(bytes));
  }
  static String b64(byte[] b){return Base64.encodeToString(b,Base64.NO_WRAP);}
  private String security()throws Exception{
