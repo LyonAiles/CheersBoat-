@@ -67,7 +67,7 @@ public class TrematageService extends Service {
      try{
       camera.beginEvents();long renewed=System.currentTimeMillis();
       if(generation!=watchGeneration)break;
-      status("Écoute active · alertes véhicule uniquement");
+      status("Écoute active · types d’alerte sélectionnés");
       while(running&&generation==watchGeneration&&!Thread.currentThread().isInterrupted()){
        if(System.currentTimeMillis()-renewed>40000){camera.endEvents();camera.beginEvents();renewed=System.currentTimeMillis();}
        List<CameraEvent> messages=camera.readEvents();
@@ -91,7 +91,7 @@ public class TrematageService extends Service {
   String raw=e.topic+" — "+e.source+" — "+e.detail+" — UTC caméra="+e.utcTime;
   SharedPreferences p=getSharedPreferences("nautic_trematage",MODE_PRIVATE);
   p.edit().putString("lastRawEvent",raw).apply();
-  long now=System.currentTimeMillis();if(!gate.receive(e,settled,now))return;
+  long now=System.currentTimeMillis();if(!gate.receive(e,settled,now,CameraAlertTypes.enabled(this,"44",e.category)))return;
   String message="Trématage · "+e.category+" détecté"+("personne".equals(e.category)?"e":"");
   if("mouvement générique".equals(e.category))message="Trématage · mouvement détecté (catégorie non fournie)";
   if(e.initial)message="Trématage · "+e.category+" : présence signalée par la caméra";

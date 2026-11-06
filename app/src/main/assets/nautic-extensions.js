@@ -427,10 +427,25 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <div id="settingCam${i}ScanResults" class="muted"></div>
  </section>`).join('')}
 
+ <h3>Alertes des caméras</h3><p class="muted">Choisis les types reçus pour chaque veille. Active ou arrête ensuite la veille depuis son bouton sur l’accueil. Seuls les événements transmis par la caméra peuvent déclencher une alerte.</p>
+ ${[['44','Trématage · caméra mobile'],['42','Caméra '+esc(state.camera2.name)]].map(([id,name])=>`<section class="emPanel"><h3>${name}</h3>${[['vehicle','Véhicule'],['person','Personne'],['motion','Mouvement général']].map(([type,label])=>`<label class="settingRow"><input type="checkbox" data-alert-watch="${id}" data-alert-type="${type}" ${(state.alertTypes?.[id]?.[type]??(type==='vehicle'))?'checked':''}><span>${label}</span></label>`).join('')}</section>`).join('')}
+ <p class="muted">Mouvement général peut aussi signaler des remous ou de la végétation. Aucun type coché : aucune alerte pour cette veille.</p>
  <h3>Contacts locaux et personnels</h3><p class="muted">Une ligne par contact : nom ; numéro ; motif. Contacts personnels : appels téléphoniques uniquement.</p>
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type].join(' ; ')).join('\n'))}</textarea>
  <div class="dialogActions"><button id="settingsMaps">Choisir les cartes</button><button id="settingsReset">Rétablir les boutons</button></div>`,true);
  dialog.classList.add('nautic-settings');
+ const content=get('dialogContent');let group=null;
+ for(const node of [...content.children]){
+  if(node.tagName==='H3'){
+   const details=document.createElement('details');details.className='nautic-settings-group';
+   const summary=document.createElement('summary');summary.textContent=node.textContent;details.appendChild(summary);content.insertBefore(details,node);node.remove();group=details;
+  }else if(group&&!node.classList.contains('dialogActions'))group.appendChild(node);
+ }
+ for(const panel of [...content.querySelectorAll('.emPanel')]){
+  const heading=panel.querySelector('h3');if(!heading)continue;
+  const details=document.createElement('details');details.className='nautic-settings-subgroup';const summary=document.createElement('summary');summary.textContent=heading.textContent;details.appendChild(summary);heading.remove();while(panel.firstChild)details.appendChild(panel.firstChild);panel.replaceWith(details);
+ }
+
  get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
  applyObjectNumbers();
 
@@ -478,6 +493,8 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('settingsSave').onclick=()=>{
   const previous=JSON.stringify(state), previousCfg=JSON.stringify(cfg);
   dialog.querySelectorAll('[data-button]').forEach(e=>state.buttons[e.dataset.button]=e.checked);
+  state.alertTypes={};
+  dialog.querySelectorAll('[data-alert-watch]').forEach(e=>{const id=e.dataset.alertWatch;if(!state.alertTypes[id])state.alertTypes[id]={};state.alertTypes[id][e.dataset.alertType]=e.checked;});
   state.moveThreshold=Math.max(3,Number(get('settingMove').value)||8);
   state.stopMinutes=Math.max(1,Number(get('settingStop').value)||20);
   state.boatName=get('settingBoat').value.trim();

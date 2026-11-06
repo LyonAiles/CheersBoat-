@@ -24,4 +24,13 @@ public class CameraAlertGateTest {
  @Test public void peopleAndGenericMotionNeverTriggerTrematage(){
   CameraAlertGate gate=new CameraAlertGate();for(String category:new String[]{"personne","mouvement générique","autre"})assertFalse(gate.receive(new CameraEvent("rule","State=true",category,"vsconf",true,false),true,10000));
  }
+ @Test public void selectedPersonAndMotionCanAlertButDisabledVehicleCannot(){
+  CameraAlertGate gate=new CameraAlertGate();
+  assertFalse(gate.receive(vehicle(true,false),true,10000,false));
+  for(String category:new String[]{"personne","mouvement générique"})assertTrue(gate.receive(new CameraEvent(category,"State=true",category,"vsconf",true,false),true,10000,true));
+ }
+ @Test public void disablingThenEnablingResetsTheCategoryEpisode(){
+  CameraAlertGate gate=new CameraAlertGate();assertTrue(gate.receive(vehicle(true,false),true,1000,true));
+  assertFalse(gate.receive(vehicle(true,false),true,2000,false));assertTrue(gate.receive(vehicle(true,false),true,3000,true));
+ }
 }

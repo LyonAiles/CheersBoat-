@@ -43,7 +43,7 @@
  window.nauticNumberDashboard=()=>{numberButtons();previews();};
  function refresh(){try{
   const w=JSON.parse(call('camera42Status')||'{}');
-  if(camera42){camera42.classList.toggle('trematage-active',!!w.active);camera42.setAttribute('aria-pressed',String(!!w.active));camera42.dataset.watchStatus=pending42?'Connexion…':w.active?'● Veille véhicule':'▶ Veille';}
+  if(camera42){camera42.classList.toggle('trematage-active',!!w.active);camera42.setAttribute('aria-pressed',String(!!w.active));camera42.dataset.watchStatus=pending42?'Connexion…':w.active?'● Veille active':'▶ Veille';}
   const s=JSON.parse(call('trematageStatus')||'{}');
   trematage.classList.toggle('trematage-active',!!s.active);trematage.setAttribute('aria-pressed',String(!!s.active));
   $('trematageIndicator').textContent=s.active?'●':'○';

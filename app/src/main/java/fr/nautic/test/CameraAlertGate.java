@@ -8,7 +8,10 @@ final class CameraAlertGate {
  private static final class State {boolean active,announced;long since,lastAlarm=Long.MIN_VALUE;}
  private final Map<String,State> states=new HashMap<>();
  boolean receive(CameraEvent e,boolean settled,long now){
-  if(!"véhicule".equals(e.category))return false;
+  return receive(e,settled,now,"véhicule".equals(e.category));
+ }
+ boolean receive(CameraEvent e,boolean settled,long now,boolean enabled){
+  if(!enabled){states.remove(e.topic+"|"+e.source);return false;}
   String key=e.topic+"|"+e.source;State s=states.get(key);if(s==null){s=new State();states.put(key,s);}
   if(!e.active){s.active=false;s.announced=false;s.since=0;return false;}
   if(!s.active){s.active=true;s.since=now;}
