@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
  private final java.util.concurrent.atomic.AtomicBoolean trematageBusy=new java.util.concurrent.atomic.AtomicBoolean();
  private boolean dashboardVisible=false,mapManipulating=false;
  void dashboardClick(String id,boolean held){js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
+ void refreshDashboardVideos(){js("nauticDashboardResume","");}
  void dashboardAlert(String message){js("nauticTrematageAlert",message);}
  private PermissionRequest pendingCamera;
  private NotesPad notesPad;
@@ -218,7 +219,7 @@ public class MainActivity extends Activity {
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("settings",true);i.putExtra("cameraIndex",index);startActivity(i);
   });}
   @JavascriptInterface public void openCameraMosaic(){runOnUiThread(()->startActivity(new Intent(MainActivity.this,CameraMosaicActivity.class)));}
-  @JavascriptInterface public void openDashboardCamera(int index){runOnUiThread(()->{try{if(index!=1&&index!=3)return;String address=TrematageAccess.address(MainActivity.this,index);if(address==null||!address.startsWith("rtsp://")){toast("Configurer cette caméra dans Paramètres");return;}Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);i.putExtra("cameraIndex",index);i.putExtra("singleCamera",true);startActivity(i);}catch(Exception e){toast("Caméra indisponible");}});}
+  @JavascriptInterface public void openDashboardCamera(int index){runOnUiThread(()->{try{if(index!=1&&index!=3)return;int sourceIndex=CameraDisplaySource.index(MainActivity.this,index);String address=TrematageAccess.address(MainActivity.this,sourceIndex);if(address==null||!address.startsWith("rtsp://")){toast("Configurer cette caméra dans Paramètres");return;}Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);i.putExtra("cameraIndex",sourceIndex);i.putExtra("singleCamera",true);startActivity(i);}catch(Exception e){toast("Caméra indisponible");}});}
   @JavascriptInterface public void openRtspForCamera(String address,int index){runOnUiThread(()->{
    if(address==null||!address.startsWith("rtsp://")){discoverForCamera(index);return;}
    Intent i=new Intent(MainActivity.this,CameraActivity.class);

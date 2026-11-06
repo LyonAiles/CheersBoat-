@@ -423,7 +423,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <h3>Analyse du réseau local</h3><button type="button" id="settingPlugsButton">🔌 Prises</button><button type="button" id="settingDiscoverDevices">🔎 Analyser le réseau Wi-Fi</button><div id="settingNetworkReport">${networkAddressReport()}</div><div id="settingDiscoverResults" class="muted">Aucune adresse ne sera remplacée sans validation.</div><h3>Prises intelligentes — libellés et adresses</h3>
  ${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>Prise ${i+1}</h3>${field('Libellé','settingPlug'+i+'Label',p.label)}${field('Adresse IP locale','settingPlug'+i+'Ip',p.ip)}</section>`).join('')}
  <p class="muted">Ces paramètres préparent la connexion locale Tuya. Les interrupteurs ne seront activés qu'après validation du protocole de commande.</p>
- <h3>Caméras — réglages indépendants</h3>
+ <h3>Caméras — réglages indépendants</h3><label class="settingRow"><input type="checkbox" id="settingCameraSimulation42" ${state.cameraSimulation42===false?'':'checked'}><span>Simulation : afficher la caméra 42 dans les emplacements 41 et 43</span></label>
  <p class="muted">Appui de plus d’une seconde pour zoomer sur un point, puis simple toucher pour revenir. Double-touche une vidéo pour la relancer. Pince pour zoomer, puis glisse pour déplacer l’image. En paysage, touche le médaillon pour inverser les vues.</p>
  ${[1,2,3].map(i=>`<section class="emPanel"><h3>Caméra ${i}</h3>
  ${field('Nom du panneau','settingCam'+i+'Name',state['camera'+i].name)}
@@ -508,6 +508,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('settingsSave').onclick=()=>{
   const previous=JSON.stringify(state), previousCfg=JSON.stringify(cfg);
   dialog.querySelectorAll('[data-button]').forEach(e=>state.buttons[e.dataset.button]=e.checked);
+  state.cameraSimulation42=get("settingCameraSimulation42").checked;
   state.mapEngine=get('settingMapEngine').value;
   state.waterwayWorks=get('settingWaterwayWorks').checked;
   state.waterwayRadius=Math.max(1,Math.min(100,Number(get('settingWaterwayRadius').value)||5))*1000;

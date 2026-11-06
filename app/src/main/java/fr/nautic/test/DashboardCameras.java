@@ -37,6 +37,7 @@ final class DashboardCameras {
    banner=overlay(11);banner.setSingleLine(true);banner.setEllipsize(android.text.TextUtils.TruncateAt.END);frame.addView(banner,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
    footer=overlay(10);footer.setMaxLines(2);frame.addView(footer,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));footer.setVisibility(View.GONE);
    beacon=overlay(42);beacon.setText("⚠");beacon.setBackgroundColor(0xe6e00000);beacon.setVisibility(View.GONE);frame.addView(beacon,new FrameLayout.LayoutParams(dp(70),dp(66),Gravity.CENTER));
+   TextView refresh=overlay(20);refresh.setText("↻");refresh.setContentDescription("Rafraîchir cette caméra");frame.addView(refresh,new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.TOP|Gravity.RIGHT));refresh.setOnClickListener(v->{refreshTile(id);activity.refreshDashboardVideos();});
    frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{activity.dashboardClick(id,true);return true;});layer.addView(frame);
   }
   void decorate(JSONObject data){
@@ -93,7 +94,7 @@ final class DashboardCameras {
     visible.add(id);Tile tile=tiles.get(id);if(tile==null){tile=new Tile(id);tiles.put(id,tile);}
     FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(Math.max(1,(int)(item.getDouble("w")*scale)),Math.max(1,(int)(item.getDouble("h")*scale)));lp.leftMargin=(int)(item.getDouble("x")*scale);lp.topMargin=(int)(item.getDouble("y")*scale);tile.frame.setLayoutParams(lp);tile.frame.setVisibility(View.VISIBLE);
     tile.decorate(item);
-    boolean mobile=id.equals("trematagePreview");int index=mobile?TrematageAccess.index(activity):id.charAt(3)-'0';
+    boolean mobile=id.equals("trematagePreview");int index=mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
     String url=TrematageAccess.address(activity,index);
     if(!url.startsWith("rtsp://")){tile.message.setText("📷");continue;}
     Uri uri=Uri.parse(url);android.content.SharedPreferences p=activity.getSharedPreferences("nautic_camera_private",0);
@@ -128,5 +129,6 @@ final class DashboardCameras {
    }
   }catch(Exception ignored){}
  }
+ void refreshTile(String id){Iterator<Map.Entry<String,Source>> entries=sources.entrySet().iterator();while(entries.hasNext()){Map.Entry<String,Source> e=entries.next();Source source=e.getValue();boolean matches=source.owner.id.equals(id);for(Tile t:source.mirrors)matches|=t.id.equals(id);if(matches){source.close();entries.remove();retryAt.remove(e.getKey());}}}
  void close(){stopped=true;for(Source s:sources.values())s.close();sources.clear();layer.removeAllViews();tiles.clear();}
 }
