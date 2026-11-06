@@ -43,14 +43,14 @@ public class MainActivity extends Activity {
  private DashboardCameras dashboardCameras;
  private final java.util.concurrent.ExecutorService dashboardCommands=java.util.concurrent.Executors.newSingleThreadExecutor();
  private final java.util.concurrent.atomic.AtomicBoolean trematageBusy=new java.util.concurrent.atomic.AtomicBoolean();
- private boolean dashboardVisible=false;
+ private boolean dashboardVisible=false,mapManipulating=false;
  void dashboardClick(String id,boolean held){js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
  void dashboardAlert(String message){js("nauticTrematageAlert",message);}
  private PermissionRequest pendingCamera;
  private NotesPad notesPad;
  private android.content.BroadcastReceiver trematageReceiver;
  @Override protected void onStart(){super.onStart();dashboardVisible=true;trematageReceiver=TrematageAlerts.attach(this);}
- @Override protected void onPause(){dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}super.onPause();}
+ @Override protected void onPause(){mapManipulating=false;dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}super.onPause();}
  @Override protected void onStop(){dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
@@ -106,8 +106,9 @@ public class MainActivity extends Activity {
  }
  public class Bridge {
   @JavascriptInterface public void openNotes(){runOnUiThread(()->{dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}notesPad.show();});}
+  @JavascriptInterface public void mapInteraction(boolean active){runOnUiThread(()->{mapManipulating=active;if(dashboardCameras!=null)dashboardCameras.pauseForMap(active);});}
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
-   if(!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
+   if(mapManipulating||!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
   });}
   @JavascriptInterface public void openRemoteTwin(){runOnUiThread(()->RemoteTwinSettings.open(MainActivity.this));}
   @JavascriptInterface public void previewAlertSound(String sound){CameraAlertSounds.play(MainActivity.this,"42",sound);}

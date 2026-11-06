@@ -80,7 +80,7 @@
  }
  // Use real HTTP/MJPEG previews in web builds; Android handles RTSP without a relay.
  if(!bridge)for(let i=1;i<=3;i++){try{const saved=JSON.parse(localStorage.getItem('nautic-v04')||'{}'),url=saved['cam'+i];if(/^https?:\/\//i.test(url||'')){const img=new Image();img.alt='Caméra '+i;img.src=url;$('cam'+i+'Body').replaceChildren(img);}}catch(e){}}
- setInterval(()=>{numberButtons();refresh();previews();},800);
+ window.nauticEvery(()=>{numberButtons();refresh();previews();},800);
  window.nauticDashboardResume=()=>{refresh();for(let i=1;i<=3;i++){const e=$('cam'+i+'Body');if(e)delete e.dataset.previewUrl;}previews();};
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.nauticDashboardResume();else previews();});window.addEventListener('resize',previews);
  new MutationObserver(previews).observe($('dialog'),{attributes:true,attributeFilter:['open']});

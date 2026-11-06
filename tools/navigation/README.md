@@ -41,3 +41,16 @@ le rendu WebGL et le coût graphique avec les caméras restent à tester à bord
 Contrôles : `node tools/navigation/waterways.test.cjs`. Les contrôles d'interface
 ont aussi vérifié l'activation du moteur, l'alignement des textes et le repli après
 perte WebGL avec un moteur simulé. Le rendu distant réel n'a pas été validé ici.
+
+## Priorité aux gestes de carte
+
+Pendant un geste tactile ou à la molette, Nautic suspend ses callbacks périodiques
+(interface, suivi automatique, calcul d'ouvrages, actualisation des aperçus).
+Les temporisations internes du moteur de carte restent actives pour traiter le geste.
+Les lecteurs RTSP d'aperçu sont libérés en conservant leur dernière image ; la bordure
+animée s'arrête aussi. Les lecteurs sont recréés après la fin du geste, avec un délai
+normal de reconnexion vidéo. Reprise après 650 ms sans geste, y compris après annulation,
+perte de focus ou passage en arrière-plan. Un garde-fou évite une pause permanente.
+Le dernier résultat GPS reçu pendant le geste est traité à la reprise. L'écoute
+native des alertes caméra reste active. La rotation utilisateur est mémorisée à chaque
+événement de rotation, même si le moteur ne fournit pas originalEvent à la fin du geste.

@@ -9,7 +9,7 @@ const $=id=>document.getElementById(id), KEY='nautic-v04';let cfg={fuel:400,tank
 let speedSamples=[],speedLastMotion=0;const WIND_PERIOD=300000;let windBusy=false;let map,mapPositioned=false,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null,weatherForecast=null,weatherLocation=null;
 try{points=JSON.parse(localStorage.getItem('nautic-v04-points')||'[]');travel=Number(localStorage.getItem('nautic-v04-travel')||0)}catch(e){}
 const fmt=n=>Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2});
-function clock(){let d=new Date();$('clock').textContent=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});$('clock').title=d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}clock();setInterval(clock,1000);
+function clock(){let d=new Date();$('clock').textContent=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});$('clock').title=d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}clock();window.nauticEvery(clock,1000);
 function modal(title,body){$('dialogTitle').textContent=title;$('dialogContent').innerHTML=body;$('dialog').showModal()}$('dialogClose').onclick=()=>$('dialog').close();
 function field(label,id,value,type='text'){return `<label class="formLabel">${label}<input id="${id}" type="${type}" value="${String(value??'').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;')}"></label>`}
 function saveCfg(){
@@ -42,7 +42,7 @@ function heatingTick(){
  localStorage.setItem('nautic-heating-last',String(now));
  localStorage.setItem('nautic-heating-used',String(heatingUsed));
 }
-setInterval(()=>{heatingTick();fuelUpdate()},60000);
+window.nauticEvery(()=>{heatingTick();fuelUpdate()},60000);
 function openFuel(){heatingTick();modal('Carburant',field('Carburant avant déduction des consommations suivies (L)','inFuel',Number(cfg.fuelBaseline??cfg.fuel),'number')+field('Capacité du réservoir (L)','inTank',cfg.tank,'number')+field('Consommation de référence (L/h)','inCons',cfg.cons,'number')+
 field('Chauffage — consommation quotidienne (L/jour)','inHeatingRate',heatingRate,'number')+field('Consommation navigation suivie (L)','inNavUsed',fuelUsed,'number')+field('Consommation chauffage suivie (L)','inHeatUsed',heatingUsed,'number')+
 '<label class="settingRow"><input type="checkbox" id="inHeatingActive" '+(heatingActive?'checked':'')+'> Chauffage en service</label>'+
@@ -105,7 +105,7 @@ function fuelTick(now,moving){
  }
  localStorage.setItem('nautic-fuel-used',String(fuelUsed));
 }
-setInterval(()=>{fuelTick(Date.now(),!!stableFix&&stationarySince===0);fuelUpdate();},1000);
+window.nauticEvery(()=>{fuelTick(Date.now(),!!stableFix&&stationarySince===0);fuelUpdate();},1000);
 function angleDifference(to,from){return ((to-from+180)%360+360)%360-180}
 function updateCourse(course,now){
  if(!Number.isFinite(course))return;
@@ -147,8 +147,9 @@ function animateFollow(){
  $('mapBoat').style.transform=`translate(-50%,-50%) rotate(${userMapRotation}deg)`;
  if(weather)$('windArrow').style.transform=`rotate(${(weather.wind_direction_10m+180-(heading??0)+userMapRotation)%360}deg)`;
 }
-setInterval(animateFollow,80);
+window.nauticEvery(animateFollow,80);
 function onPos(result){
+ if(window.nauticMapInteracting){window.nauticDeferredPosition=result;return;}
  const c=result.coords,now=Date.now();
  const p={lat:c.latitude,lon:c.longitude,acc:c.accuracy,t:now,speed:c.speed,head:c.heading};
  latest=p;
@@ -230,9 +231,9 @@ function updateWindCountdown(){
  el.textContent='Vent '+v+' · Raf. '+(Number.isFinite(g)?Math.round(g):'—')+' km/h · '+String(mins).padStart(2,'0')+':'+String(secs).padStart(2,'0');
  const bar=$('windRefreshBar');if(bar)bar.style.width=(100-remain/WIND_PERIOD*100).toFixed(1)+'%';
 }
-setInterval(()=>{if(latest)loadWeather()},WIND_PERIOD);
-setInterval(updateWindCountdown,1000);
-function updateLog(){$('distance').textContent=(travel/1000).toFixed(2)+' km';$('routeDistance').textContent=(travel/1000).toFixed(2)+' km';$('recordState').textContent=recording?'Enregistrement actif':'En pause';$('recordDot').classList.toggle('live',recording);if(recording){let s=Math.floor((Date.now()-started)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;$('elapsed').textContent=[h,m,ss].map(x=>String(x).padStart(2,'0')).join(':')}}setInterval(updateLog,1000);updateLog();
+window.nauticEvery(()=>{if(latest)loadWeather()},WIND_PERIOD);
+window.nauticEvery(updateWindCountdown,1000);
+function updateLog(){$('distance').textContent=(travel/1000).toFixed(2)+' km';$('routeDistance').textContent=(travel/1000).toFixed(2)+' km';$('recordState').textContent=recording?'Enregistrement actif':'En pause';$('recordDot').classList.toggle('live',recording);if(recording){let s=Math.floor((Date.now()-started)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;$('elapsed').textContent=[h,m,ss].map(x=>String(x).padStart(2,'0')).join(':')}}window.nauticEvery(updateLog,1000);updateLog();
 function exportCsv(){let csv=['date,latitude,longitude,precision_m,vitesse_m_s,cap_deg',...points.map(p=>[new Date(p.t).toISOString(),p.lat,p.lon,p.acc,p.speed??'',p.head??''].join(','))].join('\n');let u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=u;a.download='nautic-journal.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 function logDialog(){modal('Journal de bord',`<p>Points enregistrés : ${points.length}<br>Distance GPS estimée : ${(travel/1000).toFixed(2)} km</p><p class="muted">Le navigateur doit rester ouvert pour enregistrer le trajet. Le suivi en arrière-plan n’est pas garanti.</p><div class="dialogActions"><button id="recordBtn">${recording?'Arrêter':'Démarrer'} l’enregistrement</button><button id="csvBtn">Exporter CSV</button><button id="eraseBtn">Effacer</button></div>`);$('recordBtn').onclick=()=>{recording=!recording;if(recording){started=Date.now();startGps()}updateLog();logDialog()};$('csvBtn').onclick=exportCsv;$('eraseBtn').onclick=()=>{if(confirm('Effacer le trajet et la distance enregistrée ?')){points=[];travel=0;localStorage.removeItem('nautic-v04-points');localStorage.removeItem('nautic-v04-travel');if(routeLine)routeLine.setLatLngs([]);updateLog();logDialog()}}}
 let cameraStream=null;function cameraDialog(i){let key='cam'+i;modal('Caméra '+i,`<div class="viewer" id="viewer"><span id="camMessage">Flux local non configuré</span><img id="cameraImg" hidden alt="Flux caméra"><video id="cameraVideo" autoplay muted playsinline hidden></video></div>${field('Adresse HTTP d’un flux MJPEG ou d’une image locale', 'cameraUrl',cfg[key])}<p class="muted">Les flux RTSP Tapo TC47 ne sont pas directement lisibles par le navigateur : un relais local RTSP → WebRTC/MJPEG est nécessaire. Une page HTTPS peut bloquer un flux HTTP.</p><div class="dialogActions"><button id="saveCamera">Enregistrer / essayer</button><button id="fullCamera">Agrandir la vidéo</button><button id="deviceCam">Tester caméra tablette</button></div>`);$('saveCamera').onclick=()=>{cfg[key]=$('cameraUrl').value.trim();saveCfg();showCamUrl(cfg[key],i)};$('fullCamera').onclick=()=>$('viewer').requestFullscreen?.();$('deviceCam').onclick=async()=>{try{cameraStream?.getTracks().forEach(t=>t.stop());cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('cameraImg').hidden=true;$('cameraVideo').hidden=false;$('cameraVideo').srcObject=cameraStream;$('camMessage').hidden=true}catch(e){$('camMessage').textContent=e.message}};if(cfg[key])showCamUrl(cfg[key],i)}

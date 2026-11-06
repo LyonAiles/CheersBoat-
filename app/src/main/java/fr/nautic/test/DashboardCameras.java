@@ -17,7 +17,13 @@ final class DashboardCameras {
  final Map<String,Source> sources=new LinkedHashMap<>();
  final Map<String,Long> retryAt=new HashMap<>();
  int decoderBudget=4;
- boolean stopped=false;
+ boolean stopped=false,mapPaused=false;
+ void pauseForMap(boolean paused){
+  if(mapPaused==paused)return;mapPaused=paused;
+  if(paused){for(Source source:sources.values())source.close();sources.clear();for(Tile tile:tiles.values())tile.message.setText("Image figée · carte");}
+  for(Tile tile:tiles.values()){tile.garland.setPaused(paused);if(paused)tile.beacon.clearAnimation();else if(tile.alarm)tile.alarm=false;}
+ }
+
  class Tile{
   final String id;final FrameLayout frame;final ImageView mirror;final TextView message,banner,footer,beacon;
   boolean alarm=false,active=false;
@@ -78,7 +84,7 @@ final class DashboardCameras {
  }
  DashboardCameras(MainActivity activity,FrameLayout layer){this.activity=activity;this.layer=layer;}
  void update(String json){
-  if(stopped)return;
+  if(stopped||mapPaused)return;
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();
