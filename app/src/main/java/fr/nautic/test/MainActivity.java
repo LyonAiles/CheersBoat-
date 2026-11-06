@@ -217,6 +217,8 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void configureRtsp(int index){runOnUiThread(()->{
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("settings",true);i.putExtra("cameraIndex",index);startActivity(i);
   });}
+  @JavascriptInterface public void openCameraMosaic(){runOnUiThread(()->startActivity(new Intent(MainActivity.this,CameraMosaicActivity.class)));}
+  @JavascriptInterface public void openDashboardCamera(int index){runOnUiThread(()->{try{if(index!=1&&index!=3)return;String address=TrematageAccess.address(MainActivity.this,index);if(address==null||!address.startsWith("rtsp://")){toast("Configurer cette caméra dans Paramètres");return;}Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);i.putExtra("cameraIndex",index);i.putExtra("singleCamera",true);startActivity(i);}catch(Exception e){toast("Caméra indisponible");}});}
   @JavascriptInterface public void openRtspForCamera(String address,int index){runOnUiThread(()->{
    if(address==null||!address.startsWith("rtsp://")){discoverForCamera(index);return;}
    Intent i=new Intent(MainActivity.this,CameraActivity.class);
