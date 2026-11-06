@@ -5,7 +5,7 @@ import java.text.Normalizer;
 import java.util.List;
 import org.w3c.dom.*;
 
-/** A return preset is committed before moving, and survives a failed command or app restart. */
+/** Normal mode changes only recall existing positions; they never create or rename presets. */
 final class TrematageSession {
  interface Store {String backup();boolean armed();void save(String backup,boolean armed)throws Exception;}
  private final OnvifCamera camera;
@@ -17,9 +17,10 @@ final class TrematageSession {
  private String destination(List<Element> list){for(Element e:list)if(named(OnvifCamera.value(e,"Name")))return e.getAttribute("token");return "";}
  private void go(String token)throws Exception{camera.ptz(profile,"GotoPreset","<c:PresetToken>"+OnvifCamera.xml(token)+"</c:PresetToken>");}
  void remember()throws Exception{synchronized(TrematageSession.class){
-  if(store.armed())throw new IOException("Désactiver Trématage avant de modifier sa position");
-  String old=destination(presets());
-  camera.ptz(profile,"SetPreset","<c:PresetName>Trématage</c:PresetName>"+(old.isEmpty()?"":"<c:PresetToken>"+OnvifCamera.xml(old)+"</c:PresetToken>"));
+  if(destination(presets()).isEmpty())throw new IOException("Créer la position Trématage dans Tapo, puis l’associer ici");
+ }}
+ void restoreBaseName()throws Exception{synchronized(TrematageSession.class){
+  String token=new BasePresetRepair(camera,profile).restore(store.backup());store.save(token,false);
  }}
  void activate()throws Exception{synchronized(TrematageSession.class){
   if(store.armed())return; // Never replace the original return position on repeated activation.

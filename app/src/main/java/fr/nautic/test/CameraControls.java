@@ -123,7 +123,7 @@ final class CameraControls {
     if(presets>0){
      trematage(target,p);
      add(target,"Positions mémorisées",()->showPresets(p));
-     add(target,"Mémoriser la position actuelle",()->ui(()->savePreset(p)));
+
     }
    });
   },"Commandes disponibles affichées");
@@ -138,7 +138,9 @@ final class CameraControls {
   };
   TrematageSession session=new TrematageSession(camera,p,store);
   Runnable bindShortcut=()->prefs.edit().putInt("shortcutIndex",cameraIndex).putString("shortcutProfile",p.getAttribute("token")).putString("shortcutKey",key).apply();
-  add(target,"Mémoriser cette orientation : Trématage",()->ui(()->new AlertDialog.Builder(activity).setTitle("Position Trématage").setMessage("Mémoriser l’orientation actuelle de l’objectif pour la veille arrière ?").setPositiveButton("Mémoriser",(d,w)->task(()->{session.remember();bindShortcut.run();},"Position Trématage mémorisée")).setNegativeButton("Annuler",null).show()));
+  add(target,"Associer la position Trématage existante",()->{session.remember();bindShortcut.run();});
+  Button repair=new Button(activity);repair.setText("Restaurer le nom BASE (ancien Nautic retour…)");target.addView(repair);
+  repair.setOnClickListener(v->{repair.setEnabled(false);state.setText("Rappel de l’ancienne position et vérification…");task(()->{try{session.restoreBaseName();TrematageService.stop(activity,key);ui(()->new AlertDialog.Builder(activity).setTitle("BASE").setMessage("Le nom BASE et sa position ont été vérifiés.").setPositiveButton("Fermer",null).show());}finally{ui(()->repair.setEnabled(true));}},"BASE vérifiée");});
   Button toggle=new Button(activity);target.addView(toggle);
   Runnable refresh=()->toggle.setText(store.armed()?"Désactiver Trématage · BASE":"Activer Trématage");refresh.run();
   toggle.setOnClickListener(v->{
@@ -176,12 +178,6 @@ final class CameraControls {
   ui(()->{if(names.length==0){state.setText("Aucune position mémorisée");return;}
    new AlertDialog.Builder(activity).setTitle("Aller à une position").setItems(names,(d,i)->task(()->camera.ptz(p,"GotoPreset","<c:PresetToken>"+OnvifCamera.xml(presets.get(i).getAttribute("token"))+"</c:PresetToken>"),"Position rappelée")).setNegativeButton("Annuler",null).show();
   });
- }
- private void savePreset(Element p){
-  EditText name=new EditText(activity);name.setSingleLine(true);name.setHint("Ex. Veille arrière");
-  new AlertDialog.Builder(activity).setTitle("Nouvelle position").setView(name).setPositiveButton("Mémoriser",(d,w)->{
-   String n=name.getText().toString().trim();if(!n.isEmpty())task(()->camera.ptz(p,"SetPreset","<c:PresetName>"+OnvifCamera.xml(n)+"</c:PresetName>"),"Position mémorisée");
-  }).setNegativeButton("Annuler",null).show();
  }
  private void imageSettings(String ns,String token,Document current,Document options){
   LinearLayout form=new LinearLayout(activity);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(20,8,20,8);

@@ -43,4 +43,7 @@ public class TrematageSessionTest {
    try{new TrematageSession(c,profile(),s).activate();fail();}catch(java.io.IOException expected){}assertFalse(s.armed);assertEquals(1,c.commands.size());}
  }
  @Test public void matchesExactNameWithOrWithoutAccent(){assertTrue(TrematageSession.named(" Trématage "));assertTrue(TrematageSession.named("TREMATAGE"));assertFalse(TrematageSession.named("Trématage 2"));}
+ @Test public void associatingAnExistingPositionNeverWritesToTheCamera()throws Exception{
+  Camera c=new Camera();new TrematageSession(c,profile(),new Memory()).remember();assertEquals(Collections.singletonList("GetPresets"),c.commands);
+ }
 }
