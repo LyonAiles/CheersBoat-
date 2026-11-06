@@ -7,6 +7,7 @@ def signedBuild = signingPath && signingPassword
 android {
     namespace "fr.nautic.test"
     compileSdk 35
+    sourceSets { test.java.srcDirs = ['src/unitTests/java'] }
 
     defaultConfig {
         applicationId "fr.nautic.test"
@@ -44,6 +45,7 @@ android {
 
 // Lecteur RTSP natif (H.264) pour les caméras Tapo.
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
     implementation 'androidx.media3:media3-exoplayer:1.5.1'
     implementation 'androidx.media3:media3-exoplayer-rtsp:1.5.1'
     implementation 'androidx.media3:media3-ui:1.5.1'

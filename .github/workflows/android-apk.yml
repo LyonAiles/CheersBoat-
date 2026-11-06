@@ -47,7 +47,7 @@ jobs:
 
       - name: Compiler APK de mise à jour signé
         run: |
-          gradle --no-daemon :app:assembleRelease \
+          gradle --no-daemon :app:testReleaseUnitTest :app:assembleRelease \
             -PnauticVersionCode=${{ github.run_number }} \
             -PnauticVersionName=0.4.${{ github.run_number }}
 

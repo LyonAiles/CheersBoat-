@@ -41,6 +41,9 @@ public class CameraActivity extends Activity {
  private boolean settingsOnly=false;
  private boolean discovering=false;
  private int cameraIndex=1;
+ private CameraControls controls;
+ private boolean mobileAudio=false;
+ void toggleMobileAudio(){mobileAudio=!mobileAudio;if(players[1]!=null)players[1].setVolume(mobileAudio?1f:0f);}
  private final org.json.JSONObject scanStatuses=new org.json.JSONObject();
  private final java.util.ArrayList<ExoPlayer> previewPlayers=new java.util.ArrayList<>();
  private static final String PREF="nautic_camera_private";
@@ -202,6 +205,14 @@ public class CameraActivity extends Activity {
   status.setPadding(dp(8),dp(4),dp(8),dp(4));status.setBackground(bubble());
   FrameLayout.LayoutParams sp=new FrameLayout.LayoutParams(-2,-2,Gravity.LEFT|Gravity.TOP);
   sp.setMargins(dp(8),dp(10),dp(55),0);root.addView(status,sp);
+  TextView commands=new TextView(this);commands.setText("⚙ Objectif 2 · commandes");commands.setTextColor(Color.WHITE);
+  commands.setPadding(dp(12),dp(10),dp(12),dp(10));commands.setBackground(bubble());
+  FrameLayout.LayoutParams commandsLayout=new FrameLayout.LayoutParams(-2,-2,Gravity.LEFT|Gravity.BOTTOM);
+  commandsLayout.setMargins(dp(8),0,dp(8),dp(8));root.addView(commands,commandsLayout);
+  commands.setOnClickListener(v->{
+   if(controls!=null)controls.close();
+   controls=new CameraControls(this,Uri.parse(baseUrl).getHost(),credential("username"),credential("password"));controls.show();
+  });
   for(int i=0;i<2;i++){retries[i]=0;restart(i,true);}
  }
  private void restart(int lens,boolean reset){
@@ -211,6 +222,7 @@ public class CameraActivity extends Activity {
   try{
    DefaultRenderersFactory renderers=new DefaultRenderersFactory(this).setEnableDecoderFallback(true);
    ExoPlayer p=new ExoPlayer.Builder(this,renderers).build();players[lens]=p;
+   p.setVolume(lens==1&&mobileAudio?1f:0f);
    views[lens].setPlayer(p);
    final int index=lens;
    p.addListener(new Player.Listener(){
@@ -394,6 +406,7 @@ public class CameraActivity extends Activity {
  }
  private void releasePreviews(){for(ExoPlayer p:previewPlayers)p.release();previewPlayers.clear();}
  private void release(){for(int i=0;i<2;i++)if(players[i]!=null){views[i].setPlayer(null);players[i].release();players[i]=null;}}
- @Override public void onConfigurationChanged(Configuration config){super.onConfigurationChanged(config);if(!settingsOnly&&!discovering&&root!=null&&views[0]!=null)buildViews();}
- @Override protected void onStop(){release();releasePreviews();super.onStop();}
+ @Override public void onConfigurationChanged(Configuration config){super.onConfigurationChanged(config);if(controls!=null)controls.close();if(!settingsOnly&&!discovering&&root!=null&&views[0]!=null)buildViews();}
+ @Override protected void onStart(){super.onStart();if(root!=null&&!settingsOnly&&!discovering&&views[0]!=null&&players[0]==null)buildViews();}
+ @Override protected void onStop(){if(controls!=null)controls.close();release();releasePreviews();super.onStop();}
 }
