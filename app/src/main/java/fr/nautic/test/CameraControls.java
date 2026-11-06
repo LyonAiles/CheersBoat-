@@ -137,8 +137,8 @@ final class CameraControls {
    public void save(String backup,boolean armed)throws Exception{if(!prefs.edit().putString(key+".return",backup).putBoolean(key+".active",armed).commit())throw new java.io.IOException("Sauvegarde de la position de retour impossible");}
   };
   TrematageSession session=new TrematageSession(camera,p,store);
-  prefs.edit().putInt("shortcutIndex",cameraIndex).putString("shortcutProfile",p.getAttribute("token")).putString("shortcutKey",key).apply();
-  add(target,"Mémoriser cette orientation : Trématage",()->ui(()->new AlertDialog.Builder(activity).setTitle("Position Trématage").setMessage("Mémoriser l’orientation actuelle de l’objectif pour la veille arrière ?").setPositiveButton("Mémoriser",(d,w)->task(()->session.remember(),"Position Trématage mémorisée")).setNegativeButton("Annuler",null).show()));
+  Runnable bindShortcut=()->prefs.edit().putInt("shortcutIndex",cameraIndex).putString("shortcutProfile",p.getAttribute("token")).putString("shortcutKey",key).apply();
+  add(target,"Mémoriser cette orientation : Trématage",()->ui(()->new AlertDialog.Builder(activity).setTitle("Position Trématage").setMessage("Mémoriser l’orientation actuelle de l’objectif pour la veille arrière ?").setPositiveButton("Mémoriser",(d,w)->task(()->{session.remember();bindShortcut.run();},"Position Trématage mémorisée")).setNegativeButton("Annuler",null).show()));
   Button toggle=new Button(activity);target.addView(toggle);
   Runnable refresh=()->toggle.setText(store.armed()?"Désactiver Trématage · revenir":"Activer Trématage");refresh.run();
   toggle.setOnClickListener(v->{
@@ -149,7 +149,7 @@ final class CameraControls {
       session.deactivate();TrematageService.stop(activity,key);
      }else{
       String other=prefs.getString("watchKey","");if(!other.isEmpty()&&!other.equals(key))throw new java.io.IOException("Désactiver d’abord la veille de l’autre caméra");
-      session.activate();TrematageService.start(activity,camera.host,cameraIndex,key);
+      session.activate();bindShortcut.run();TrematageService.start(activity,camera.host,cameraIndex,key);
      }
     }finally{ui(()->{toggle.setEnabled(true);refresh.run();});}
    },"Commande Trématage effectuée");
