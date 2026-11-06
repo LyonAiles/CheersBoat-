@@ -44,6 +44,7 @@ public class CameraActivity extends Activity {
  private CameraControls controls;
  private android.content.BroadcastReceiver trematageReceiver;
  private boolean mobileAudio=false;
+ private boolean mobileOnly=false;
  void toggleMobileAudio(){mobileAudio=!mobileAudio;if(players[1]!=null)players[1].setVolume(mobileAudio?1f:0f);}
  private final org.json.JSONObject scanStatuses=new org.json.JSONObject();
  private final java.util.ArrayList<ExoPlayer> previewPlayers=new java.util.ArrayList<>();
@@ -55,6 +56,7 @@ public class CameraActivity extends Activity {
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
   baseUrl=getIntent().getStringExtra("url");
   settingsOnly=getIntent().getBooleanExtra("settings",false);
+  mobileOnly=getIntent().getBooleanExtra("mobileOnly",false);
   cameraIndex=Math.max(1,Math.min(3,getIntent().getIntExtra("cameraIndex",1)));
   boolean discover=getIntent().getBooleanExtra("discover",false);
   if(settingsOnly){configure();return;}
@@ -140,7 +142,7 @@ public class CameraActivity extends Activity {
    @Override public boolean onDoubleTap(MotionEvent e){restart(lens,true);return true;}
    @Override public boolean onSingleTapConfirmed(MotionEvent e){
     if(zoom[0]>1.01f){resetZoom.run();return true;}
-    if(getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE
+    if(!mobileOnly&&getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE
        &&((swapped?0:1)==lens)){swapped=!swapped;buildViews();}
     return true;
    }
@@ -186,7 +188,8 @@ public class CameraActivity extends Activity {
   release();root.removeAllViews();
   makeView(0);makeView(1);
   boolean landscape=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
-  if(landscape){
+  if(mobileOnly){root.addView(cameraFrames[1],new FrameLayout.LayoutParams(-1,-1));}
+  else if(landscape){
    int large=swapped?1:0,small=1-large;
    root.addView(cameraFrames[large],new FrameLayout.LayoutParams(-1,-1));
    FrameLayout.LayoutParams inset=new FrameLayout.LayoutParams(dp(180),dp(110),Gravity.RIGHT|Gravity.BOTTOM);
@@ -214,7 +217,8 @@ public class CameraActivity extends Activity {
    if(controls!=null)controls.close();
    controls=new CameraControls(this,Uri.parse(baseUrl).getHost(),credential("username"),credential("password"),cameraIndex);controls.show();
   });
-  for(int i=0;i<2;i++){retries[i]=0;restart(i,true);}
+  for(int i=0;i<2;i++)if(!mobileOnly||i==1){retries[i]=0;restart(i,true);}
+  if(getIntent().getBooleanExtra("autoControls",false)){getIntent().removeExtra("autoControls");commands.post(()->commands.performClick());}
  }
  private void restart(int lens,boolean reset){
   if(reset)retries[lens]=0;
@@ -408,6 +412,6 @@ public class CameraActivity extends Activity {
  private void releasePreviews(){for(ExoPlayer p:previewPlayers)p.release();previewPlayers.clear();}
  private void release(){for(int i=0;i<2;i++)if(players[i]!=null){views[i].setPlayer(null);players[i].release();players[i]=null;}}
  @Override public void onConfigurationChanged(Configuration config){super.onConfigurationChanged(config);if(controls!=null)controls.close();if(!settingsOnly&&!discovering&&root!=null&&views[0]!=null)buildViews();}
- @Override protected void onStart(){super.onStart();trematageReceiver=TrematageAlerts.attach(this);if(root!=null&&!settingsOnly&&!discovering&&views[0]!=null&&players[0]==null)buildViews();}
+ @Override protected void onStart(){super.onStart();trematageReceiver=TrematageAlerts.attach(this);int lens=mobileOnly?1:0;if(root!=null&&!settingsOnly&&!discovering&&views[lens]!=null&&players[lens]==null)buildViews();}
  @Override protected void onStop(){if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}if(controls!=null)controls.close();release();releasePreviews();super.onStop();}
 }

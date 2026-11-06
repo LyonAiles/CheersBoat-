@@ -1,0 +1,38 @@
+/* Dashboard controls share the same frame, spacing and preview area. */
+#app header #nauticHeaderControls{right:6px!important;gap:5px!important}
+#app header #nauticHeaderControls button{width:38px!important;height:36px!important;min-width:0!important;margin:0!important;padding:3px!important;font-size:23px!important;line-height:1!important}
+#app header #nauticContactsButton{order:99!important}
+#app .gauges #nauticCallsSlot{flex:0 0 12%!important;order:0;align-items:center}
+#app #dashboardPhone{width:100%;height:100%;border:0;background:transparent;font-size:clamp(27px,4vw,44px);padding:2px}
+#app .left>.dashboard-symbol{position:relative!important;display:grid!important;place-items:center!important;padding:4px!important}
+#app .left>.dashboard-symbol>*:not(h3):not(.nautic-object-tag){display:none!important}
+#app .left>.dashboard-symbol h3{display:grid!important;place-items:center!important;margin:0!important;overflow:visible!important}
+#app .left>.dashboard-symbol .dashboard-symbol-icon{font-size:clamp(28px,4vw,58px)!important;line-height:1!important;color:#def6ff}
+#app .left>#gpsCard .dashboard-symbol-icon{color:#ff7373}
+#app .left>#fuelCard{padding:4px 6px!important;justify-content:center!important;gap:1px!important}
+#app .left>#fuelCard h3{margin:0!important;font-size:18px!important;line-height:1}
+#app .left>#fuelCard p{display:block!important;margin:0!important;font-size:clamp(9px,1vw,13px)!important;line-height:1.12!important;letter-spacing:-.3px}
+#app .left>#fuelCard .fuelrow{font-size:10px!important;margin:1px 0!important}
+#app .left>#fuelCard .fuelbar{height:5px!important;flex:none}
+#app .right{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:1.2fr repeat(3,minmax(0,1fr))!important;gap:5px!important;overflow:hidden!important}
+#app .right>.camCard{display:flex!important;flex-direction:column!important;min-width:0!important;min-height:0!important;width:100%!important;padding:4px!important;margin:0!important;border-width:2px!important;border-radius:10px!important;flex:1!important}
+#app .right>.camCard h3{flex:none!important;display:flex!important;justify-content:space-between;align-items:center;gap:4px;margin:0 2px 3px!important;font-size:clamp(9px,1vw,13px)!important;line-height:1.15;min-height:13px}
+#app .right>.camCard .camBody{position:relative;flex:1!important;min-height:0!important;width:100%;height:auto!important;border-radius:5px!important;overflow:hidden!important}
+#app .right>.camCard .camBody>span{font-size:18px}
+#app #trematageCard{border-color:#658398!important}
+#app #trematageCard.trematage-active{border-color:#4be0b0!important}
+#app #trematageCard.trematage-alert{border-color:#ff2929!important;box-shadow:inset 0 0 0 2px #ff2929,0 0 8px #ff2929!important}
+#app #trematageState{flex:none;max-height:24px;overflow:hidden;font-size:10px;line-height:12px;text-align:center}
+@media(orientation:portrait){
+ #app .right{grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-template-rows:minmax(0,1fr)!important;gap:4px!important}
+ #app .right>.camCard{padding:3px!important}
+ #app .right>.camCard h3{font-size:9px!important;min-height:11px}
+ #app #trematageCard h3 b{font-size:8px;overflow:hidden;text-overflow:ellipsis}
+ #app .left>.dashboard-symbol .dashboard-symbol-icon{font-size:30px!important}
+ #app .left>#fuelCard p{font-size:9px!important;line-height:1.05!important}
+ #app .left>#fuelCard .fuelrow{font-size:8px!important}
+ #app header .brand{font-size:15px!important}
+ #app header #nauticHeaderControls button{width:30px!important;height:32px!important;font-size:20px!important}
+ body>#clock{top:45px!important;height:27px!important;line-height:27px!important;font-size:20px!important}
+ #app{grid-template-rows:76px minmax(0,1fr) 0px!important}
+}

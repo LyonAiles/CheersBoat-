@@ -39,10 +39,17 @@ import java.io.InputStream;
 public class MainActivity extends Activity {
  private static final int PICK_PHONE=201, PICK_IMAGE=202, GPS=100, CAMERA=101, CALLS=103;
  private WebView web;
+ private android.widget.FrameLayout dashboardLayer;
+ private DashboardCameras dashboardCameras;
+ private final java.util.concurrent.ExecutorService dashboardCommands=java.util.concurrent.Executors.newSingleThreadExecutor();
+ private final java.util.concurrent.atomic.AtomicBoolean trematageBusy=new java.util.concurrent.atomic.AtomicBoolean();
+ private boolean dashboardVisible=false;
+ void dashboardClick(String id,boolean held){js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
+ void dashboardAlert(String message){js("nauticTrematageAlert",message);}
  private PermissionRequest pendingCamera;
  private android.content.BroadcastReceiver trematageReceiver;
- @Override protected void onStart(){super.onStart();trematageReceiver=TrematageAlerts.attach(this);}
- @Override protected void onStop(){if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
+ @Override protected void onStart(){super.onStart();dashboardVisible=true;trematageReceiver=TrematageAlerts.attach(this);}
+ @Override protected void onStop(){dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -82,7 +89,8 @@ public class MainActivity extends Activity {
    });}
    @Override public void onPermissionRequestCanceled(PermissionRequest req){if(pendingCamera==req)pendingCamera=null;}
   });
-  setContentView(web);
+  android.widget.FrameLayout dashboard=new android.widget.FrameLayout(this);dashboard.addView(web,new android.widget.FrameLayout.LayoutParams(-1,-1));
+  dashboardLayer=new android.widget.FrameLayout(this);dashboard.addView(dashboardLayer,new android.widget.FrameLayout.LayoutParams(-1,-1));setContentView(dashboard);
   if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)
    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},GPS);
   web.loadUrl("file:///android_asset/index.html");
@@ -93,6 +101,19 @@ public class MainActivity extends Activity {
   runOnUiThread(()->web.evaluateJavascript("window."+name+" && window."+name+"("+escaped+")",null));
  }
  public class Bridge {
+  @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
+   if(!dashboardVisible)return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
+  });}
+  @JavascriptInterface public String trematageStatus(){return TrematageAccess.status(MainActivity.this);}
+  @JavascriptInterface public void toggleTrematage(){
+   if(!trematageBusy.compareAndSet(false,true))return;
+   dashboardCommands.execute(()->{try{String message=TrematageAccess.toggle(MainActivity.this);js("nauticTrematageResult",message);}catch(Exception e){js("nauticTrematageResult",e.getMessage());}finally{trematageBusy.set(false);}});
+  }
+  @JavascriptInterface public void openTrematageCamera(){runOnUiThread(()->{try{
+   int index=TrematageAccess.index(MainActivity.this);String address=TrematageAccess.address(MainActivity.this,index);
+   if(!address.startsWith("rtsp://")){toast("Configurer la TC47 dans Paramètres");return;}
+   Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("url",address);i.putExtra("cameraIndex",index);i.putExtra("mobileOnly",true);i.putExtra("autoControls",true);startActivity(i);
+  }catch(Exception e){toast("Caméra mobile indisponible");}});}
   // SharedPreferences est indépendant du stockage WebView (file://).
   @JavascriptInterface public String readSetting(String key){
    return getSharedPreferences("nautic_settings",MODE_PRIVATE).getString(key,"");
@@ -254,5 +275,5 @@ public class MainActivity extends Activity {
     r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});else r.deny();}
  }
  @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
- @Override protected void onDestroy(){if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
+ @Override protected void onDestroy(){dashboardCommands.shutdown();if(dashboardCameras!=null)dashboardCameras.close();if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
 }
