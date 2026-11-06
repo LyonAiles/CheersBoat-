@@ -223,6 +223,8 @@ public class MainActivity extends Activity {
  }
  @Override protected void onResume(){
   super.onResume();
+  if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}
+  js("nauticDashboardResume","");
   String saved=getSharedPreferences("nautic_settings",MODE_PRIVATE).getString("nautic-v04","");
   if(!saved.isEmpty())js("nauticCameraAddressSync",saved);
  }

@@ -11,10 +11,11 @@ public class TrematageService extends Service {
  static final String ACTION="fr.nautic.test.TREMATAGE_EVENT";
  private static final String STATUS="nautic_trematage_status", ALERTS="nautic_trematage_alerts";
  private volatile boolean running;
+ private volatile long generation=0;
  private ExecutorService worker;
  private String cameraKey;
- private final Map<String,Boolean> states=new HashMap<>();
- private final Map<String,Long> last=new HashMap<>();
+ private final Map<String,Boolean> states=new java.util.concurrent.ConcurrentHashMap<>();
+ private final Map<String,Long> last=new java.util.concurrent.ConcurrentHashMap<>();
  @Override public android.os.IBinder onBind(Intent intent){return null;}
  static void start(Context context,String host,int index,String key){
   Intent i=new Intent(context,TrematageService.class).putExtra("host",host).putExtra("index",index).putExtra("key",key);
@@ -22,7 +23,7 @@ public class TrematageService extends Service {
  }
  static void stop(Context context,String key){
   String current=context.getSharedPreferences("nautic_trematage",MODE_PRIVATE).getString("watchKey","");
-  if(key.equals(current))context.stopService(new Intent(context,TrematageService.class));
+  if(key.equals(current)||TrematageProfiles.sameCamera(key,current))context.stopService(new Intent(context,TrematageService.class));
  }
  @Override public void onCreate(){
   super.onCreate();
@@ -45,7 +46,9 @@ public class TrematageService extends Service {
   ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(1101,notification(STATUS,"Trématage",text,true));
  }
  @Override public int onStartCommand(Intent intent,int flags,int id){
-  if(running)return START_NOT_STICKY;
+  if(running&&intent!=null&&TrematageProfiles.sameCamera(cameraKey,intent.getStringExtra("key")==null?"":intent.getStringExtra("key"))){cameraKey=intent.getStringExtra("key");getSharedPreferences("nautic_trematage",MODE_PRIVATE).edit().putString("watchKey",cameraKey).apply();return START_NOT_STICKY;}
+  final long watchGeneration=++generation;
+  if(worker!=null)worker.shutdownNow();
   startForeground(1101,notification(STATUS,"Trématage","Connexion à la caméra…",true));
   if(intent==null){stopSelf();return START_NOT_STICKY;}
   String key=intent.getStringExtra("key");
@@ -60,24 +63,25 @@ public class TrematageService extends Service {
    try{
     camera.discover();if(!camera.services.containsKey(OnvifCamera.EVENTS))throw new java.io.IOException("La caméra n’expose pas de service d’alertes");
     int failures=0;
-    while(running&&!Thread.currentThread().isInterrupted()){
+    while(running&&generation==watchGeneration&&!Thread.currentThread().isInterrupted()){
      try{
       states.clear();camera.beginEvents();long renewed=System.currentTimeMillis();
+      if(generation!=watchGeneration)break;
       status("Écoute active · personne, véhicule et mouvement selon les signaux disponibles");
-      while(running&&!Thread.currentThread().isInterrupted()){
+      while(running&&generation==watchGeneration&&!Thread.currentThread().isInterrupted()){
        if(System.currentTimeMillis()-renewed>40000){camera.endEvents();states.clear();camera.beginEvents();renewed=System.currentTimeMillis();}
        List<CameraEvent> messages=camera.readEvents();
-       if(!running)break;
+       if(!running||generation!=watchGeneration)break;
        for(CameraEvent event:messages)receive(event,System.currentTimeMillis()-renewed>4000);
        failures=0;
       }
      }catch(Exception e){
-      if(!running||Thread.currentThread().isInterrupted())break;
+      if(!running||generation!=watchGeneration||Thread.currentThread().isInterrupted())break;
       status("Alertes indisponibles · reconnexion : "+e.getMessage());
       failures++;Thread.sleep(Math.min(15000,2000L*failures));
      }finally{camera.endEvents();}
     }
-   }catch(Exception e){if(running){status("Veille indisponible : "+e.getMessage());running=false;}}
+   }catch(Exception e){if(running&&generation==watchGeneration){status("Veille indisponible : "+e.getMessage());running=false;}}
    finally{camera.endEvents();}
   });
   return START_NOT_STICKY;

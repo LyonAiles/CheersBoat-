@@ -212,7 +212,7 @@ public class CameraActivity extends Activity {
   TextView commands=new TextView(this);commands.setText("⚙ Objectif 2 · commandes");commands.setTextColor(Color.WHITE);
   commands.setPadding(dp(12),dp(10),dp(12),dp(10));commands.setBackground(bubble());
   FrameLayout.LayoutParams commandsLayout=new FrameLayout.LayoutParams(-2,-2,Gravity.LEFT|Gravity.BOTTOM);
-  commandsLayout.setMargins(dp(8),0,dp(8),dp(8));root.addView(commands,commandsLayout);
+  commandsLayout.setMargins(dp(8),0,dp(8),dp(8));root.addView(commands,commandsLayout);commands.setVisibility(View.GONE);
   commands.setOnClickListener(v->{
    if(controls!=null)controls.close();
    controls=new CameraControls(this,Uri.parse(baseUrl).getHost(),credential("username"),credential("password"),cameraIndex);controls.show();

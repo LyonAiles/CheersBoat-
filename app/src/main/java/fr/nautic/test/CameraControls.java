@@ -148,8 +148,8 @@ final class CameraControls {
      if(store.armed()){
       session.deactivate();TrematageService.stop(activity,key);
      }else{
-      String other=prefs.getString("watchKey","");if(!other.isEmpty()&&!other.equals(key))throw new java.io.IOException("Désactiver d’abord la veille de l’autre caméra");
-      session.activate();bindShortcut.run();TrematageService.start(activity,camera.host,cameraIndex,key);
+      String other=prefs.getString("watchKey","");if(!other.isEmpty()&&!TrematageProfiles.sameCamera(other,key)&&prefs.getBoolean(other+".active",false))throw new java.io.IOException("Une position de retour est conservée sur une autre caméra ; revenir depuis ses commandes");
+      session.activate();bindShortcut.run();TrematageService.start(activity,camera.host,cameraIndex,key);TrematageFeedback.activated(activity);
      }
     }finally{ui(()->{toggle.setEnabled(true);refresh.run();});}
    },"Commande Trématage effectuée");
