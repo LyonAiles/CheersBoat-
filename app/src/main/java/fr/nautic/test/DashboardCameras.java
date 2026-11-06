@@ -17,11 +17,28 @@ final class DashboardCameras {
  final Map<String,Source> sources=new LinkedHashMap<>();
  boolean stopped=false;
  class Tile{
-  final String id;final FrameLayout frame;final ImageView mirror;final TextView message;
+  final String id;final FrameLayout frame;final ImageView mirror;final TextView message,banner,footer,beacon;
+  boolean alarm=false;
+  int dp(float n){return (int)(n*activity.getResources().getDisplayMetrics().density+.5f);}
+  TextView overlay(int size){TextView t=new TextView(activity);t.setTextColor(Color.WHITE);t.setTextSize(size);t.setGravity(Gravity.CENTER);t.setPadding(dp(4),dp(3),dp(4),dp(3));t.setBackgroundColor(0xb3075e9f);return t;}
   Tile(String id){this.id=id;frame=new FrameLayout(activity);frame.setBackgroundColor(Color.BLACK);
-   mirror=new ImageView(activity);mirror.setScaleType(ImageView.ScaleType.FIT_CENTER);frame.addView(mirror,new FrameLayout.LayoutParams(-1,-1));
+   android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(Color.BLACK);shape.setCornerRadius(dp(8));frame.setBackground(shape);frame.setClipToOutline(true);
+   mirror=new ImageView(activity);mirror.setScaleType(ImageView.ScaleType.CENTER_CROP);frame.addView(mirror,new FrameLayout.LayoutParams(-1,-1));
    message=new TextView(activity);message.setTextColor(Color.WHITE);message.setTextSize(10);message.setGravity(Gravity.CENTER);frame.addView(message,new FrameLayout.LayoutParams(-1,-1));
+   banner=overlay(11);banner.setSingleLine(true);banner.setEllipsize(android.text.TextUtils.TruncateAt.END);frame.addView(banner,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+   footer=overlay(10);footer.setMaxLines(2);frame.addView(footer,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));footer.setVisibility(View.GONE);
+   beacon=overlay(42);beacon.setText("⚠");beacon.setBackgroundColor(0xe6e00000);beacon.setVisibility(View.GONE);frame.addView(beacon,new FrameLayout.LayoutParams(dp(70),dp(66),Gravity.CENTER));
    frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{activity.dashboardClick(id,true);return true;});layer.addView(frame);
+  }
+  void decorate(JSONObject data){
+   banner.setText(data.optString("label","📷"));footer.setText(data.optString("status",""));footer.setVisibility(footer.length()==0?View.GONE:View.VISIBLE);
+   boolean next=data.optBoolean("alarm",false);
+   if(next!=alarm){alarm=next;beacon.clearAnimation();beacon.setVisibility(alarm?View.VISIBLE:View.GONE);
+    if(alarm){android.view.animation.AlphaAnimation blink=new android.view.animation.AlphaAnimation(1f,.12f);blink.setDuration(500);blink.setRepeatMode(android.view.animation.Animation.REVERSE);blink.setRepeatCount(android.view.animation.Animation.INFINITE);beacon.startAnimation(blink);}
+   }
+   android.graphics.drawable.GradientDrawable border=new android.graphics.drawable.GradientDrawable();border.setColor(Color.TRANSPARENT);border.setCornerRadius(dp(8));border.setStroke(dp(alarm?6:2),alarm?0xffff2424:data.optBoolean("active",false)?0xff4be0b0:0xff287398);frame.setForeground(border);
+   // Keep the beacon large but inside even a narrow portrait thumbnail.
+   FrameLayout.LayoutParams bp=(FrameLayout.LayoutParams)beacon.getLayoutParams();FrameLayout.LayoutParams fp=(FrameLayout.LayoutParams)frame.getLayoutParams();bp.width=Math.max(24,Math.min(dp(70),fp.width*2/3));bp.height=Math.max(24,Math.min(dp(66),fp.height/2));beacon.setTextSize(Math.max(22,Math.min(42,bp.height/activity.getResources().getDisplayMetrics().density*.7f)));beacon.setLayoutParams(bp);
   }
  }
  class Source{
@@ -35,7 +52,7 @@ final class DashboardCameras {
     @Override public void onVideoSizeChanged(VideoSize size){texture.post(()->{
      if(size.width==0||size.height==0||texture.getWidth()==0||texture.getHeight()==0)return;
      float sourceRatio=(float)size.width*size.pixelWidthHeightRatio/size.height,viewRatio=(float)texture.getWidth()/texture.getHeight();
-     Matrix m=new Matrix();m.setScale(sourceRatio<viewRatio?sourceRatio/viewRatio:1,sourceRatio>viewRatio?viewRatio/sourceRatio:1,texture.getWidth()/2f,texture.getHeight()/2f);texture.setTransform(m);
+     Matrix m=new Matrix();m.setScale(sourceRatio>viewRatio?sourceRatio/viewRatio:1,sourceRatio<viewRatio?viewRatio/sourceRatio:1,texture.getWidth()/2f,texture.getHeight()/2f);texture.setTransform(m);
     });}
    });
    player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));player.prepare();player.play();
@@ -53,6 +70,7 @@ final class DashboardCameras {
     JSONObject item=list.getJSONObject(i);String id=item.getString("id");if(!id.matches("cam[123]Body|trematagePreview"))continue;
     visible.add(id);Tile tile=tiles.get(id);if(tile==null){tile=new Tile(id);tiles.put(id,tile);}
     FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(Math.max(1,(int)(item.getDouble("w")*scale)),Math.max(1,(int)(item.getDouble("h")*scale)));lp.leftMargin=(int)(item.getDouble("x")*scale);lp.topMargin=(int)(item.getDouble("y")*scale);tile.frame.setLayoutParams(lp);tile.frame.setVisibility(View.VISIBLE);
+    tile.decorate(item);
     boolean mobile=id.equals("trematagePreview");int index=mobile?TrematageAccess.index(activity):id.charAt(3)-'0';
     String url=TrematageAccess.address(activity,index);
     if(!url.startsWith("rtsp://")){tile.message.setText("📷");continue;}

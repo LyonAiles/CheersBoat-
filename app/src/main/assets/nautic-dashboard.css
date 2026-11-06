@@ -36,3 +36,25 @@
  body>#clock{top:45px!important;height:27px!important;line-height:27px!important;font-size:20px!important}
  #app{grid-template-rows:76px minmax(0,1fr) 0px!important}
 }
+
+/* Cadres symétriques, image bord à bord et bandeaux superposés. */
+#app .right{grid-template-rows:repeat(4,minmax(0,1fr))!important}
+#app .right>.camCard{position:relative!important;padding:0!important;isolation:isolate;border-radius:10px!important}
+#app .right>.camCard .camBody{position:absolute!important;inset:0!important;display:grid!important;width:100%!important;height:100%!important;border-radius:0!important}
+#app .right>.camCard .camBody img,#app .right>.camCard .camBody video{object-fit:cover!important}
+#app .right>.camCard h3{position:absolute!important;top:0!important;left:0!important;right:0!important;z-index:3!important;margin:0!important;padding:5px 8px!important;min-height:25px!important;background:#075e9fb3!important;color:white!important;text-shadow:0 1px 2px #001c39;pointer-events:none}
+#app #trematageState{position:absolute!important;bottom:0!important;left:0!important;right:0!important;z-index:3!important;padding:4px 6px!important;max-height:34px!important;line-height:13px!important;background:#075e9fa8!important;color:white!important;pointer-events:none}
+#app #trematageCard.trematage-alert::after{content:'⚠';position:absolute;inset:25% 25%;display:grid;place-items:center;z-index:4;background:#e00000dc;border:3px solid white;border-radius:10px;font-size:clamp(32px,5vw,70px);color:white;pointer-events:none;animation:trematageBeacon 1s step-end infinite}
+#app #trematageCard.trematage-alert{animation:trematageFrame 1s step-end infinite}
+@keyframes trematageBeacon{0%,100%{opacity:1}50%{opacity:.12}}
+@keyframes trematageFrame{0%,100%{box-shadow:inset 0 0 0 6px #ff2424,0 0 12px #ff2424}50%{box-shadow:inset 0 0 0 3px #ff2424}}
+@media(orientation:landscape){
+ #app .layout{grid-template-columns:minmax(0,20fr) minmax(0,60fr) minmax(0,20fr)!important;gap:5px!important}
+ #app .left{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:repeat(4,minmax(0,1fr))!important;gap:5px!important}
+}
+@media(orientation:portrait){
+ #app .layout{grid-template-rows:clamp(88px,14dvh,132px) minmax(0,1fr) clamp(88px,14dvh,132px)!important}
+ #app .left,#app .right{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-template-rows:minmax(0,1fr)!important;gap:4px!important}
+ #app .right>.camCard h3{padding:4px!important;min-height:22px!important}
+ #app #trematageState{font-size:9px!important;line-height:11px!important;padding:3px!important}
+}

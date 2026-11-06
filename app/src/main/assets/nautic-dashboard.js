@@ -16,20 +16,21 @@
  const trematage=document.createElement('section');trematage.id='trematageCard';trematage.className='camCard click';trematage.tabIndex=0;trematage.setAttribute('role','button');trematage.setAttribute('aria-label','Activer ou désactiver Trématage');trematage.title='Trématage · toucher pour activer/désactiver · appui long pour régler';
  trematage.innerHTML='<h3><span aria-hidden="true">◀◀</span> <b>Trématage</b><span id="trematageIndicator">○</span></h3><div class="camBody" id="trematagePreview">📷</div><div id="trematageState" aria-live="polite">○</div>';
  right?.prepend(trematage);
- let pending=false,lastAlert=0,alarmUntil=0;
+ let pending=false,lastAlert=0,alarmUntil=0,resultUntil=0,resultText='';
  function refresh(){try{
   const s=JSON.parse(call('trematageStatus')||'{}');
   trematage.classList.toggle('trematage-active',!!s.active);trematage.setAttribute('aria-pressed',String(!!s.active));
   $('trematageIndicator').textContent=s.active?'●':'○';
   if(Number(s.alertTime)>lastAlert){lastAlert=Number(s.alertTime);if(Date.now()-lastAlert<30000)alarmUntil=lastAlert+30000;}
   trematage.classList.toggle('trematage-alert',Date.now()<alarmUntil);
-  $('trematageState').textContent=pending?'…':Date.now()<alarmUntil?(s.alert||'⚠'):s.active?'●':'○';
+  $('trematageState').textContent=pending?'Positionnement…':Date.now()<alarmUntil?(s.alert||'⚠'):Date.now()<resultUntil?resultText:s.active?'↶ Revenir':'▶ Activer';
+  trematage.setAttribute('aria-label',s.active?'Revenir à la position précédente':'Activer la position Trématage');
   trematage.title=(s.active?'Trématage actif':'Trématage inactif')+' · '+(s.status||'appui long pour régler');
  }catch(e){}}
  trematage.onclick=()=>{if(pending)return;if(!bridge){$('trematageState').textContent='Application Android requise';return;}pending=true;refresh();call('toggleTrematage');};
  trematage.oncontextmenu=e=>{e.preventDefault();call('openTrematageCamera');};
  trematage.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();trematage.click();}};
- window.nauticTrematageResult=message=>{pending=false;refresh();$('trematageState').textContent=message||'';};
+ window.nauticTrematageResult=message=>{pending=false;resultText=message||'';resultUntil=Date.now()+7000;refresh();};
  window.nauticTrematageAlert=()=>{alarmUntil=Date.now()+30000;refresh();};
  window.nauticDashboardClick=id=>{if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
  window.nauticDashboardHold=id=>{if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
@@ -44,7 +45,9 @@
     if(/^https?:\/\//i.test(url)){if(e.dataset.previewUrl!==url){const img=new Image();img.alt='Caméra '+index;img.src=url;e.replaceChildren(img);e.dataset.previewUrl=url;}continue;}
    }
    const r=e.getBoundingClientRect();if(r.width<2||r.height<2)continue;
-   tiles.push({id,x:r.left,y:r.top,w:r.width,h:r.height});
+   const card=e.closest('.camCard'),mobile=id==='trematagePreview';
+   const heading=card?.querySelector('h3')?.cloneNode(true);heading?.querySelectorAll('.nautic-object-tag').forEach(t=>t.remove());
+   tiles.push({id,x:r.left,y:r.top,w:r.width,h:r.height,label:mobile?'Trématage':heading?.textContent.trim()||'📷',active:mobile&&card.classList.contains('trematage-active'),alarm:mobile&&card.classList.contains('trematage-alert'),status:mobile?$('trematageState').textContent:''});
   }
   call('dashboardPreviews',JSON.stringify({width:innerWidth,tiles}));
  }
