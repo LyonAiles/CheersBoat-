@@ -108,6 +108,8 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
    if(!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
   });}
+  @JavascriptInterface public String camera42Status(){return Camera42Access.status(MainActivity.this);}
+  @JavascriptInterface public void toggleCamera42(){runOnUiThread(()->{try{js("nauticCamera42Result",Camera42Access.toggle(MainActivity.this));}catch(Exception e){js("nauticCamera42Result",e.getMessage());}});}
   @JavascriptInterface public String trematageStatus(){return TrematageAccess.status(MainActivity.this);}
   @JavascriptInterface public void toggleTrematage(){
    if(!trematageBusy.compareAndSet(false,true))return;

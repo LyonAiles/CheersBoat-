@@ -26,6 +26,10 @@
   const gauges=document.querySelector('#app .gauges');if(gauges&&$('speedCard'))gauges.insertBefore(trematage,$('speedCard'));
  };
  window.nauticArrangeDashboard();
+ const camera42=$('cam2Card'),open42=camera42?.onclick;
+ let pending42=false;
+ if(camera42){camera42.onclick=()=>{if(pending42||!bridge)return;pending42=true;call('toggleCamera42');};camera42.oncontextmenu=e=>{e.preventDefault();if(open42)open42.call(camera42,e);};}
+ window.nauticCamera42Result=message=>{pending42=false;if(camera42)camera42.title=message||'';refresh();previews();};
  let pending=false,lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
  let extraNumbers={};try{extraNumbers=JSON.parse(call('readSetting','nautic-control-numbers')||localStorage.getItem('nautic-control-numbers')||'{}');}catch(_){}
  function numberButtons(){
@@ -38,6 +42,8 @@
  }
  window.nauticNumberDashboard=()=>{numberButtons();previews();};
  function refresh(){try{
+  const w=JSON.parse(call('camera42Status')||'{}');
+  if(camera42){camera42.classList.toggle('trematage-active',!!w.active);camera42.setAttribute('aria-pressed',String(!!w.active));camera42.dataset.watchStatus=pending42?'Connexion…':w.active?'● Veille véhicule':'▶ Veille';}
   const s=JSON.parse(call('trematageStatus')||'{}');
   trematage.classList.toggle('trematage-active',!!s.active);trematage.setAttribute('aria-pressed',String(!!s.active));
   $('trematageIndicator').textContent=s.active?'●':'○';
@@ -68,7 +74,7 @@
    const r=e.getBoundingClientRect();if(r.width<2||r.height<2)continue;
    const card=e.closest('.camCard'),mobile=id==='trematagePreview';
    const heading=card?.querySelector('h3')?.cloneNode(true);heading?.querySelectorAll('.nautic-object-tag').forEach(t=>t.remove());
-   tiles.push({id,x:r.left,y:r.top,w:r.width,h:r.height,label:mobile?'Trématage':heading?.textContent.trim()||'📷',number:card?.dataset.objectNumber||'',active:mobile&&card.classList.contains('trematage-active'),alarm:mobile&&card.classList.contains('trematage-alert'),status:mobile?$('trematageState').textContent:''});
+   tiles.push({id,x:r.left,y:r.top,w:r.width,h:r.height,label:mobile?'Trématage':heading?.textContent.trim()||'📷',number:card?.dataset.objectNumber||'',active:(mobile||id==='cam2Body')&&card.classList.contains('trematage-active'),alarm:mobile&&card.classList.contains('trematage-alert'),status:mobile?$('trematageState').textContent:id==='cam2Body'?camera42?.dataset.watchStatus||'':''});
   }
   call('dashboardPreviews',JSON.stringify({width:innerWidth,tiles}));
  }
