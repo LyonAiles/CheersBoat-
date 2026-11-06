@@ -92,25 +92,25 @@ final class CameraControls {
     listening=true;watch.setText("Arrêter le test");eventLog="";
     receptionReport="Caméra "+camera.host+"\nConnexion à l’abonnement ONVIF…";log.setText(receptionReport);
     events.execute(()->{
-     int polls=0,messages=0,active=0;java.util.Set<String> categories=new java.util.LinkedHashSet<>();String failure="";
+     int polls=0,messages=0,active=0,initialActive=0;java.util.Set<String> categories=new java.util.LinkedHashSet<>();String failure="";
      String started=new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss",Locale.FRANCE).format(new Date());
      try{
       camera.beginEvents();long deadline=System.nanoTime()+30000000000L;
       while(listening&&!closed&&!Thread.currentThread().isInterrupted()&&System.nanoTime()<deadline){
        java.util.List<CameraEvent> received=camera.readEvents();polls++;messages+=received.size();
        for(CameraEvent event:received){
-        if(event.active&&!event.initial){active++;categories.add(event.category);}
+        if(event.active){categories.add(event.category);if(event.initial)initialActive++;else active++;}
         String stamp=new java.text.SimpleDateFormat("HH:mm:ss",Locale.FRANCE).format(new Date());
-        eventLog=stamp+" · "+event.category+" · "+(event.initial?"initialisation":event.active?"ACTIF":"inactif/non reconnu")+"\n"+event.topic+" — "+event.source+" — "+event.detail+"\n"+eventLog;
+        eventLog=stamp+" · "+event.category+" · "+(event.initial?(event.active?"ÉTAT INITIAL ACTIF":"état initial inactif"):event.active?"ACTIF":"inactif/non reconnu")+"\n"+event.topic+" — "+event.source+" — "+event.detail+" — UTC caméra="+event.utcTime+"\n"+eventLog;
         if(eventLog.length()>8000)eventLog=eventLog.substring(0,8000);
        }
-       receptionReport="Caméra "+camera.host+" · test "+started+"\nAbonnement confirmé · réponses reçues : "+polls+"\nÉvénements reçus : "+messages+" · actifs hors initialisation : "+active+"\nCatégories actives reçues : "+(categories.isEmpty()?"aucune":categories.toString())+"\n\n"+eventLog;
-       final String display=receptionReport;ui(()->log.setText(display));if(received.isEmpty())Thread.sleep(150);
+       receptionReport="Caméra "+camera.host+" · test "+started+"\nAbonnement confirmé · réponses reçues : "+polls+"\nÉvénements reçus : "+messages+" · actifs hors initialisation : "+active+" · états initiaux actifs : "+initialActive+"\nCatégories signalées actives : "+(categories.isEmpty()?"aucune":categories.toString())+"\n\n"+eventLog;
+       final String display=receptionReport;ui(()->log.setText(display));Thread.sleep(250);
       }
      }catch(Exception e){failure=e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();}
      finally{
       camera.endEvents();listening=false;
-      String conclusion=!failure.isEmpty()?"ÉCHEC : "+failure:active>0?"RÉCEPTION VALIDÉE pour : "+categories:messages>0?"Événements reçus, mais aucune activation de détection confirmée.":"Aucun événement reçu : détection NON VALIDÉE.";
+      String conclusion=!failure.isEmpty()?"ÉCHEC : "+failure:active>0?"RÉCEPTION VALIDÉE pour : "+categories:initialActive>0?"RÉCEPTION VALIDÉE : états initiaux actifs "+categories+". Présence signalée ; nouvelle apparition non démontrée.":messages>0?"Événements reçus, mais aucune activation de détection confirmée.":"Aucun événement reçu : détection NON VALIDÉE.";
       receptionReport=conclusion+"\n"+receptionReport;final String display=receptionReport;
       activity.getSharedPreferences("nautic_trematage",Activity.MODE_PRIVATE).edit().putString("lastReceptionTest",display).apply();
       ui(()->{log.setText(display);watch.setEnabled(true);watch.setText("Recommencer le test (30 s)");});

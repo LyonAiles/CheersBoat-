@@ -5,6 +5,7 @@ import org.w3c.dom.*;
 
 final class CameraEvent {
  final String topic,detail,category,source;
+ String utcTime="";
  final boolean active,initial;
  CameraEvent(String topic,String detail,String category,String source,boolean active,boolean initial){this.topic=topic;this.detail=detail;this.category=category;this.source=source;this.active=active;this.initial=initial;}
  static List<CameraEvent> parse(Document d){
@@ -24,7 +25,9 @@ final class CameraEvent {
    else if(lower.contains("vehicle"))category="véhicule";
    else if(lower.contains("motion"))category="mouvement générique";
    else category="autre";
-   out.add(new CameraEvent(topic,details.toString(),category,sources.toString(),on,initial));
+   CameraEvent event=new CameraEvent(topic,details.toString(),category,sources.toString(),on,initial);
+   for(Element m:OnvifCamera.elements(n,"Message"))if(!m.getAttribute("UtcTime").isEmpty())event.utcTime=m.getAttribute("UtcTime");
+   out.add(event);
   }return out;
  }
 }

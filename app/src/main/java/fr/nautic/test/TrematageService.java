@@ -14,8 +14,7 @@ public class TrematageService extends Service {
  private volatile long generation=0;
  private ExecutorService worker;
  private String cameraKey;
- private final Map<String,Boolean> states=new java.util.concurrent.ConcurrentHashMap<>();
- private final Map<String,Long> last=new java.util.concurrent.ConcurrentHashMap<>();
+
  @Override public android.os.IBinder onBind(Intent intent){return null;}
  static void start(Context context,String host,int index,String key){
   Intent i=new Intent(context,TrematageService.class).putExtra("host",host).putExtra("index",index).putExtra("key",key);
@@ -60,19 +59,21 @@ public class TrematageService extends Service {
   worker.execute(()->{
    SharedPreferences p=getSharedPreferences("nautic_camera_private",MODE_PRIVATE);
    OnvifCamera camera=new OnvifCamera(host,p.getString("username"+index,p.getString("username","")),p.getString("password"+index,p.getString("password","")));
+   CameraAlertGate gate=new CameraAlertGate();long watchStarted=System.currentTimeMillis();
    try{
     camera.discover();if(!camera.services.containsKey(OnvifCamera.EVENTS))throw new java.io.IOException("La caméra n’expose pas de service d’alertes");
     int failures=0;
     while(running&&generation==watchGeneration&&!Thread.currentThread().isInterrupted()){
      try{
-      states.clear();camera.beginEvents();long renewed=System.currentTimeMillis();
+      camera.beginEvents();long renewed=System.currentTimeMillis();
       if(generation!=watchGeneration)break;
       status("Écoute active · personne, véhicule et mouvement selon les signaux disponibles");
       while(running&&generation==watchGeneration&&!Thread.currentThread().isInterrupted()){
-       if(System.currentTimeMillis()-renewed>40000){camera.endEvents();states.clear();camera.beginEvents();renewed=System.currentTimeMillis();}
+       if(System.currentTimeMillis()-renewed>40000){camera.endEvents();camera.beginEvents();renewed=System.currentTimeMillis();}
        List<CameraEvent> messages=camera.readEvents();
        if(!running||generation!=watchGeneration)break;
-       for(CameraEvent event:messages)receive(event,System.currentTimeMillis()-renewed>4000);
+       for(CameraEvent event:messages)receive(event,System.currentTimeMillis()-watchStarted>4000,gate);
+       Thread.sleep(250); // Firmware may immediately repeat Initialized states; avoid a busy poll loop.
        failures=0;
       }
      }catch(Exception e){
@@ -86,15 +87,14 @@ public class TrematageService extends Service {
   });
   return START_NOT_STICKY;
  }
- private void receive(CameraEvent e,boolean settled){
-  String raw=e.topic+" — "+e.source+" — "+e.detail;
+ private void receive(CameraEvent e,boolean settled,CameraAlertGate gate){
+  String raw=e.topic+" — "+e.source+" — "+e.detail+" — UTC caméra="+e.utcTime;
   SharedPreferences p=getSharedPreferences("nautic_trematage",MODE_PRIVATE);
   p.edit().putString("lastRawEvent",raw).apply();
-  String key=e.topic+"|"+e.source;boolean was=Boolean.TRUE.equals(states.put(key,e.active));
-  if(!e.active||e.initial||was||!settled||"autre".equals(e.category))return;
-  long now=System.currentTimeMillis();Long previous=last.get(key);if(previous!=null&&now-previous<5000)return;last.put(key,now);
+  long now=System.currentTimeMillis();if(!gate.receive(e,settled,now))return;
   String message="Trématage · "+e.category+" détecté"+("personne".equals(e.category)?"e":"");
   if("mouvement générique".equals(e.category))message="Trématage · mouvement détecté (catégorie non fournie)";
+  if(e.initial)message="Trématage · "+e.category+" : présence signalée par la caméra";
   p.edit().putString("lastAlert",message).putLong("lastAlertTime",now).apply();
   ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(1102,notification(ALERTS,message,"Alerte caméra · vérifier la vue arrière",false));
   TrematageFeedback.playAlert(this);
