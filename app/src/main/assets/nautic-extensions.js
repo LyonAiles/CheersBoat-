@@ -428,7 +428,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  </section>`).join('')}
 
  <h3>Alertes des caméras</h3><p class="muted">Choisis les types reçus pour chaque veille. Active ou arrête ensuite la veille depuis son bouton sur l’accueil. Seuls les événements transmis par la caméra peuvent déclencher une alerte.</p>
- ${[['44','Trématage · caméra mobile'],['42','Caméra '+esc(state.camera2.name)]].map(([id,name])=>`<section class="emPanel"><h3>${name}</h3>${[['vehicle','Véhicule'],['person','Personne'],['motion','Mouvement général']].map(([type,label])=>`<label class="settingRow"><input type="checkbox" data-alert-watch="${id}" data-alert-type="${type}" ${(state.alertTypes?.[id]?.[type]??(type==='vehicle'))?'checked':''}><span>${label}</span></label>`).join('')}</section>`).join('')}
+ ${[['44','Trématage · caméra mobile'],['42','Caméra '+esc(state.camera2.name)]].map(([id,name])=>`<section class="emPanel"><h3>${name}</h3><label>Son d’alerte<select class="nautic-select" data-alert-sound="${id}">${[['ding','Ding'],['dingding','Ding-ding'],['bell','Cloche'],['warning','Warning'],['horn','Klaxon du bateau'],['silent','Silencieux']].map(([value,label])=>`<option value="${value}" ${(state.alertSounds?.[id]??(id==='42'?'ding':'horn'))===value?'selected':''}>${label}</option>`).join('')}</select></label><button type="button" data-preview-sound="${id}">▶ Écouter</button>${[['vehicle','Véhicule'],['person','Personne'],['motion','Mouvement général']].map(([type,label])=>`<label class="settingRow"><input type="checkbox" data-alert-watch="${id}" data-alert-type="${type}" ${(state.alertTypes?.[id]?.[type]??(type==='vehicle'))?'checked':''}><span>${label}</span></label>`).join('')}</section>`).join('')}
  <p class="muted">Mouvement général peut aussi signaler des remous ou de la végétation. Aucun type coché : aucune alerte pour cette veille.</p>
  <h3>Contacts locaux et personnels</h3><p class="muted">Une ligne par contact : nom ; numéro ; motif. Contacts personnels : appels téléphoniques uniquement.</p>
  <textarea id="contactList">${esc(state.contacts.map(c=>[c.label,c.phone,c.type].join(' ; ')).join('\n'))}</textarea>
@@ -446,6 +446,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
   const details=document.createElement('details');details.className='nautic-settings-subgroup';const summary=document.createElement('summary');summary.textContent=heading.textContent;details.appendChild(summary);heading.remove();while(panel.firstChild)details.appendChild(panel.firstChild);panel.replaceWith(details);
  }
 
+ dialog.querySelectorAll('[data-preview-sound]').forEach(button=>{button.onclick=()=>nativeCall('previewAlertSound',dialog.querySelector('[data-alert-sound="'+button.dataset.previewSound+'"]').value);});
  get('settingObjectNumbers').onchange=e=>{state.objectNumbers=e.target.checked;persist();applyObjectNumbers();};
  applyObjectNumbers();
 
@@ -493,6 +494,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('settingsSave').onclick=()=>{
   const previous=JSON.stringify(state), previousCfg=JSON.stringify(cfg);
   dialog.querySelectorAll('[data-button]').forEach(e=>state.buttons[e.dataset.button]=e.checked);
+  state.alertSounds={};dialog.querySelectorAll('[data-alert-sound]').forEach(e=>{state.alertSounds[e.dataset.alertSound]=e.value;});
   state.alertTypes={};
   dialog.querySelectorAll('[data-alert-watch]').forEach(e=>{const id=e.dataset.alertWatch;if(!state.alertTypes[id])state.alertTypes[id]={};state.alertTypes[id][e.dataset.alertType]=e.checked;});
   state.moveThreshold=Math.max(3,Number(get('settingMove').value)||8);

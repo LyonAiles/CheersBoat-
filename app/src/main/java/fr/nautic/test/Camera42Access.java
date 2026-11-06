@@ -10,7 +10,7 @@ import org.json.JSONObject;
 /** Independent, stationary watch for dashboard camera 42. No PTZ commands. */
 final class Camera42Access {
  static SharedPreferences prefs(Context c){return c.getSharedPreferences("nautic_camera42",Context.MODE_PRIVATE);}
- static void ding(Context c){new Handler(Looper.getMainLooper()).post(()->{try{android.media.MediaPlayer tone=android.media.MediaPlayer.create(c.getApplicationContext(),R.raw.camera42_ding);if(tone!=null){tone.setOnCompletionListener(android.media.MediaPlayer::release);tone.setOnErrorListener((player,what,extra)->{player.release();return true;});tone.start();}}catch(Exception ignored){}});}
+ static void ding(Context c){CameraAlertSounds.play(c,"42",null);}
  static String toggle(Context c)throws Exception{
   SharedPreferences p=prefs(c);
   if(p.getBoolean("active",false)){c.stopService(new Intent(c,Camera42Service.class));p.edit().putBoolean("active",false).apply();return "Veille désactivée";}
