@@ -269,6 +269,7 @@ function updateCameras(){
    else if(!nativeCall('discoverForCamera',i))equipmentDialog(i);
   };
  }
+ window.nauticBindCamera42?.();
 }
 updateCameras();
 const appearanceDefaults={theme:'nautic',background:'gradient',buttons:'rounded',labels:'both',scale:100,accent:'#31b9e9',panel:'#09283e',layout:'navigation',order:[]};
