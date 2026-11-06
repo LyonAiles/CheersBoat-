@@ -101,3 +101,9 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
 #app .mapFoot{display:none!important}
 #app .left>#fuelCard h3{text-align:center!important;align-self:center!important;display:block!important;width:100%!important}
 @media(max-width:520px){#nauticVersion{display:none!important}#app header .brand{font-size:16px!important}}
+
+/* Sortie dessinée en vectoriel et orientation circulaire sans lettre. */
+#app header #nauticExitButton{display:flex!important;align-items:center!important;justify-content:center!important;flex:none!important;overflow:visible!important}
+#app header #nauticExitButton svg{display:block;width:25px;height:25px;flex:none;max-width:none!important}
+#app #mapWrap #compass{width:46px!important;height:46px!important;border-radius:50%!important;padding:0!important;border:1px solid #5793ac!important;display:grid!important;place-items:center!important;line-height:1!important}
+#app #mapWrap #compass>div{font-size:25px!important;line-height:1!important}
