@@ -47,12 +47,14 @@ public class MainActivity extends Activity {
  void dashboardClick(String id,boolean held){js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
  void dashboardAlert(String message){js("nauticTrematageAlert",message);}
  private PermissionRequest pendingCamera;
+ private NotesPad notesPad;
  private android.content.BroadcastReceiver trematageReceiver;
  @Override protected void onStart(){super.onStart();dashboardVisible=true;trematageReceiver=TrematageAlerts.attach(this);}
  @Override protected void onPause(){dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}super.onPause();}
  @Override protected void onStop(){dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
+  notesPad=new NotesPad(this,()->{dashboardVisible=true;js("nauticDashboardResume","");});
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
   web=new WebView(this);
   WebSettings s=web.getSettings();
@@ -102,8 +104,9 @@ public class MainActivity extends Activity {
   runOnUiThread(()->web.evaluateJavascript("window."+name+" && window."+name+"("+escaped+")",null));
  }
  public class Bridge {
+  @JavascriptInterface public void openNotes(){runOnUiThread(()->{dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}notesPad.show();});}
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
-   if(!dashboardVisible)return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
+   if(!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
   });}
   @JavascriptInterface public String trematageStatus(){return TrematageAccess.status(MainActivity.this);}
   @JavascriptInterface public void toggleTrematage(){
@@ -250,6 +253,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onActivityResult(int request,int result,Intent data){
   super.onActivityResult(request,result,data);
+  if(notesPad!=null&&notesPad.result(request,result,data))return;
   if(result!=RESULT_OK||data==null||data.getData()==null)return;
   if(request==PICK_PHONE){
    try(Cursor c=getContentResolver().query(data.getData(),new String[]{ContactsContract.CommonDataKinds.Phone.NUMBER},null,null,null)){
@@ -280,5 +284,5 @@ public class MainActivity extends Activity {
     r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});else r.deny();}
  }
  @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
- @Override protected void onDestroy(){dashboardCommands.shutdown();if(dashboardCameras!=null)dashboardCameras.close();if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
+ @Override protected void onDestroy(){if(notesPad!=null)notesPad.destroy();dashboardCommands.shutdown();if(dashboardCameras!=null)dashboardCameras.close();if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
 }

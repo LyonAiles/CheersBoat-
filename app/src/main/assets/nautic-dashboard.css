@@ -15,18 +15,18 @@
 #app .left>#fuelCard .fuelrow{font-size:10px!important;margin:1px 0!important}
 #app .left>#fuelCard .fuelbar{height:5px!important;flex:none}
 #app .right{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:1.2fr repeat(3,minmax(0,1fr))!important;gap:5px!important;overflow:hidden!important}
-#app .right>.camCard{display:flex!important;flex-direction:column!important;min-width:0!important;min-height:0!important;width:100%!important;padding:4px!important;margin:0!important;border-width:2px!important;border-radius:10px!important;flex:1!important}
-#app .right>.camCard h3{flex:none!important;display:flex!important;justify-content:space-between;align-items:center;gap:4px;margin:0 2px 3px!important;font-size:clamp(9px,1vw,13px)!important;line-height:1.15;min-height:13px}
-#app .right>.camCard .camBody{position:relative;flex:1!important;min-height:0!important;width:100%;height:auto!important;border-radius:5px!important;overflow:hidden!important}
-#app .right>.camCard .camBody>span{font-size:18px}
+#app .camCard{display:flex!important;flex-direction:column!important;min-width:0!important;min-height:0!important;width:100%!important;padding:4px!important;margin:0!important;border-width:2px!important;border-radius:10px!important;flex:1!important}
+#app .camCard h3{flex:none!important;display:flex!important;justify-content:space-between;align-items:center;gap:4px;margin:0 2px 3px!important;font-size:clamp(9px,1vw,13px)!important;line-height:1.15;min-height:13px}
+#app .camCard .camBody{position:relative;flex:1!important;min-height:0!important;width:100%;height:auto!important;border-radius:5px!important;overflow:hidden!important}
+#app .camCard .camBody>span{font-size:18px}
 #app #trematageCard{border-color:#658398!important}
 #app #trematageCard.trematage-active{border-color:#4be0b0!important}
 #app #trematageCard.trematage-alert{border-color:#ff2929!important;box-shadow:inset 0 0 0 2px #ff2929,0 0 8px #ff2929!important}
 #app #trematageState{flex:none;max-height:24px;overflow:hidden;font-size:10px;line-height:12px;text-align:center}
 @media(orientation:portrait){
  #app .right{grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-template-rows:minmax(0,1fr)!important;gap:4px!important}
- #app .right>.camCard{padding:3px!important}
- #app .right>.camCard h3{font-size:9px!important;min-height:11px}
+ #app .camCard{padding:3px!important}
+ #app .camCard h3{font-size:9px!important;min-height:11px}
  #app #trematageCard h3 b{font-size:8px;overflow:hidden;text-overflow:ellipsis}
  #app .left>.dashboard-symbol .dashboard-symbol-icon{font-size:30px!important}
  #app .left>#fuelCard p{font-size:9px!important;line-height:1.05!important}
@@ -39,10 +39,10 @@
 
 /* Cadres symétriques, image bord à bord et bandeaux superposés. */
 #app .right{grid-template-rows:repeat(4,minmax(0,1fr))!important}
-#app .right>.camCard{position:relative!important;padding:0!important;isolation:isolate;border-radius:10px!important}
-#app .right>.camCard .camBody{position:absolute!important;inset:0!important;display:grid!important;width:100%!important;height:100%!important;border-radius:0!important}
-#app .right>.camCard .camBody img,#app .right>.camCard .camBody video{object-fit:cover!important}
-#app .right>.camCard h3{position:absolute!important;top:0!important;left:0!important;right:0!important;z-index:3!important;margin:0!important;padding:5px 8px!important;min-height:25px!important;background:#075e9fb3!important;color:white!important;text-shadow:0 1px 2px #001c39;pointer-events:none}
+#app .camCard{position:relative!important;padding:0!important;isolation:isolate;border-radius:10px!important}
+#app .camCard .camBody{position:absolute!important;inset:0!important;display:grid!important;width:100%!important;height:100%!important;border-radius:0!important}
+#app .camCard .camBody img,#app .camCard .camBody video{object-fit:cover!important}
+#app .camCard h3{position:absolute!important;top:0!important;left:0!important;right:0!important;z-index:3!important;margin:0!important;padding:5px 8px!important;min-height:25px!important;background:#075e9fb3!important;color:white!important;text-shadow:0 1px 2px #001c39;pointer-events:none}
 #app #trematageState{position:absolute!important;bottom:0!important;left:0!important;right:0!important;z-index:3!important;padding:4px 6px!important;max-height:34px!important;line-height:13px!important;background:#075e9fa8!important;color:white!important;pointer-events:none}
 #app #trematageCard.trematage-alert::after{content:'⚠';position:absolute;inset:25% 25%;display:grid;place-items:center;z-index:4;background:#e00000dc;border:3px solid white;border-radius:10px;font-size:clamp(32px,5vw,70px);color:white;pointer-events:none;animation:trematageBeacon 1s step-end infinite}
 #app #trematageCard.trematage-alert{animation:trematageFrame 1s step-end infinite}
@@ -55,6 +55,37 @@
 @media(orientation:portrait){
  #app .layout{grid-template-rows:clamp(88px,14dvh,132px) minmax(0,1fr) clamp(88px,14dvh,132px)!important}
  #app .left,#app .right{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-template-rows:minmax(0,1fr)!important;gap:4px!important}
- #app .right>.camCard h3{padding:4px!important;min-height:22px!important}
+ #app .camCard h3{padding:4px!important;min-height:22px!important}
  #app #trematageState{font-size:9px!important;line-height:11px!important;padding:3px!important}
+}
+
+/* Notes à la suite, téléphone après le journal, Trématage devant la vitesse. */
+#app .left>#nauticCallsSlot{display:flex;justify-content:center;align-items:center;padding:0!important}
+#app .left>#nauticCallsSlot.nautic-hidden{display:none!important}
+#app .left>#nauticCallsSlot #dashboardPhone{border-radius:inherit;color:#eaf8ff;font-size:clamp(28px,4vw,46px)}
+#app .gauges>#trematageCard{position:relative!important;flex:1 1 0!important;width:0!important;min-width:0!important;height:100%!important;order:1!important}
+#app .gauges>#speedCard{flex:1 1 0!important;order:2!important}
+#app .gauges>#headingCard{flex:1 1 0!important;order:3!important}
+#app .gauges>#weatherCard{flex:1 1 0!important;order:4!important}
+#app .right{grid-template-rows:repeat(3,minmax(0,1fr))!important}
+@media(orientation:landscape){#app .left{grid-template-rows:repeat(6,minmax(0,1fr))!important}}
+@media(orientation:portrait){
+ #app .left{grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:minmax(0,1fr)!important}
+ #app .right{grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-template-rows:minmax(0,1fr)!important}
+ #app .center{grid-template-rows:minmax(0,1fr) clamp(98px,14dvh,142px)!important}
+}
+@media(orientation:portrait) and (max-width:480px){
+ #app .left{grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-template-rows:repeat(2,minmax(0,1fr))!important}
+ #app .layout{grid-template-rows:clamp(116px,16dvh,156px) minmax(0,1fr) clamp(88px,13dvh,125px)!important}
+ #app .left>.dashboard-symbol .dashboard-symbol-icon{font-size:27px!important}
+ #app .left>#fuelCard h3{font-size:13px!important}
+ #app .left>#fuelCard .fuelrow{font-size:8px!important}
+ #app .left>#fuelCard p{font-size:8px!important}
+}
+@media(orientation:landscape) and (max-height:600px){
+ #app .left>#fuelCard{padding:2px 4px!important}
+ #app .left>#fuelCard h3{font-size:12px!important}
+ #app .left>#fuelCard p{font-size:9px!important;line-height:1.05!important}
+ #app .left>#fuelCard .fuelrow{font-size:8px!important;line-height:1!important;margin:0!important}
+ #app .left>#fuelCard .fuelbar{height:4px!important}
 }

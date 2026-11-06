@@ -338,6 +338,7 @@ function applyAppearance(){
  if(Array.isArray(a.order)&&a.order.length){
   for(const id of a.order){const el=get(id);if(el&&el.parentElement)el.parentElement.appendChild(el)}
  }
+ window.nauticArrangeDashboard?.();
  if(map)setTimeout(()=>map.invalidateSize(),120);
 }
 let editingLayout=false,dragging=null;
