@@ -19,6 +19,7 @@ class OnvifCamera {
  final List<Element> profiles=new ArrayList<>();
  final List<String> topics=new ArrayList<>(),notes=new ArrayList<>();
  String device,subscription="";
+ String subscriptionHeaders="";
  OnvifCamera(String host,String user,String password){this.host=host;this.user=user;this.password=password;}
  static String xml(String s){return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&apos;");}
  static List<Element> elements(Node n,String name){
@@ -56,7 +57,7 @@ class OnvifCamera {
  }
  Document call(String address,String ns,String operation,String body)throws Exception{
   String action=actionFor(ns,operation);
-  String envelope="<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope' xmlns:tt='http://www.onvif.org/ver10/schema' xmlns:wsa='http://www.w3.org/2005/08/addressing'><s:Header>"+security()+"<wsa:Action>"+xml(action)+"</wsa:Action><wsa:MessageID>urn:uuid:"+UUID.randomUUID()+"</wsa:MessageID><wsa:To>"+xml(address)+"</wsa:To></s:Header><s:Body><c:"+operation+" xmlns:c='"+ns+"'>"+body+"</c:"+operation+"></s:Body></s:Envelope>";
+  String envelope="<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope' xmlns:tt='http://www.onvif.org/ver10/schema' xmlns:wsa='http://www.w3.org/2005/08/addressing'><s:Header>"+security()+"<wsa:Action>"+xml(action)+"</wsa:Action><wsa:MessageID>urn:uuid:"+UUID.randomUUID()+"</wsa:MessageID><wsa:To>"+xml(address)+"</wsa:To>"+(address.equals(subscription)?subscriptionHeaders:"")+"</s:Header><s:Body><c:"+operation+" xmlns:c='"+ns+"'>"+body+"</c:"+operation+"></s:Body></s:Envelope>";
   HttpURLConnection c=(HttpURLConnection)new URL(endpoint(address)).openConnection();
   c.setConnectTimeout(3500);c.setReadTimeout(9000);c.setInstanceFollowRedirects(false);c.setRequestMethod("POST");c.setDoOutput(true);
   c.setRequestProperty("Content-Type","application/soap+xml; charset=utf-8; action=\""+action+"\"");
@@ -96,11 +97,23 @@ class OnvifCamera {
  Document ptz(Element p,String op,String body)throws Exception{return call(services.get(PTZ),PTZ,op,token(p)+body);}
  void beginEvents()throws Exception{
   Document d=call(services.get(EVENTS),EVENTS,"CreatePullPointSubscription","<c:InitialTerminationTime>PT60S</c:InitialTerminationTime>");
-  subscription=endpoint(value(d,"Address"));
+  List<Element> references=elements(d,"SubscriptionReference");
+  if(references.isEmpty())throw new IOException("La caméra n’a pas confirmé l’abonnement aux événements");
+  subscription=endpoint(value(references.get(0),"Address"));subscriptionHeaders=referenceHeaders(references.get(0));
+ }
+ static String referenceHeaders(Element reference)throws Exception{
+  StringBuilder headers=new StringBuilder();
+  for(Element parameters:elements(reference,"ReferenceParameters")){
+   NodeList children=parameters.getChildNodes();for(int i=0;i<children.getLength();i++)if(children.item(i) instanceof Element){
+    Element e=(Element)children.item(i).cloneNode(true);e.setAttributeNS("http://www.w3.org/2005/08/addressing","wsa:IsReferenceParameter","true");
+    java.io.StringWriter writer=new java.io.StringWriter();javax.xml.transform.Transformer transformer=javax.xml.transform.TransformerFactory.newInstance().newTransformer();
+    transformer.setOutputProperty(javax.xml.transform.OutputKeys.OMIT_XML_DECLARATION,"yes");transformer.transform(new javax.xml.transform.dom.DOMSource(e),new javax.xml.transform.stream.StreamResult(writer));headers.append(writer);
+   }
+  }return headers.toString();
  }
  List<String> pullEvents()throws Exception{
   List<String> out=new ArrayList<>();for(CameraEvent event:readEvents())out.add(event.topic+" — "+event.detail);return out;
  }
  List<CameraEvent> readEvents()throws Exception{return CameraEvent.parse(call(subscription,EVENTS,"PullMessages","<c:Timeout>PT3S</c:Timeout><c:MessageLimit>20</c:MessageLimit>"));}
- void endEvents(){if(!subscription.isEmpty())try{call(subscription,"http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager","Unsubscribe","");}catch(Exception ignored){}finally{subscription="";}}
+ void endEvents(){if(!subscription.isEmpty())try{call(subscription,"http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager","Unsubscribe","");}catch(Exception ignored){}finally{subscription="";subscriptionHeaders="";}}
 }

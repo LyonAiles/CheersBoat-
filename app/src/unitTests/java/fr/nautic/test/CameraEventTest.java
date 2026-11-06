@@ -18,4 +18,10 @@ public class CameraEventTest {
  @Test public void genericMotionIsNeverPromotedToVehicle()throws Exception{
   CameraEvent e=event("CellMotionDetector/Motion","Changed","<SimpleItem Name='IsMotion' Value='true'/>");assertTrue(e.active);assertEquals("mouvement générique",e.category);
  }
+ @Test public void falsePersonFlagDoesNotSuppressOrMislabelTrueMotion()throws Exception{
+  CameraEvent e=event("CellMotionDetector/Motion","Changed","<SimpleItem Name='IsMotion' Value='true'/><SimpleItem Name='IsPeople' Value='false'/>");assertTrue(e.active);assertEquals("mouvement générique",e.category);
+ }
+ @Test public void inactiveMotionFlagDoesNotSuppressTrueVehicle()throws Exception{
+  CameraEvent e=event("VehicleDetector","Changed","<SimpleItem Name='IsVehicle' Value='true'/><SimpleItem Name='IsMotion' Value='false'/>");assertTrue(e.active);assertEquals("véhicule",e.category);
+ }
 }
