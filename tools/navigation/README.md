@@ -100,3 +100,23 @@ Standard selon le zoom, avec un plafond absolu de 20 pixels CSS pour tous les
 réglages, y compris les anciennes préférences. Mini est ajouté. Les deux moteurs
 partagent la même échelle. Les regroupements restent actifs jusqu'au zoom 13 et
 utilisent un rayon de 48 pixels pour alléger les vues régionales.
+
+### Carte prioritaire et stabilité des marqueurs
+
+Un bouton discret Ⅱ / ▶ dans la carte active une pause manuelle des aperçus caméra
+et des callbacks périodiques secondaires. Ce mode reste actif entre deux gestes,
+jusqu'au second clic ; il n'est pas conservé après relancement complet. La carte,
+le GPS et l'horloge continuent, ainsi que l'écoute native des alertes caméra.
+La pause des gestes reste indépendante et n'annule pas le mode manuel.
+
+La caméra vectorielle n'est mise à jour que si la position change d'au moins 0,8 m,
+le cap de plus de 0,5 degré, ou le zoom, l'inclinaison ou la taille du cadre changent.
+Le contrôle est espacé de 350 ms. resize() n'est plus appelé à chaque contrôle,
+uniquement lors des changements de dimensions. Les calculs de proximité sont
+espacés d'au moins 7 secondes ; en mode prioritaire une liste déjà affichée reste
+figée, tandis qu'une réponse réseau en cours peut finir et s'afficher.
+L'ordre des identifiants est normalisé pour ne pas renvoyer les mêmes marqueurs
+au moteur lorsque seuls les rangs dans la liste ont changé.
+Les groupes sont dessinés comme des pastilles de 12 pixels de rayon avec compte,
+sans dépendre du chargement des images ; un petit repère sous chaque pictogramme
+assure aussi sa présence en cas de retard de chargement de l'icône.

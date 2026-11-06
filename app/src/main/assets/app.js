@@ -9,7 +9,7 @@ const $=id=>document.getElementById(id), KEY='nautic-v04';let cfg={fuel:400,tank
 let speedSamples=[],speedLastMotion=0;const WIND_PERIOD=300000;let windBusy=false;let map,mapPositioned=false,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null,weatherForecast=null,weatherLocation=null;
 try{points=JSON.parse(localStorage.getItem('nautic-v04-points')||'[]');travel=Number(localStorage.getItem('nautic-v04-travel')||0)}catch(e){}
 const fmt=n=>Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2});
-function clock(){let d=new Date();$('clock').textContent=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});$('clock').title=d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}clock();window.nauticEvery(clock,1000);
+function clock(){let d=new Date();$('clock').textContent=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});$('clock').title=d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}clock();window.nauticEvery(clock,1000,true);
 function modal(title,body){$('dialogTitle').textContent=title;$('dialogContent').innerHTML=body;$('dialog').showModal()}$('dialogClose').onclick=()=>$('dialog').close();
 function field(label,id,value,type='text'){return `<label class="formLabel">${label}<input id="${id}" type="${type}" value="${String(value??'').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;')}"></label>`}
 function saveCfg(){
@@ -147,7 +147,7 @@ function animateFollow(){
  $('mapBoat').style.transform=`translate(-50%,-50%) rotate(${userMapRotation}deg)`;
  if(weather)$('windArrow').style.transform=`rotate(${(weather.wind_direction_10m+180-(heading??0)+userMapRotation)%360}deg)`;
 }
-window.nauticEvery(animateFollow,80);
+window.nauticEvery(animateFollow,160,true);
 function onPos(result){
  if(window.nauticMapInteracting){window.nauticDeferredPosition=result;return;}
  const c=result.coords,now=Date.now();
