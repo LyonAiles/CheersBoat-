@@ -34,7 +34,8 @@ const css=document.createElement('style');css.textContent=`
  #nauticSettingsButton{margin-left:4px}
  #mapRecenter,#mapLayers{position:absolute;z-index:800;right:8px}
  #mapRecenter{top:88px;bottom:auto}#mapLayers{top:140px;bottom:auto}
- #windWidget{left:calc(50% + 22px)!important;top:calc(50% + 28px)!important;pointer-events:none}
+ #windWidget{left:calc(50% + 22px)!important;top:calc(66.666667% + 28px)!important;pointer-events:none}
+ #mapBoat{top:66.666667%!important;left:50%!important}
  #boatPhoto{width:100%;height:100%;object-fit:contain}
  dialog .choiceGrid{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
  dialog .choiceGrid button{flex:1 1 145px;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.25;min-height:48px;padding:9px 8px}
@@ -85,9 +86,9 @@ function networkAddressReport(){
  try{states=JSON.parse(readSetting('nautic-network-status')||readSetting('nautic-network-states')||'{}')}catch(e){}
  if(!rows.length){try{rows=JSON.parse(readSetting('nautic-network-results')||'[]')}catch(e){}}
  rows.sort((a,b)=>Number(a.ip.split('.').pop())-Number(b.ip.split('.').pop()));
- return rows.length?'<p class="muted">Dernière analyse mémorisée (🔌 = réponse sans vidéo confirmée) :</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px">'+rows.map(d=>{
+ return rows.length?'<p class="muted">Dernière analyse mémorisée (🔌 = réponse sans vidéo · ❔ = aucune réponse aux tests) :</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px">'+rows.map(d=>{
  const kind=states[d.ip]||(d.responding===false?'offline':d.rtsp?'unknown':d.responding?'unknown':'pending');
- const symbol=kind==='camera'?'📷':kind==='offline'?'❌':kind==='unknown'?'🔌':'◌';
+ const symbol=kind==='camera'?'📷':kind==='offline'?'❔':kind==='unknown'?'🔌':'◌';
  return '<div class="emPanel">'+symbol+' '+esc(d.ip)+'</div>';
  }).join('')+'</div>':'<p class="muted">Aucune analyse enregistrée.</p>';
 }
@@ -95,14 +96,14 @@ function plugsDialog(){equipmentDialog()}
 plugsButton.onclick=plugsDialog;
 const mapWrap=get('mapWrap');
 const recenter=document.createElement('button');recenter.id='mapRecenter';recenter.textContent='⌖';recenter.title='Recentrer';mapWrap.append(recenter);
-recenter.onclick=()=>{if(map&&latest){gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};map.setView([latest.lat,latest.lon],map.getZoom())}};
+recenter.onclick=()=>{if(map&&latest){gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};manualRotationUntil=0;userMapRotation=0;map.setView([latest.lat,latest.lon],map.getZoom());rotateMap()}};
 const layers=document.createElement('button');layers.id='mapLayers';layers.textContent='▤';layers.title='Fond de carte';mapWrap.append(layers);
 const layerDefs={osm:{label:'OpenStreetMap',url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:19,attr:'© OpenStreetMap'},topo:{label:'Topographique',url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',maxZoom:17,attr:'© OpenTopoMap'},sat:{label:'Satellite',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'© Esri'},
  streets:{label:'Routière Esri',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'Tiles © Esri · HERE · Garmin · contributeurs'},
  relief:{label:'Topographique Esri',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'Tiles © Esri · contributeurs'},
  sea:{label:'OpenSeaMap — balisage',url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:18,attr:'© OpenStreetMap'}};
 let chosenLayer=null;
-function setLayer(id){if(!map||!window.L)return;map.eachLayer(l=>{if(l instanceof L.TileLayer)map.removeLayer(l)});let d=layerDefs[id]||layerDefs.osm;chosenLayer=L.tileLayer(d.url,{maxZoom:d.maxZoom,attribution:d.attr}).addTo(map);if(id==='sea')L.tileLayer('https://t1.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap',zIndex:5}).addTo(map);state.map=id;persist();let foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Carte '+d.label+' · suivi GPS';rotateMap()}
+function setLayer(id){if(!map||!window.L)return;layoutNavigationMap();map.invalidateSize();map.eachLayer(l=>{if(l instanceof L.TileLayer)map.removeLayer(l)});let d=layerDefs[id]||layerDefs.osm;chosenLayer=L.tileLayer(d.url,{maxZoom:d.maxZoom,attribution:d.attr}).addTo(map);if(id==='sea')L.tileLayer('https://t1.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap',zIndex:5}).addTo(map);state.map=id;persist();let foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Carte '+d.label+' · suivi GPS';rotateMap()}
 function mapDialog(){
  openModal('Choisir la carte',`<div class="choiceGrid">${Object.entries(layerDefs).map(([k,v])=>`<button data-map="${k}" aria-pressed="${state.map===k}">${v.label}</button>`).join('')}</div>
  <label>Inclinaison de la carte <output id="mapPitchValue">${mapPitch}°</output><input type="range" id="mapPitch" min="0" max="45" step="5" value="${mapPitch}"></label>

@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id), KEY='nautic-v04';let cfg={fuel:400,tank
  Object.assign(cfg,JSON.parse(saved||previous||'{}'));
  if(!saved&&previous&&bridge&&typeof bridge.writeSetting==='function')bridge.writeSetting(KEY,previous);
 }catch(e){};
-let speedSamples=[],speedLastMotion=0;const WIND_PERIOD=300000;let windBusy=false;let map,boatMarker,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null,weatherForecast=null,weatherLocation=null;
+let speedSamples=[],speedLastMotion=0;const WIND_PERIOD=300000;let windBusy=false;let map,mapPositioned=false,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null,weatherForecast=null,weatherLocation=null;
 try{points=JSON.parse(localStorage.getItem('nautic-v04-points')||'[]');travel=Number(localStorage.getItem('nautic-v04-travel')||0)}catch(e){}
 const fmt=n=>Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2});
 function clock(){let d=new Date();$('clock').textContent=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});$('clock').title=d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}clock();setInterval(clock,1000);
@@ -66,13 +66,23 @@ field('Chauffage — consommation quotidienne (L/jour)','inHeatingRate',heatingR
 function openBoat(){modal('Mon bateau','<p>Kotter acier · 13,40 × 4,30 m · tirant d’eau 1,35 m · tirant d’air 3,45 m.</p><div class="dialogActions"><button id="openBoat">Ouvrir Mon bateau</button><button id="embedBoat">Afficher dans Nautic</button></div><div id="boatEmbed"></div><p class="muted">L’intégration dans une fenêtre dépend des autorisations du site existant. La base de données n’est pas encore fusionnée.</p>');$('openBoat').onclick=()=>window.open('https://cerulean-mochi-747b13.netlify.app','_blank','noopener');$('embedBoat').onclick=()=>{$('boatEmbed').innerHTML='<iframe title="Mon bateau" src="https://cerulean-mochi-747b13.netlify.app" style="width:100%;height:50vh;border:1px solid #41768b;border-radius:8px;background:white"></iframe>'}}
 function sms(){if(!latest){startGps();modal('Position GPS','Le GPS cherche une position. Réessaie lorsque les coordonnées apparaissent.');return}modal('SMS d’urgence',field('Numéro du destinataire (à choisir)','emergencyNumber',cfg.emergency,'tel')+`<p>Position : ${latest.lat.toFixed(6)}, ${latest.lon.toFixed(6)}<br>Précision annoncée : ±${Math.round(latest.acc)} m</p><p class="muted">Le SMS sera préparé dans l’application de messagerie ; tu devras confirmer son envoi. Ne remplace pas l’appel aux secours ou la VHF.</p><button id="smsSend">Préparer le SMS</button>`);$('smsSend').onclick=()=>{let n=$('emergencyNumber').value.trim();if(!n){alert('Renseigne un numéro.');return}cfg.emergency=n;saveCfg();let m=`Position du bateau : ${latest.lat.toFixed(6)}, ${latest.lon.toFixed(6)} (précision GPS ±${Math.round(latest.acc)} m). https://maps.google.com/?q=${latest.lat},${latest.lon}`;location.href='sms:'+encodeURIComponent(n)+'?body='+encodeURIComponent(m)}}
 function rad(x){return x*Math.PI/180}function distanceM(a,b){let d1=rad(b.lat-a.lat),d2=rad(b.lon-a.lon),q=Math.sin(d1/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(d2/2)**2;return 12742000*Math.asin(Math.min(1,Math.sqrt(q)))}function bearing(a,b){let dl=rad(b.lon-a.lon),x=Math.sin(dl)*Math.cos(rad(b.lat)),y=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(dl);return(Math.atan2(x,y)*180/Math.PI+360)%360}
-function initMap(){if(!window.L){$('mapFallback').style.display='grid';return}map=L.map('map',{zoomControl:false}).setView([47.5911,2.7521],14);L.control.zoom({position:'bottomright'}).addTo(map);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);routeLine=L.polyline(points.map(p=>[p.lat,p.lon]),{color:'#28bdf1',weight:4}).addTo(map);map.on('tileerror',()=>{$('mapFallback').style.display='grid'});map.on('tileload',()=>{$('mapFallback').style.display='none'});map.on('moveend zoomend',rotateMap);map.dragging.disable();enableMapRotation()}
+function layoutNavigationMap(){
+ const wrap=$('mapWrap'),element=$('map');if(!wrap||!element)return;
+ const w=wrap.clientWidth,h=wrap.clientHeight;
+ // Overscan around the vessel covers rotated and tilted viewport corners.
+ const size=Math.ceil(3*Math.hypot(w/2,h*2/3));
+ const left=w/2-size/2,top=h*2/3-size/2;
+ for(const [key,value] of Object.entries({width:size+'px',height:size+'px',left:left+'px',top:top+'px',bottom:'auto'}))element.style.setProperty(key,value,'important');
+ element.querySelectorAll('.leaflet-bottom').forEach(control=>control.style.setProperty('bottom',Math.max(0,top+size-h)+'px','important'));
+ element.querySelectorAll('.leaflet-right').forEach(control=>control.style.setProperty('right',Math.max(0,left+size-w)+'px','important'));
+}
+function initMap(){if(!window.L){$('mapFallback').style.display='grid';return}layoutNavigationMap();map=L.map('map',{zoomControl:false}).setView([47.5911,2.7521],14);L.control.zoom({position:'bottomright'}).addTo(map);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);routeLine=L.polyline(points.map(p=>[p.lat,p.lon]),{color:'#28bdf1',weight:4}).addTo(map);map.on('tileerror',()=>{$('mapFallback').style.display='grid'});map.on('tileload',()=>{$('mapFallback').style.display='none'});map.on('moveend zoomend',rotateMap);map.dragging.disable();enableMapRotation()}
 // Heading-up is a visual CSS rotation; geographic marker placement is handled by Leaflet.
 let mapPitch=0;try{mapPitch=Math.max(0,Math.min(45,Number(JSON.parse(localStorage.getItem('nautic-extensions')||'{}').mapPitch)||0))}catch(e){}
-let userMapRotation=0;let rotationGesture=null;
+let userMapRotation=0,manualRotationUntil=0,targetHeading=null,headingCandidate=null,lastMapFrame=0;let rotationGesture=null;
 function enableMapRotation(){const el=document.getElementById('map');if(!el)return;const angle=(a,b)=>Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI;
  el.addEventListener('touchstart',e=>{if(e.touches.length===2)rotationGesture={angle:angle(e.touches[0],e.touches[1]),base:userMapRotation}},{passive:true});
- el.addEventListener('touchmove',e=>{if(e.touches.length!==2||!rotationGesture)return;userMapRotation=rotationGesture.base+angle(e.touches[0],e.touches[1])-rotationGesture.angle;rotateMap()},{passive:true});
+ el.addEventListener('touchmove',e=>{if(e.touches.length!==2||!rotationGesture)return;userMapRotation=rotationGesture.base+angle(e.touches[0],e.touches[1])-rotationGesture.angle;manualRotationUntil=Date.now()+8000;rotateMap()},{passive:true});
  el.addEventListener('touchend',e=>{if(e.touches.length<2)rotationGesture=null},{passive:true});}
 function rotateMap(){if(!map)return;let pane=map.getPane('mapPane'),pos=L.DomUtil.getPosition(pane)||L.point(0,0),center=map.getSize().divideBy(2).subtract(pos);pane.style.transform=`translate3d(${pos.x}px,${pos.y}px,0) perspective(1200px) rotateX(${mapPitch}deg) scale(${1/Math.cos(rad(mapPitch))}) rotate(${-(heading??0)+userMapRotation}deg)`;pane.style.transformOrigin=`${center.x}px ${center.y}px`;let tile=map.getPane('tilePane');tile.style.transformOrigin='center center';$('compass').style.transform=`rotate(${(heading??0)-userMapRotation}deg)`;}
 // GPS filtering: boat stays visually fixed, map follows accepted positions smoothly.
@@ -96,8 +106,35 @@ function fuelTick(now,moving){
  localStorage.setItem('nautic-fuel-used',String(fuelUsed));
 }
 setInterval(()=>{fuelTick(Date.now(),!!stableFix&&stationarySince===0);fuelUpdate();},1000);
+function angleDifference(to,from){return ((to-from+540)%360)-180}
+function updateCourse(course,now){
+ if(!Number.isFinite(course))return;
+ course=(course+360)%360;
+ if(targetHeading===null){targetHeading=course;heading=course;return;}
+ const difference=angleDifference(course,targetHeading);
+ if(Math.abs(difference)<2)return;
+ // A large isolated GPS turn needs a second consistent fix.
+ if(Math.abs(difference)>65){
+  if(!headingCandidate||now-headingCandidate.t>8000||Math.abs(angleDifference(course,headingCandidate.course))>20){
+   headingCandidate={course,t:now};return;
+  }
+ }
+ headingCandidate=null;
+ targetHeading=(targetHeading+difference*.35+360)%360;
+}
 function animateFollow(){
+ const now=Date.now(),dt=Math.min(.5,(now-(lastMapFrame||now))/1000);lastMapFrame=now;
  if(!map||!gpsFollowTarget)return;
+ if(targetHeading!==null){
+  const difference=angleDifference(targetHeading,heading??targetHeading);
+  const step=Math.sign(difference)*Math.min(Math.abs(difference),12*dt);
+  heading=((heading??targetHeading)+step+360)%360;
+  $('headingValue').textContent=Math.round(heading)+'°';
+ }
+ if(now>manualRotationUntil&&userMapRotation){
+  userMapRotation=angleDifference(userMapRotation,0)*Math.exp(-dt*3);
+  if(Math.abs(userMapRotation)<.1)userMapRotation=0;
+ }
  if(!smoothCenter)smoothCenter={lat:gpsFollowTarget.lat,lon:gpsFollowTarget.lon};
  let delta=distanceM(smoothCenter,gpsFollowTarget);
  if(delta>.15){
@@ -106,6 +143,9 @@ function animateFollow(){
   smoothCenter.lon+=(gpsFollowTarget.lon-smoothCenter.lon)*factor;
   map.panTo([smoothCenter.lat,smoothCenter.lon],{animate:false,noMoveStart:true});
  }
+ rotateMap();
+ $('mapBoat').style.transform=`translate(-50%,-50%) rotate(${userMapRotation}deg)`;
+ if(weather)$('windArrow').style.transform=`rotate(${(weather.wind_direction_10m+180-(heading??0)+userMapRotation)%360}deg)`;
 }
 setInterval(animateFollow,80);
 function onPos(result){
@@ -124,7 +164,7 @@ function onPos(result){
  $('mapGps').textContent='GPS ±'+Math.round(p.acc)+' m';
  $('speedValue').textContent=speed==null?'—':speed.toFixed(1);
  $('speedCard').style.setProperty('--speedRotation',(-70+Math.min(30,speed||0)/30*140)+'deg');
- if(!stableFix){stableFix=p;gpsFollowTarget=p;smoothCenter={lat:p.lat,lon:p.lon};}
+ if(!stableFix){if(p.acc>35)return;stableFix=p;gpsFollowTarget=p;smoothCenter={lat:p.lat,lon:p.lon};}
  const opt=motionConfig();
  const d=distanceM(stableFix,p);
  const uncertainty=Math.min(25,Math.max(opt.threshold,(p.acc+(stableFix.acc||p.acc))*.35));
@@ -137,8 +177,10 @@ function onPos(result){
   if(movementConfirm>=2){confirmed=true;movingCandidate=null;movementConfirm=0;}
  }else if(d<opt.threshold){movingCandidate=null;movementConfirm=0;}
  if(confirmed){
-  if(Number.isFinite(c.heading)&&speed>1)heading=c.heading;
-  else heading=bearing(stableFix,p);
+  if(speed===null||speed>=2){
+   if(Number.isFinite(c.heading)&&p.acc<=20&&speed!==null)updateCourse(c.heading,now);
+   else if(d>=Math.max(12,p.acc,stableFix.acc||0))updateCourse(bearing(stableFix,p),now);
+  }
   stableFix=p;gpsFollowTarget=p;
   stationarySince=0;
   fuelTick(now,true);
@@ -155,10 +197,8 @@ function onPos(result){
  if(!confirmed&&stationarySince===0)stationarySince=now;
  if(!confirmed&&now-stationarySince>=opt.stopMs)fuelPending=0;
  $('headingValue').textContent=heading==null?'—°':Math.round(heading)+'°';
- $('mapBoat').style.transform='translate(-50%,-50%)';
  if(map){let ll=[stableFix.lat,stableFix.lon];
-  if(!boatMarker){boatMarker=L.circleMarker(ll,{radius:7,color:'white',weight:2,fillColor:'#00d9ed',fillOpacity:1}).addTo(map);map.setView(ll,16)}
-  else boatMarker.setLatLng(ll);
+  if(!mapPositioned){map.setView(ll,16);mapPositioned=true;}
   rotateMap();
  }
  prev=p;
@@ -248,8 +288,9 @@ $('dialog').addEventListener('close',()=>{cameraStream?.getTracks().forEach(t=>t
 const fullBtn=document.getElementById('fullscreenToggle');
 fullBtn?.addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen()}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen()}else{fullBtn.title='Plein écran indisponible sur ce navigateur'}}catch(e){fullBtn.title='Plein écran refusé par le navigateur'}});
 document.addEventListener('fullscreenchange',()=>{if(fullBtn)fullBtn.textContent=document.fullscreenElement?'⤢':'⛶';setTimeout(()=>{if(map)map.invalidateSize()},120)});
-window.addEventListener('resize',()=>{if(map)requestAnimationFrame(()=>map.invalidateSize())});
-window.addEventListener('orientationchange',()=>setTimeout(()=>{if(map)map.invalidateSize()},300));
+if(window.ResizeObserver)new ResizeObserver(()=>{layoutNavigationMap();if(map){map.invalidateSize();rotateMap()}}).observe($('mapWrap'));
+window.addEventListener('resize',()=>{if(map)requestAnimationFrame(()=>{layoutNavigationMap();map.invalidateSize();rotateMap()})});
+window.addEventListener('orientationchange',()=>setTimeout(()=>{if(map){layoutNavigationMap();map.invalidateSize();rotateMap()}},300));
 
 (function(){
  const style=document.createElement('style');style.textContent=`

@@ -234,9 +234,9 @@ public class CameraActivity extends Activity {
   LinearLayout column=new LinearLayout(this);column.setOrientation(LinearLayout.VERTICAL);
   column.setPadding(dp(8),dp(12),dp(8),dp(8));column.setBackgroundColor(0xff091c2b);
   root.addView(column,new FrameLayout.LayoutParams(-1,-1));
-  TextView heading=new TextView(this);heading.setText("Analyse des équipements — Wi-Fi local");
+  TextView heading=new TextView(this);heading.setText("Recherche de services — Wi-Fi local");
   heading.setTextColor(Color.WHITE);heading.setTextSize(18);heading.setPadding(dp(4),dp(8),dp(4),dp(12));column.addView(heading);
-  TextView progress=new TextView(this);progress.setText("Préparation de 32 adresses consécutives…");
+  TextView progress=new TextView(this);progress.setText("32 adresses · ? = aucune réponse, 🔌 = réponse sans vidéo");
   progress.setTextColor(Color.WHITE);column.addView(progress);
   android.widget.GridLayout grid=new android.widget.GridLayout(this);grid.setColumnCount(4);
   android.widget.ScrollView scroll=new android.widget.ScrollView(this);
@@ -274,6 +274,14 @@ public class CameraActivity extends Activity {
    });
   }).start();
  }
+ private boolean refusedConnection(Exception error){
+  for(Throwable cause=error;cause!=null;cause=cause.getCause()){
+   if(cause instanceof android.system.ErrnoException
+      &&((android.system.ErrnoException)cause).errno==android.system.OsConstants.ECONNREFUSED)return true;
+  }
+  String message=error.getMessage();
+  return message!=null&&(message.contains("ECONNREFUSED")||message.contains("Connection refused"));
+ }
  private void scanPreviewInOrder(TextView[] cells,java.util.ArrayList<String> hosts,int index,TextView progress){
   if(!discovering||isFinishing())return;
   if(index>=cells.length){progress.setText("Analyse terminée — "+cells.length+" adresses");return;}
@@ -281,22 +289,26 @@ public class CameraActivity extends Activity {
   progress.setText("Test "+(index+1)+"/"+cells.length+" — "+host);
   final int next=index+1;
   TextView cell=cells[index];
-  cell.setText("◌");
+  cell.setText(host+"\n◌");cell.setTextSize(12);
   new Thread(()->{
-   boolean responding=false;
+   boolean responding=false,rtsp=false;
    for(int port:new int[]{554,6668,6667,80,443}){
     try(java.net.Socket socket=new java.net.Socket()){
-     socket.connect(new java.net.InetSocketAddress(host,port),350);
-     responding=true;break;
-    }catch(Exception ignored){}
+     socket.connect(new java.net.InetSocketAddress(host,port),650);
+     responding=true;rtsp=port==554;break;
+    }catch(Exception error){if(refusedConnection(error))responding=true;}
    }
-   final boolean found=responding;
+   final boolean found=responding,videoService=rtsp;
    runOnUiThread(()->{
     if(!discovering||isFinishing())return;
     if(!found){
-     cell.setText("✕");cell.setTextColor(0xffff5555);rememberScanState(host,"offline");saveScanStatus(host,"offline");
+     cell.setText(host+"\n?");cell.setTextColor(0xffb9d9ee);rememberScanState(host,"offline");saveScanStatus(host,"offline");
      scanPreviewInOrder(cells,hosts,next,progress);
-    }else previewTile(cell,host,()->scanPreviewInOrder(cells,hosts,next,progress));
+    }else if(videoService)previewTile(cell,host,()->scanPreviewInOrder(cells,hosts,next,progress));
+    else{
+     cell.setText(host+"\n🔌");rememberScanState(host,"unknown");saveScanStatus(host,"unknown");
+     scanPreviewInOrder(cells,hosts,next,progress);
+    }
    });
   }).start();
  }
