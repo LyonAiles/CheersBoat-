@@ -104,11 +104,13 @@ const layerDefs={osm:{label:'OpenStreetMap',url:'https://{s}.tile.openstreetmap.
  sea:{label:'OpenSeaMap — balisage',url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:18,attr:'© OpenStreetMap'}};
 let chosenLayer=null;
 function setLayer(id){if(!map||!window.L)return;layoutNavigationMap();map.invalidateSize();map.eachLayer(l=>{if(l instanceof L.TileLayer)map.removeLayer(l)});let d=layerDefs[id]||layerDefs.osm;chosenLayer=L.tileLayer(d.url,{maxZoom:d.maxZoom,attribution:d.attr}).addTo(map);if(id==='sea')L.tileLayer('https://t1.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap',zIndex:5}).addTo(map);state.map=id;persist();let foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Carte '+d.label+' · suivi GPS';rotateMap()}
+window.nauticRestoreLegacy=()=>setLayer(state.map);
 function mapDialog(){
- openModal('Choisir la carte',`<div class="choiceGrid">${Object.entries(layerDefs).map(([k,v])=>`<button data-map="${k}" aria-pressed="${state.map===k}">${v.label}</button>`).join('')}</div>
+ openModal('Choisir la carte',`<button type="button" id="chooseVectorMap">MapLibre · vectorielle · libellés horizontaux</button><div class="choiceGrid">${Object.entries(layerDefs).map(([k,v])=>`<button data-map="${k}" aria-pressed="${state.map===k}">${v.label}</button>`).join('')}</div>
  <label>Inclinaison de la carte <output id="mapPitchValue">${mapPitch}°</output><input type="range" id="mapPitch" min="0" max="45" step="5" value="${mapPitch}"></label>
  <p class="muted">Vue en perspective. OpenSeaMap ajoute le balisage disponible. Connexion Internet nécessaire.</p>`);
- dialog.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{setLayer(b.dataset.map);dialog.querySelectorAll('[data-map]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
+ get('chooseVectorMap').onclick=()=>{state.mapEngine='vector';persist();window.nauticApplyNavigation?.(state);dialog.close();};
+ dialog.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{state.mapEngine='legacy';window.nauticApplyNavigation?.(state);setLayer(b.dataset.map);dialog.querySelectorAll('[data-map]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
  get('mapPitch').oninput=()=>{mapPitch=Number(get('mapPitch').value);get('mapPitchValue').textContent=mapPitch+'°';rotateMap()};
  get('mapPitch').onchange=()=>{state.mapPitch=mapPitch;persist()};
 }
@@ -405,6 +407,12 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <label>Taille générale : <output id="settingScaleValue">${state.appearance.scale}%</output><input type="range" id="settingScale" min="80" max="130" step="5" value="${state.appearance.scale}"></label>
  <h3>Tableau de bord</h3>${buttons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <h3>Navigation</h3>${field('Seuil de déplacement confirmé (m)','settingMove',state.moveThreshold,'number')}${field('Arrêt prolongé (minutes)','settingStop',state.stopMinutes,'number')}
+ <h3>Carte et ouvrages fluviaux</h3>
+ <label>Moteur de carte<select class="nautic-select" id="settingMapEngine"><option value="vector" ${(state.mapEngine||'vector')==='vector'?'selected':''}>MapLibre · libellés horizontaux</option><option value="legacy" ${state.mapEngine==='legacy'?'selected':''}>Carte classique · retour arrière</option></select></label>
+ <p class="muted">MapLibre utilise le fond vectoriel OpenFreeMap. Si le chargement ou WebGL échoue, retour automatique à la carte classique. Les réglages classiques sont conservés.</p>
+ <label class="settingRow"><input type="checkbox" id="settingWaterwayWorks" ${state.waterwayWorks===false?'':'checked'}><span>Afficher les ouvrages fluviaux OpenStreetMap</span></label>
+ <label>Périmètre de recherche<select class="nautic-select" id="settingWaterwayRadius">${[2000,5000,10000].map(r=>`<option value="${r}" ${(Number(state.waterwayRadius)||5000)===r?'selected':''}>${r/1000} km</option>`).join('')}</select></label>
+ <p class="muted">Écluses, ponts, barrages, seuils et tunnels selon les données disponibles. Actualisation après progression ; cache local. Les distances par le réseau ne désignent pas un itinéraire choisi : bifurcations à confirmer. Sans raccordement, distance à vol d’oiseau explicitement indiquée.</p>
  <h3>Bateau</h3>${field('Nom du bateau','settingBoat',state.boatName)}${field('Téléphone de rappel (inclus dans les SMS)','settingContactPhone',state.contactPhone||testNumber,'tel')}
  <p>Carburant estimé consommé : <b>${(typeof fuelUsed==='number'?fuelUsed:0).toFixed(2)} L</b>. La consommation d'un arrêt de moins de ${state.stopMinutes} minutes est ajoutée à la reprise ; après ce délai elle est annulée.</p>
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
@@ -496,6 +504,9 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('settingsSave').onclick=()=>{
   const previous=JSON.stringify(state), previousCfg=JSON.stringify(cfg);
   dialog.querySelectorAll('[data-button]').forEach(e=>state.buttons[e.dataset.button]=e.checked);
+  state.mapEngine=get('settingMapEngine').value;
+  state.waterwayWorks=get('settingWaterwayWorks').checked;
+  state.waterwayRadius=Number(get('settingWaterwayRadius').value);
   state.alertSounds={};dialog.querySelectorAll('[data-alert-sound]').forEach(e=>{state.alertSounds[e.dataset.alertSound]=e.value;});
   state.alertTypes={};
   dialog.querySelectorAll('[data-alert-watch]').forEach(e=>{const id=e.dataset.alertWatch;if(!state.alertTypes[id])state.alertTypes[id]={};state.alertTypes[id][e.dataset.alertType]=e.checked;});
@@ -522,7 +533,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
     alert('Échec de sauvegarde des caméras : '+e.message);
     return;
   }
-  applyVisibility();applyAppearance();updateCameras();
+  applyVisibility();applyAppearance();updateCameras();window.nauticApplyNavigation?.(state);
   dialog.classList.remove('nautic-settings');
   dialog.close();
  };
