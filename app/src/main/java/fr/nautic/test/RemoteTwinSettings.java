@@ -10,13 +10,8 @@ final class RemoteTwinSettings {
   Spinner role=new Spinner(a);role.setAdapter(new ArrayAdapter<String>(a,android.R.layout.simple_spinner_dropdown_item,new String[]{"À bord · transmettre","À distance · recevoir"}));role.setSelection("viewer".equals(p.getString("role","boat"))?1:0);box.addView(role);
   EditText url=new EditText(a);url.setHint("URL HTTPS du relais de cette paire");url.setSingleLine(true);url.setInputType(17);url.setText(p.getString("url",""));box.addView(url);
   EditText token=new EditText(a);token.setHint("Clé de jumelage commune (24 caractères minimum)");token.setSingleLine(true);token.setInputType(129);token.setText(p.getString("token",""));box.addView(token);
-  TextView info=new TextView(a);info.setText("Configurer la même URL et la même clé sur les deux appareils. Un relais HTTPS compatible est requis. Cette version échange les états des veilles et leurs dernières alertes, sans vidéo ni commande distante.
-
-"+p.getString("status","Relais non configuré"));box.addView(info);
-  String raw=p.getString("remoteState","");if(!raw.isEmpty())try{org.json.JSONObject state=new org.json.JSONObject(raw);long age=Math.max(0,System.currentTimeMillis()-state.optLong("sentAt",0))/1000;info.append("
-Dernier état à bord : il y a "+age+" s");for(String id:new String[]{"42","44"}){org.json.JSONObject cam=state.optJSONObject("camera"+id);if(cam!=null)info.append("
-Caméra "+id+" : "+(cam.optBoolean("active")?"veille activée":"veille désactivée")+"
-"+cam.optString("alert"));}}catch(Exception ignored){}
+  TextView info=new TextView(a);info.setText("Configurer la même URL et la même clé sur les deux appareils. Un relais HTTPS compatible est requis. Cette version échange les états des veilles et leurs dernières alertes, sans vidéo ni commande distante.\n\n"+p.getString("status","Relais non configuré"));box.addView(info);
+  String raw=p.getString("remoteState","");if(!raw.isEmpty())try{org.json.JSONObject state=new org.json.JSONObject(raw);long age=Math.max(0,System.currentTimeMillis()-state.optLong("sentAt",0))/1000;info.append("\nDernier état à bord : il y a "+age+" s");for(String id:new String[]{"42","44"}){org.json.JSONObject cam=state.optJSONObject("camera"+id);if(cam!=null)info.append("\nCaméra "+id+" : "+(cam.optBoolean("active")?"veille activée":"veille désactivée")+"\n"+cam.optString("alert"));}}catch(Exception ignored){}
   ScrollView scroll=new ScrollView(a);scroll.addView(box);
   AlertDialog dialog=new AlertDialog.Builder(a).setTitle("Jumelle distante · module préparatoire").setView(scroll).setNegativeButton("Fermer",null).setPositiveButton("Enregistrer",null).create();dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(v->{
    String endpoint=url.getText().toString().trim(),secret=token.getText().toString().trim();
