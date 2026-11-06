@@ -11,7 +11,11 @@
  slipway:['#8c643c','<path d="M7 13l25 16M10 12h15l-3 7H14zM7 32q4-4 8 0t8 0 10 0"/>'],
  group:['#285b7b','<rect x="9" y="9" width="15" height="15" rx="2"/><rect x="16" y="16" width="15" height="15" rx="2"/>']};
  function svg(type){const [color,path]=shapes[type]||shapes.group;return `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="${color}" stroke="white" stroke-width="2.5"/><g fill="none" stroke="white" stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round">${path}</g></svg>`;}
- function size(zoom,percent=120){return Math.round((zoom<9?25:zoom<13?30:36)*Math.max(.75,Math.min(1.75,percent/100)));}
+ const stops=[[6,8],[10,10],[14,14],[18,18]];
+ function at(zoom){for(let i=1;i<stops.length;i++){if(zoom<=stops[i][0]){const [a,x]=stops[i-1],[b,y]=stops[i];return x+(y-x)*Math.max(0,(zoom-a)/(b-a));}}return 18;}
+ function size(zoom,percent=120){return Math.round(Math.max(7,Math.min(20,at(zoom)*Math.max(.5,Math.min(1.5,percent/120)))));}
+ function expression(percent=120){return ['interpolate',['linear'],['zoom'],...stops.flatMap(([zoom])=>[zoom,size(zoom,percent)/40])];}
+
  async function install(map,valid=()=>true){await Promise.all(Object.keys(shapes).map(type=>new Promise(resolve=>{const img=new Image();img.onload=()=>{if(valid()&&!map.hasImage('nautic-'+type))map.addImage('nautic-'+type,img,{pixelRatio:2});resolve();};img.onerror=resolve;img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg(type));})));}
- const api={svg,size,install,types:Object.keys(shapes)};root.NauticWorkIcons=api;if(typeof module!=='undefined')module.exports=api;
+ const api={svg,size,expression,install,types:Object.keys(shapes)};root.NauticWorkIcons=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

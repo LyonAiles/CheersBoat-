@@ -92,3 +92,11 @@ MapLibre. Le regroupement vectoriel cesse au-delà du zoom 10, au lieu du zoom 1
 pour montrer plus tôt les ouvrages séparés. Les groupes ont leur propre pictogramme
 et un nombre ; les toucher ouvre une liste.
 Ces améliorations de lisibilité ne créent pas de nouvelles données géographiques.
+
+### Réduction après vérification sur téléphone
+
+Les pictogrammes sont désormais dimensionnés de 8 à 18 pixels CSS au réglage
+Standard selon le zoom, avec un plafond absolu de 20 pixels CSS pour tous les
+réglages, y compris les anciennes préférences. Mini est ajouté. Les deux moteurs
+partagent la même échelle. Les regroupements restent actifs jusqu'au zoom 13 et
+utilisent un rayon de 48 pixels pour alléger les vues régionales.
