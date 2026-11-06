@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id), KEY='nautic-v04';let cfg={fuel:400,tank
  Object.assign(cfg,JSON.parse(saved||previous||'{}'));
  if(!saved&&previous&&bridge&&typeof bridge.writeSetting==='function')bridge.writeSetting(KEY,previous);
 }catch(e){};
-let speedSamples=[],speedLastMotion=0;const WIND_PERIOD=300000;let windBusy=false;let map,boatMarker,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null;
+let speedSamples=[],speedLastMotion=0;const WIND_PERIOD=300000;let windBusy=false;let map,boatMarker,routeLine,watchId=null,latest=null,prev=null,heading=null,speed=null,recording=false,started=0,travel=0,points=[],weatherAt=0,weather=null,weatherForecast=null,weatherLocation=null;
 try{points=JSON.parse(localStorage.getItem('nautic-v04-points')||'[]');travel=Number(localStorage.getItem('nautic-v04-travel')||0)}catch(e){}
 const fmt=n=>Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2});
 function clock(){let d=new Date();$('clock').textContent=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});$('clock').title=d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}clock();setInterval(clock,1000);
@@ -68,12 +68,13 @@ function sms(){if(!latest){startGps();modal('Position GPS','Le GPS cherche une p
 function rad(x){return x*Math.PI/180}function distanceM(a,b){let d1=rad(b.lat-a.lat),d2=rad(b.lon-a.lon),q=Math.sin(d1/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(d2/2)**2;return 12742000*Math.asin(Math.min(1,Math.sqrt(q)))}function bearing(a,b){let dl=rad(b.lon-a.lon),x=Math.sin(dl)*Math.cos(rad(b.lat)),y=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(dl);return(Math.atan2(x,y)*180/Math.PI+360)%360}
 function initMap(){if(!window.L){$('mapFallback').style.display='grid';return}map=L.map('map',{zoomControl:false}).setView([47.5911,2.7521],14);L.control.zoom({position:'bottomright'}).addTo(map);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);routeLine=L.polyline(points.map(p=>[p.lat,p.lon]),{color:'#28bdf1',weight:4}).addTo(map);map.on('tileerror',()=>{$('mapFallback').style.display='grid'});map.on('tileload',()=>{$('mapFallback').style.display='none'});map.on('moveend zoomend',rotateMap);map.dragging.disable();enableMapRotation()}
 // Heading-up is a visual CSS rotation; geographic marker placement is handled by Leaflet.
+let mapPitch=0;try{mapPitch=Math.max(0,Math.min(45,Number(JSON.parse(localStorage.getItem('nautic-extensions')||'{}').mapPitch)||0))}catch(e){}
 let userMapRotation=0;let rotationGesture=null;
 function enableMapRotation(){const el=document.getElementById('map');if(!el)return;const angle=(a,b)=>Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI;
  el.addEventListener('touchstart',e=>{if(e.touches.length===2)rotationGesture={angle:angle(e.touches[0],e.touches[1]),base:userMapRotation}},{passive:true});
  el.addEventListener('touchmove',e=>{if(e.touches.length!==2||!rotationGesture)return;userMapRotation=rotationGesture.base+angle(e.touches[0],e.touches[1])-rotationGesture.angle;rotateMap()},{passive:true});
  el.addEventListener('touchend',e=>{if(e.touches.length<2)rotationGesture=null},{passive:true});}
-function rotateMap(){if(!map)return;let pane=map.getPane('mapPane'),pos=L.DomUtil.getPosition(pane)||L.point(0,0),center=map.getSize().divideBy(2).subtract(pos);pane.style.transform=`translate3d(${pos.x}px,${pos.y}px,0) rotate(${-(heading??0)+userMapRotation}deg)`;pane.style.transformOrigin=`${center.x}px ${center.y}px`;let tile=map.getPane('tilePane');tile.style.transformOrigin='center center';$('compass').style.transform=`rotate(${(heading??0)-userMapRotation}deg)`;}
+function rotateMap(){if(!map)return;let pane=map.getPane('mapPane'),pos=L.DomUtil.getPosition(pane)||L.point(0,0),center=map.getSize().divideBy(2).subtract(pos);pane.style.transform=`translate3d(${pos.x}px,${pos.y}px,0) perspective(1200px) rotateX(${mapPitch}deg) scale(${1/Math.cos(rad(mapPitch))}) rotate(${-(heading??0)+userMapRotation}deg)`;pane.style.transformOrigin=`${center.x}px ${center.y}px`;let tile=map.getPane('tilePane');tile.style.transformOrigin='center center';$('compass').style.transform=`rotate(${(heading??0)-userMapRotation}deg)`;}
 // GPS filtering: boat stays visually fixed, map follows accepted positions smoothly.
 // Only confirmed displacement counts; brief stops count as engine-on, long stops do not.
 let stableFix=null, movingCandidate=null, movementConfirm=0, gpsFollowTarget=null, smoothCenter=null;
@@ -168,16 +169,18 @@ const weatherIcon=code=>code===0?'☀️':code<=2?'🌤️':code===3?'☁️':co
 async function loadWeather(){
  if(!latest||windBusy)return;windBusy=true;
  try{
-  const u=`https://api.open-meteo.com/v1/forecast?latitude=${latest.lat}&longitude=${latest.lon}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,weather_code&wind_speed_unit=kmh`;
+  const requestedLocation={lat:latest.lat,lon:latest.lon};
+  const u=`https://api.open-meteo.com/v1/forecast?latitude=${requestedLocation.lat}&longitude=${requestedLocation.lon}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,weather_code&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,temperature_2m,precipitation,weather_code&forecast_hours=12&timeformat=unixtime&timezone=auto&wind_speed_unit=kmh`;
   const r=await fetch(u);if(!r.ok)throw Error('Réseau');
-  weather=(await r.json()).current;weatherAt=Date.now();
+  const data=await r.json();weather=data.current;weatherForecast=data.hourly;weatherLocation=requestedLocation;weatherAt=Date.now();
+  window.dispatchEvent(new Event('nautic-weather-updated'));
   $('windSpeed').textContent=Math.round(weather.wind_speed_10m)+' km/h';
   $('windDirection').textContent=Math.round(weather.wind_direction_10m)+'°';
   $('weatherLabel').textContent=weatherIcon(weather.weather_code)+' '+Math.round(weather.temperature_2m)+'°C';
   const symbol=$('weatherCard').querySelector('.weatherSymbol');if(symbol)symbol.textContent=weatherIcon(weather.weather_code);
   const angle=(weather.wind_direction_10m+180-(heading??0))%360;$('windArrow').style.transform=`rotate(${angle}deg)`;
   updateWindCountdown();
- }catch(e){$('weatherTime').textContent='Météo indisponible · toucher pour réessayer'}
+ }catch(e){$('weatherTime').textContent='Météo indisponible · toucher pour réessayer';const box=$('localWeatherForecast');if(box&&!weatherForecast)box.textContent='Météo indisponible. Vérifie la connexion puis touche Actualiser.'}
  finally{windBusy=false}
 }
 function updateWindCountdown(){
@@ -203,7 +206,37 @@ function showCamUrl(u,i){if(!u)return;
   $('camMessage').hidden=false;return;
  }
 let img=$('cameraImg');img.hidden=false;img.src=u;img.onerror=()=>{$('camMessage').hidden=false;$('camMessage').textContent='Flux inaccessible ou format non pris en charge';img.hidden=true};img.onload=()=>{$('camMessage').hidden=true};let body=$('cam'+i+'Body');body.innerHTML='';let preview=document.createElement('img');preview.src=u;preview.alt='Aperçu caméra '+i;preview.style.cssText='width:100%;height:100%;object-fit:contain';preview.onerror=()=>{body.textContent='Caméra '+i+' : flux indisponible'};body.append(preview)}
-function weatherDialog(){modal('Météo locale',`<p>Source : Open-Meteo, conditions actuelles près de la position GPS.</p><p>Vent : ${weather?Math.round(weather.wind_speed_10m)+' km/h, provenance '+Math.round(weather.wind_direction_10m)+'°':'non disponible'}</p><p>Actualisation automatique : <b>toutes les 10 minutes</b>, avec connexion Internet.</p><button id="refreshWind">Actualiser maintenant</button>`);$('refreshWind').onclick=()=>{loadWeather();$('dialog').close()}}
+function weatherDialog(){
+ $('dialog').classList.remove('nautic-settings');$('dialog').classList.add('nautic-full');
+ modal('Vent — prochaines 10 heures','<div id="localWeatherForecast">Chargement de la météo locale…</div><button id="refreshForecast">Actualiser</button>');
+ $('refreshForecast').onclick=()=>loadWeather();
+ renderWeatherForecast();if(!weatherForecast&&latest)$('localWeatherForecast').textContent='Chargement de la météo locale…';loadWeather();
+}
+function renderWeatherForecast(){
+ const box=$('localWeatherForecast');if(!box||!$('dialog').open)return;
+ if(!latest){box.textContent='Position GPS nécessaire pour la météo locale.';return}
+ if(!weatherForecast||!weather){box.textContent='Météo indisponible. Vérifie la connexion puis touche Actualiser.';return}
+ const h=weatherForecast,now=Date.now()/1000;
+ const rows=h.time.map((t,i)=>({t,v:h.wind_speed_10m[i],g:h.wind_gusts_10m[i],rain:h.precipitation[i]})).filter(p=>p.t>=now).slice(0,10);
+ const valid=rows.filter(p=>Number.isFinite(p.v)&&Number.isFinite(p.g));
+ if(!valid.length){box.textContent='Prévisions de vent indisponibles.';return}
+ const max=Math.max(10,Math.ceil(Math.max(...valid.map(p=>Math.max(p.v,p.g)))/10)*10);
+ const x=i=>48+i*58,y=v=>205-v/max*170;
+ const line=key=>rows.map((p,i)=>Number.isFinite(p[key])?`${i===0||!Number.isFinite(rows[i-1][key])?'M':'L'}${x(i)},${y(p[key])}`:'').join(' ');
+ const time=t=>new Date(t*1000).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+ const condition=code=>code===0?'Ciel dégagé':code<=2?'Éclaircies':code===3?'Ciel couvert':code<=48?'Brouillard':code<=67?'Pluie':code<=77?'Neige':code<=82?'Averses':code<=86?'Averses de neige':'Orages';
+ const rain=rows.every(p=>Number.isFinite(p.rain))?rows.reduce((n,p)=>n+p.rain,0):null;
+ const value=v=>Number.isFinite(v)?Math.round(v):'—';
+ box.innerHTML=`<p>${weatherIcon(weather.weather_code)} <b>${condition(weather.weather_code)} · ${value(weather.temperature_2m)} °C</b><br>Vent ${value(weather.wind_speed_10m)} km/h, provenance ${value(weather.wind_direction_10m)}° · rafales ${value(weather.wind_gusts_10m)} km/h.</p>
+ <p>Rafales prévues jusqu’à <b>${Math.round(Math.max(...valid.map(p=>p.g)))} km/h</b>${rain===null?'':` · précipitations sur la période ${rain.toFixed(1)} mm`}.</p>
+ <div style="overflow-x:auto"><svg viewBox="0 0 610 255" style="width:100%;min-width:540px" role="img" aria-label="Vent et rafales horaires en kilomètres par heure">
+ ${[0,1,2,3,4].map(i=>{const v=max*i/4;return `<line x1="44" y1="${y(v)}" x2="580" y2="${y(v)}" stroke="#497080"/><text x="5" y="${y(v)+4}" fill="#eaf8ff" font-size="12">${v}</text>`}).join('')}
+ <text x="5" y="17" fill="#eaf8ff" font-size="12">km/h</text><path d="${line('v')}" fill="none" stroke="#45d5f3" stroke-width="3"/><path d="${line('g')}" fill="none" stroke="#ffb95e" stroke-width="3"/>
+ ${rows.map((p,i)=>`<text x="${x(i)}" y="233" text-anchor="middle" fill="#eaf8ff" font-size="11">${time(p.t)}</text>${['v','g'].map(k=>Number.isFinite(p[k])?`<circle cx="${x(i)}" cy="${y(p[k])}" r="3" fill="${k==='v'?'#45d5f3':'#ffb95e'}"><title>${time(p.t)} · ${k==='v'?'Vent':'Rafales'} ${p[k]} km/h</title></circle>`:'').join('')}`).join('')}</svg></div>
+ <p><span style="color:#45d5f3">● Vent</span> · <span style="color:#ffb95e">● Rafales</span></p>
+ <p class="muted">Source Open-Meteo · position ${weatherLocation.lat.toFixed(4)}, ${weatherLocation.lon.toFixed(4)} · actualisé à ${new Date(weatherAt).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}. Heures locales de l’appareil.</p>`;
+}
+window.addEventListener('nautic-weather-updated',renderWeatherForecast);
 function speedDialog(){modal('Vitesse GPS','<p>Le cadran est gradué de <b>0 à 30 km/h</b>. La vitesse affichée provient du GPS.</p><p class="muted">La mesure peut être instable à très faible vitesse. Aucune vitesse fictive n’est affichée.</p>')}
 function headingDialog(){modal('Cap et orientation','<p>La carte suit le cap de progression fourni par le GPS lorsque le bateau avance.</p><p class="muted">À l’arrêt, le dernier cap reste affiché. La rotation du fond Leaflet est expérimentale : ne pas s’y fier seule pour les manœuvres délicates.</p>')}
 function keyClick(id,fn){let el=$(id);el.onclick=fn;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn()}}}

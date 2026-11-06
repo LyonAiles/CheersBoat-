@@ -94,60 +94,87 @@ public class CameraActivity extends Activity {
   PlayerView pv=new PlayerView(this);pv.setUseController(false);pv.setKeepScreenOn(true);
   pv.setBackgroundColor(Color.TRANSPARENT);pv.setShutterBackgroundColor(Color.TRANSPARENT);
   pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
-  final float[] zoom={1f},lastX={0f},lastY={0f};
-  final boolean[] pinching={false},dragging={false};
+  FrameLayout frame=new FrameLayout(this){
+   @Override public boolean onInterceptTouchEvent(MotionEvent event){return true;}
+  };
+  frame.setBackgroundColor(Color.TRANSPARENT);
+  frame.setClipChildren(true);frame.setClipToPadding(true);
+  frame.addView(pv,new FrameLayout.LayoutParams(-1,-1));
+  final float[] zoom={1f},lastX={0f},lastY={0f},downX={0f},downY={0f};
+  final boolean[] pinching={false},dragging={false},held={false};
+  final int slop=android.view.ViewConfiguration.get(this).getScaledTouchSlop();
   Runnable clamp=()->{
    float maxX=Math.max(0f,(zoom[0]-1f)*pv.getWidth()/2f);
    float maxY=Math.max(0f,(zoom[0]-1f)*pv.getHeight()/2f);
    pv.setTranslationX(Math.max(-maxX,Math.min(maxX,pv.getTranslationX())));
    pv.setTranslationY(Math.max(-maxY,Math.min(maxY,pv.getTranslationY())));
   };
+  Runnable resetZoom=()->{
+   zoom[0]=1f;pv.setScaleX(1f);pv.setScaleY(1f);
+   pv.setTranslationX(0f);pv.setTranslationY(0f);
+  };
+  Runnable focus=()->{
+   if(pinching[0]||dragging[0]||isFinishing())return;
+   held[0]=true;
+   float oldZoom=zoom[0];
+   float pointX=(downX[0]-pv.getWidth()/2f-pv.getTranslationX())/oldZoom;
+   float pointY=(downY[0]-pv.getHeight()/2f-pv.getTranslationY())/oldZoom;
+   zoom[0]=4f;pv.setScaleX(zoom[0]);pv.setScaleY(zoom[0]);
+   pv.setTranslationX(-pointX*zoom[0]);pv.setTranslationY(-pointY*zoom[0]);clamp.run();
+  };
   ScaleGestureDetector scale=new ScaleGestureDetector(this,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
-   @Override public boolean onScaleBegin(ScaleGestureDetector d){pinching[0]=true;dragging[0]=false;return true;}
+   @Override public boolean onScaleBegin(ScaleGestureDetector d){
+    frame.removeCallbacks(focus);pinching[0]=true;dragging[0]=false;return true;
+   }
    @Override public boolean onScale(ScaleGestureDetector d){
     zoom[0]=Math.max(1f,Math.min(4f,zoom[0]*d.getScaleFactor()));
     pv.setScaleX(zoom[0]);pv.setScaleY(zoom[0]);clamp.run();return true;
    }
-   @Override public void onScaleEnd(ScaleGestureDetector d){pv.postDelayed(()->pinching[0]=false,180);}
   });
   GestureDetector taps=new GestureDetector(this,new GestureDetector.SimpleOnGestureListener(){
    @Override public boolean onDown(MotionEvent e){return true;}
-   @Override public boolean onDoubleTap(MotionEvent e){if(!pinching[0]&&!dragging[0])restart(lens,true);return true;}
+   @Override public boolean onDoubleTap(MotionEvent e){restart(lens,true);return true;}
    @Override public boolean onSingleTapConfirmed(MotionEvent e){
-    if(!pinching[0]&&!dragging[0]&&zoom[0]<=1.01f
-       &&getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE
+    if(zoom[0]>1.01f){resetZoom.run();return true;}
+    if(getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE
        &&((swapped?0:1)==lens)){swapped=!swapped;buildViews();}
     return true;
    }
   });
-  pv.setOnTouchListener((v,event)->{
+  taps.setIsLongpressEnabled(false);
+  // Gestures use the untransformed frame so a zoom keeps touch coordinates stable.
+  frame.setOnTouchListener((v,event)->{
    scale.onTouchEvent(event);
-   if(event.getPointerCount()>1){dragging[0]=false;return true;}
    switch(event.getActionMasked()){
     case MotionEvent.ACTION_DOWN:
-     lastX[0]=event.getX();lastY[0]=event.getY();dragging[0]=false;break;
+     downX[0]=lastX[0]=event.getX();downY[0]=lastY[0]=event.getY();
+     dragging[0]=false;pinching[0]=false;held[0]=false;
+     frame.postDelayed(focus,1050);taps.onTouchEvent(event);break;
+    case MotionEvent.ACTION_POINTER_DOWN:
+     frame.removeCallbacks(focus);pinching[0]=true;break;
     case MotionEvent.ACTION_MOVE:
-     if(zoom[0]>1.01f&&!pinching[0]){
-      float dx=event.getX()-lastX[0],dy=event.getY()-lastY[0];
-      if(Math.abs(dx)+Math.abs(dy)>0.5f){
-       dragging[0]=true;
-       pv.setTranslationX(pv.getTranslationX()+dx);
-       pv.setTranslationY(pv.getTranslationY()+dy);clamp.run();
-      }
+     if(event.getPointerCount()>1)break;
+     if(Math.hypot(event.getX()-downX[0],event.getY()-downY[0])>slop){
+      dragging[0]=true;frame.removeCallbacks(focus);
+     }
+     if(zoom[0]>1.01f&&dragging[0]&&!pinching[0]&&!held[0]){
+      pv.setTranslationX(pv.getTranslationX()+event.getX()-lastX[0]);
+      pv.setTranslationY(pv.getTranslationY()+event.getY()-lastY[0]);clamp.run();
      }
      lastX[0]=event.getX();lastY[0]=event.getY();break;
     case MotionEvent.ACTION_UP:
-     if(!dragging[0]&&!pinching[0])taps.onTouchEvent(event);
-     dragging[0]=false;return true;
-    case MotionEvent.ACTION_CANCEL:dragging[0]=false;return true;
+    case MotionEvent.ACTION_CANCEL:
+     frame.removeCallbacks(focus);
+     if(event.getActionMasked()==MotionEvent.ACTION_UP&&!dragging[0]&&!pinching[0]&&!held[0])taps.onTouchEvent(event);
+     else{
+      MotionEvent cancel=MotionEvent.obtain(event);cancel.setAction(MotionEvent.ACTION_CANCEL);
+      taps.onTouchEvent(cancel);cancel.recycle();
+     }
+     break;
    }
-   if(event.getActionMasked()==MotionEvent.ACTION_DOWN&&!pinching[0])taps.onTouchEvent(event);
    return true;
   });
-  FrameLayout frame=new FrameLayout(this);
-  frame.setBackgroundColor(Color.TRANSPARENT);
-  frame.setClipChildren(true);frame.setClipToPadding(true);
-  frame.addView(pv,new FrameLayout.LayoutParams(-1,-1));
+  pv.setClickable(false);pv.setFocusable(false);
   cameraFrames[lens]=frame;
   views[lens]=pv;return pv;
  }
@@ -209,17 +236,18 @@ public class CameraActivity extends Activity {
   root.addView(column,new FrameLayout.LayoutParams(-1,-1));
   TextView heading=new TextView(this);heading.setText("Analyse des équipements — Wi-Fi local");
   heading.setTextColor(Color.WHITE);heading.setTextSize(18);heading.setPadding(dp(4),dp(8),dp(4),dp(12));column.addView(heading);
-  TextView progress=new TextView(this);progress.setText("Préparation de 20 adresses consécutives…");
+  TextView progress=new TextView(this);progress.setText("Préparation de 32 adresses consécutives…");
   progress.setTextColor(Color.WHITE);column.addView(progress);
-  android.widget.GridLayout grid=new android.widget.GridLayout(this);grid.setColumnCount(5);
-  column.addView(grid,new LinearLayout.LayoutParams(-1,-2));
-  TextView[] cells=new TextView[20];
+  android.widget.GridLayout grid=new android.widget.GridLayout(this);grid.setColumnCount(4);
+  android.widget.ScrollView scroll=new android.widget.ScrollView(this);
+  scroll.addView(grid);column.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+  TextView[] cells=new TextView[32];
   for(int n=0;n<cells.length;n++){
    TextView cell=new TextView(this);cells[n]=cell;cell.setText("·");cell.setTextColor(0xffb9d9ee);
    cell.setTextSize(22);cell.setGravity(Gravity.CENTER);cell.setBackgroundColor(0xff142f43);
    android.widget.GridLayout.LayoutParams lp=new android.widget.GridLayout.LayoutParams();
-   lp.width=0;lp.height=dp(90);lp.columnSpec=android.widget.GridLayout.spec(n%5,1f);
-   lp.rowSpec=android.widget.GridLayout.spec(n/5);lp.setMargins(dp(2),dp(2),dp(2),dp(2));grid.addView(cell,lp);
+   lp.width=0;lp.height=dp(86);lp.columnSpec=android.widget.GridLayout.spec(n%4,1f);
+   lp.rowSpec=android.widget.GridLayout.spec(n/4);lp.setMargins(dp(2),dp(2),dp(2),dp(2));grid.addView(cell,lp);
   }
   TextView close=new TextView(this);close.setText("Fermer ✕");close.setTextColor(Color.WHITE);
   close.setTextSize(18);close.setPadding(dp(12),dp(16),dp(12),dp(16));
@@ -235,19 +263,20 @@ public class CameraActivity extends Activity {
    if(prefix==null){runOnUiThread(()->progress.setText("Wi-Fi local indisponible"));return;}
    final String subnet=prefix;
    java.util.ArrayList<String> hosts=new java.util.ArrayList<>();
-   for(int n=101;n<=120;n++)hosts.add(subnet+n);
+   for(int n=101;n<=132;n++)hosts.add(subnet+n);
    try{org.json.JSONArray report=new org.json.JSONArray();for(String host:hosts){report.put(host);scanStatuses.put(host,"pending");}
     getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-last",report.toString()).putString("nautic-network-status",scanStatuses.toString()).apply();
    }catch(Exception ignored){}
    runOnUiThread(()->{
     if(!discovering||isFinishing())return;
-    progress.setText("Analyse progressive : "+subnet+"101 à "+subnet+"120");
+    progress.setText("Analyse progressive : "+subnet+"101 à "+subnet+"132");
     scanPreviewInOrder(cells,hosts,0,progress);
    });
   }).start();
  }
  private void scanPreviewInOrder(TextView[] cells,java.util.ArrayList<String> hosts,int index,TextView progress){
-  if(!discovering||isFinishing()||index>=cells.length)return;
+  if(!discovering||isFinishing())return;
+  if(index>=cells.length){progress.setText("Analyse terminée — "+cells.length+" adresses");return;}
   String host=hosts.get(index);
   progress.setText("Test "+(index+1)+"/"+cells.length+" — "+host);
   final int next=index+1;
@@ -326,6 +355,14 @@ public class CameraActivity extends Activity {
   }catch(Exception ignored){}
  }
  private void confirmCamera(String host){
+  if(getIntent().getBooleanExtra("chooseCamera",false)){
+   new AlertDialog.Builder(this).setTitle("Associer "+host)
+    .setItems(new String[]{"Caméra 1 — Roof","Caméra 2 — Côté","Caméra 3 — Fond"},(d,which)->{
+     cameraIndex=which+1;saveCamera(host);
+    }).setNegativeButton("Annuler",null).show();
+  }else saveCamera(host);
+ }
+ private void saveCamera(String host){
   new AlertDialog.Builder(this).setTitle("Mémoriser cette caméra ?")
    .setMessage("Adresse "+host+" — caméra "+cameraIndex)
    .setPositiveButton("Mémoriser et ouvrir",(d,w)->{
@@ -345,6 +382,6 @@ public class CameraActivity extends Activity {
  }
  private void releasePreviews(){for(ExoPlayer p:previewPlayers)p.release();previewPlayers.clear();}
  private void release(){for(int i=0;i<2;i++)if(players[i]!=null){views[i].setPlayer(null);players[i].release();players[i]=null;}}
- @Override public void onConfigurationChanged(Configuration config){super.onConfigurationChanged(config);if(!settingsOnly&&root!=null&&views[0]!=null)buildViews();}
+ @Override public void onConfigurationChanged(Configuration config){super.onConfigurationChanged(config);if(!settingsOnly&&!discovering&&root!=null&&views[0]!=null)buildViews();}
  @Override protected void onStop(){release();releasePreviews();super.onStop();}
 }

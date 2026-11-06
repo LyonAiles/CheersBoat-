@@ -176,33 +176,10 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void openBoat(){runOnUiThread(()->{
    Intent i=new Intent(MainActivity.this,BoatActivity.class);startActivity(i);
   });}
-  // Balayage local sur demande : vérifie les services sans envoyer de commande.
-  @JavascriptInterface public void scanLocalDevices(){
-   new Thread(()->{
-    org.json.JSONArray found=new org.json.JSONArray();
-    try{
-     android.net.wifi.WifiManager wifi=(android.net.wifi.WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
-     android.net.wifi.WifiInfo info=wifi==null?null:wifi.getConnectionInfo();
-     int ip=info==null?0:info.getIpAddress();
-     if(ip==0){js("nauticNetworkScanResult","[]");return;}
-     String prefix=(ip&255)+"."+((ip>>8)&255)+"."+((ip>>16)&255)+".";
-     for(int n=101;n<=120;n++){
-      String host=prefix+n;boolean rtsp=false,tuya=false,other=false;
-      for(int port:new int[]{554,6668,6667,80,443}){
-       try(java.net.Socket socket=new java.net.Socket()){
-        socket.connect(new java.net.InetSocketAddress(host,port),350);
-        if(port==554)rtsp=true;else if(port==6668||port==6667)tuya=true;else other=true;
-       }catch(Exception ignored){}
-      }
-      org.json.JSONObject row=new org.json.JSONObject();
-      row.put("ip",host);row.put("rtsp",rtsp);row.put("tuya",tuya);row.put("responding",rtsp||tuya||other);
-      found.put(row);
-     }
-     getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putString("nautic-network-results",found.toString()).apply();
-     js("nauticNetworkScanResult",found.toString());
-    }catch(Exception e){js("nauticNetworkScanResult","[]");}
-   }).start();
-  }
+  @JavascriptInterface public void scanLocalDevices(){runOnUiThread(()->{
+   Intent i=new Intent(MainActivity.this,CameraActivity.class);
+   i.putExtra("discover",true);i.putExtra("chooseCamera",true);startActivity(i);
+  });}
   @JavascriptInterface public void configureRtsp(int index){runOnUiThread(()->{
    Intent i=new Intent(MainActivity.this,CameraActivity.class);i.putExtra("settings",true);i.putExtra("cameraIndex",index);startActivity(i);
   });}

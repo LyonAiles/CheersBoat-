@@ -10,6 +10,7 @@ const readSetting=(key)=>{try{
 }catch(e){try{return localStorage.getItem(key)||''}catch(_){return ''}}};
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{}'))}catch(e){return {...d}}};
 const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:true});
+mapPitch=Math.max(0,Math.min(45,Number(state.mapPitch)||0));
 // L'horloge reste affichée, indépendamment des anciens réglages de visibilité.
 state.buttons.clock=true;
 if(!readSetting('nautic-object-numbers-v2')){state.objectNumbers=true;try{localStorage.setItem('nautic-object-numbers-v2','1')}catch(e){}}
@@ -52,10 +53,11 @@ function nativeCall(fn,...args){if(native&&typeof native[fn]==='function'){nativ
 function callNumber(n){if(!nativeCall('call',n))location.href='tel:'+n.replace(/[^+0-9]/g,'')}
 function smsNumber(n,msg){if(!nativeCall('sms',n,msg))location.href='sms:'+n.replace(/[^+0-9]/g,'')+'?body='+encodeURIComponent(msg)}
 const head=document.querySelector('header');const headerControls=document.createElement('div');headerControls.id='nauticHeaderControls';head.appendChild(headerControls);const settingsButton=document.createElement('button');
-settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';headerControls.append(settingsButton);const exitButton=document.createElement('button');exitButton.id='nauticExitButton';exitButton.textContent='Quitter';exitButton.title='Fermer Nautic';headerControls.append(exitButton);exitButton.onclick=()=>{if(!confirm('Quitter Nautic ? Le suivi GPS et le journal seront interrompus.'))return;if(!nativeCall('exitApp'))alert('La fermeture est disponible dans l’application Android.');};
+settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';headerControls.append(settingsButton);const exitButton=document.createElement('button');exitButton.id='nauticExitButton';exitButton.textContent='Sortie';exitButton.title='Fermer Nautic';headerControls.append(exitButton);exitButton.onclick=()=>{if(!nativeCall('exitApp'))alert('La fermeture est disponible dans l’application Android.');};
 window.nauticCameraAddressSync=raw=>{
  try{
   const saved=JSON.parse(raw);
+  const report=get('settingNetworkReport');if(report)report.innerHTML=networkAddressReport();
   for(let i=1;i<=3;i++)if(typeof saved['cam'+i]==='string'&&saved['cam'+i])cfg['cam'+i]=saved['cam'+i];
  }catch(e){}
 };
@@ -73,39 +75,15 @@ function equipmentDialog(camera=0){
  get('equipmentSearch').onclick=()=>scanEquipment(get('equipmentResults'),camera);
 }
 function scanEquipment(box,camera=0){
- box.textContent='Balayage du réseau Wi-Fi…';
- window.nauticNetworkScanResult=json=>{
-  if(!box.isConnected)return;
-  let rows=[];try{rows=JSON.parse(json)}catch(e){}
-  box.replaceChildren();
-  if(!rows.length){box.textContent='Aucune réponse détectée.';return}
-  rows.sort((a,b)=>Number(a.ip.split('.').pop())-Number(b.ip.split('.').pop()));
-  try{native.writeSetting('nautic-network-results',JSON.stringify(rows));const report=get('settingNetworkReport');if(report)report.innerHTML=networkAddressReport()}catch(e){}
-  for(const d of rows){
-   const p=document.createElement('section');p.className='emPanel';
-   const title=document.createElement('p');title.textContent=d.ip+' — '+(d.rtsp?'RTSP possible':d.tuya?'Tuya possible':d.responding?'Équipement indéfini':'Aucune réponse');p.append(title);
-   if(d.rtsp){
-    const select=document.createElement('select');select.innerHTML='<option value="">Caméra à associer…</option><option value="1">Caméra 1</option><option value="2">Caméra 2</option><option value="3">Caméra 3</option>';if(camera)select.value=String(camera);
-    const b=document.createElement('button');b.textContent='Mémoriser cette adresse';b.onclick=()=>{
-     const i=Number(select.value);if(!i)return alert('Choisis une caméra.');
-     const old=cfg['cam'+i]||'',suffix=(old.match(/^rtsp:\/\/[^/]+(\/.*)$/i)||[])[1]||'/stream1',next='rtsp://'+d.ip+':554'+suffix;
-     if(!confirm('Confirmer que '+d.ip+' correspond à la caméra '+i+' ?'))return;
-     cfg['cam'+i]=next;
-     try{saveCfg();if(JSON.parse(readSetting(KEY)||'{}')['cam'+i]!==next)throw Error('Écriture non confirmée');b.textContent='✓ Adresse mémorisée'}
-     catch(e){cfg['cam'+i]=old;alert('Échec de sauvegarde : '+e.message)}
-    };p.append(select,b);
-   }
-   if(d.tuya){const n=document.createElement('p');n.className='muted';n.textContent='Tuya : identification et clé locale nécessaires.';p.append(n)}
-   box.append(p);
-  }
- };
- if(!nativeCall('scanLocalDevices'))box.textContent='Balayage indisponible dans cette APK.';
+ box.textContent='Recherche de 32 adresses, de .101 à .132…';
+ const opened=camera?nativeCall('discoverForCamera',camera):nativeCall('scanLocalDevices');
+ if(!opened)box.textContent='Recherche disponible dans l’application Android.';
 }
 function networkAddressReport(){
  let rows=[],states={};
- try{rows=JSON.parse(readSetting('nautic-network-results')||'[]')}catch(e){}
- try{states=JSON.parse(readSetting('nautic-network-states')||'{}')}catch(e){}
- if(!rows.length){try{rows=JSON.parse(readSetting('nautic-network-last')||'[]').map(ip=>({ip}))}catch(e){}}
+ try{rows=JSON.parse(readSetting('nautic-network-last')||'[]').map(ip=>({ip}))}catch(e){}
+ try{states=JSON.parse(readSetting('nautic-network-status')||readSetting('nautic-network-states')||'{}')}catch(e){}
+ if(!rows.length){try{rows=JSON.parse(readSetting('nautic-network-results')||'[]')}catch(e){}}
  rows.sort((a,b)=>Number(a.ip.split('.').pop())-Number(b.ip.split('.').pop()));
  return rows.length?'<p class="muted">Dernière analyse mémorisée (🔌 = réponse sans vidéo confirmée) :</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px">'+rows.map(d=>{
  const kind=states[d.ip]||(d.responding===false?'offline':d.rtsp?'unknown':d.responding?'unknown':'pending');
@@ -119,10 +97,20 @@ const mapWrap=get('mapWrap');
 const recenter=document.createElement('button');recenter.id='mapRecenter';recenter.textContent='⌖';recenter.title='Recentrer';mapWrap.append(recenter);
 recenter.onclick=()=>{if(map&&latest){gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};map.setView([latest.lat,latest.lon],map.getZoom())}};
 const layers=document.createElement('button');layers.id='mapLayers';layers.textContent='▤';layers.title='Fond de carte';mapWrap.append(layers);
-const layerDefs={osm:{label:'OpenStreetMap',url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:19,attr:'© OpenStreetMap'},topo:{label:'Topographique',url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',maxZoom:17,attr:'© OpenTopoMap'},sat:{label:'Satellite',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'© Esri'}};
+const layerDefs={osm:{label:'OpenStreetMap',url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:19,attr:'© OpenStreetMap'},topo:{label:'Topographique',url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',maxZoom:17,attr:'© OpenTopoMap'},sat:{label:'Satellite',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'© Esri'},
+ streets:{label:'Routière Esri',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'Tiles © Esri · HERE · Garmin · contributeurs'},
+ relief:{label:'Topographique Esri',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'Tiles © Esri · contributeurs'},
+ sea:{label:'OpenSeaMap — balisage',url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:18,attr:'© OpenStreetMap'}};
 let chosenLayer=null;
-function setLayer(id){if(!map||!window.L)return;map.eachLayer(l=>{if(l instanceof L.TileLayer)map.removeLayer(l)});let d=layerDefs[id]||layerDefs.osm;chosenLayer=L.tileLayer(d.url,{maxZoom:d.maxZoom,attribution:d.attr}).addTo(map);state.map=id;persist();let foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Carte '+d.label+' · suivi GPS'}
-function mapDialog(){openModal('Choisir la carte',`<div class="choiceGrid">${Object.entries(layerDefs).map(([k,v])=>`<button data-map="${k}">${v.label}</button>`).join('')}</div><p class="muted">Conservation du zoom et du centrage. Ces fonds nécessitent une connexion Internet.</p>`);dialog.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{setLayer(b.dataset.map);dialog.close()})}
+function setLayer(id){if(!map||!window.L)return;map.eachLayer(l=>{if(l instanceof L.TileLayer)map.removeLayer(l)});let d=layerDefs[id]||layerDefs.osm;chosenLayer=L.tileLayer(d.url,{maxZoom:d.maxZoom,attribution:d.attr}).addTo(map);if(id==='sea')L.tileLayer('https://t1.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap',zIndex:5}).addTo(map);state.map=id;persist();let foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Carte '+d.label+' · suivi GPS';rotateMap()}
+function mapDialog(){
+ openModal('Choisir la carte',`<div class="choiceGrid">${Object.entries(layerDefs).map(([k,v])=>`<button data-map="${k}" aria-pressed="${state.map===k}">${v.label}</button>`).join('')}</div>
+ <label>Inclinaison de la carte <output id="mapPitchValue">${mapPitch}°</output><input type="range" id="mapPitch" min="0" max="45" step="5" value="${mapPitch}"></label>
+ <p class="muted">Vue en perspective. OpenSeaMap ajoute le balisage disponible. Connexion Internet nécessaire.</p>`);
+ dialog.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{setLayer(b.dataset.map);dialog.querySelectorAll('[data-map]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
+ get('mapPitch').oninput=()=>{mapPitch=Number(get('mapPitch').value);get('mapPitchValue').textContent=mapPitch+'°';rotateMap()};
+ get('mapPitch').onchange=()=>{state.mapPitch=mapPitch;persist()};
+}
 layers.onclick=mapDialog;
 const photoFallback='bateau.jpg';
 function applyPhoto(){const card=get('boatCard');if(!card)return;const src=state.boatPhoto||photoFallback;card.style.backgroundImage=`linear-gradient(0deg,rgba(3,20,32,.82),rgba(3,20,32,.20)),url("${src.replaceAll('"','%22')}")`;card.style.backgroundSize='cover';card.style.backgroundPosition='center';const sketch=card.querySelector('.boatSketch');if(sketch)sketch.style.display='none'}
@@ -403,7 +391,7 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 
 applyAppearance();
 
-function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Quitter'],['nauticPlugsButton','22 · Prises'],['nauticContactsButton','26 · Bouton Derniers appels'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
+function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Sortie'],['nauticPlugsButton','22 · Prises'],['nauticContactsButton','26 · Bouton Derniers appels'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
  openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet. Le 35 peut être masqué dans Tableau de bord.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><p class="muted">Nautic accepte le redimensionnement Android. Le mode fenêtre flottante dépend du téléphone.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
@@ -423,7 +411,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  ${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>Prise ${i+1}</h3>${field('Libellé','settingPlug'+i+'Label',p.label)}${field('Adresse IP locale','settingPlug'+i+'Ip',p.ip)}</section>`).join('')}
  <p class="muted">Ces paramètres préparent la connexion locale Tuya. Les interrupteurs ne seront activés qu'après validation du protocole de commande.</p>
  <h3>Caméras — réglages indépendants</h3>
- <p class="muted">Double-touche une vidéo pour la relancer. Pince pour zoomer, puis glisse pour déplacer l’image. En paysage, touche le médaillon pour inverser les vues.</p>
+ <p class="muted">Appui de plus d’une seconde pour zoomer sur un point, puis simple toucher pour revenir. Double-touche une vidéo pour la relancer. Pince pour zoomer, puis glisse pour déplacer l’image. En paysage, touche le médaillon pour inverser les vues.</p>
  ${[1,2,3].map(i=>`<section class="emPanel"><h3>Caméra ${i}</h3>
  ${field('Nom du panneau','settingCam'+i+'Name',state['camera'+i].name)}
  <label>Application<select class="nautic-select" id="settingCam${i}App"><option value="tapo">Tapo</option><option value="stream">Flux réseau</option><option value="other">Autre application Android</option></select></label>
@@ -517,8 +505,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
 
  get('settingsMaps').onclick=mapDialog;get('settingsReset').onclick=()=>{state.buttons={};persist();applyVisibility();settingsDialog()};
 }
-// Météo : accès direct au radar demandé.
-get('weatherCard').onclick=()=>{const u='https://appli.meteoetradar.fr/U13Q/frFRShare';if(!nativeCall('openExternal',u))window.open(u,'_blank','noopener')};
+get('weatherCard').onclick=weatherDialog;
 // Horloge explicite : les anciens styles cachaient les éléments <time>.
 // Horloge déplacée hors du header, où des règles historiques se contredisent.
 const fixedClock=document.getElementById('clock');
@@ -544,7 +531,7 @@ if(brand){
 function applyObjectNumbers(){
  document.querySelectorAll('.nautic-object-tag').forEach(e=>e.remove());
  if(!state.objectNumbers)return;
- const named=[['clock',10,'Horloge'],['nauticSettingsButton',20,'Paramètres'],['nauticExitButton',21,'Quitter'],['nauticContactsButton',26,'Derniers appels'],['gpsCard',31,'GPS'],['boatCard',32,'Mon bateau'],['logCard',33,'Journal'],['fuelCard',34,'Carburant'],['nauticCallsSlot',35,'Conteneur appels'],['speedCard',36,'Vitesse'],['weatherCard',37,'Météo'],['headingCard',38,'Cap'],['mapWrap',40,'Carte'],['cam1Card',41,'Caméra Roof'],['cam2Card',42,'Caméra Côté'],['cam3Card',43,'Caméra Fond']];
+ const named=[['clock',10,'Horloge'],['nauticSettingsButton',20,'Paramètres'],['nauticExitButton',21,'Sortie'],['nauticContactsButton',26,'Derniers appels'],['gpsCard',31,'GPS'],['boatCard',32,'Mon bateau'],['logCard',33,'Journal'],['fuelCard',34,'Carburant'],['nauticCallsSlot',35,'Conteneur appels'],['speedCard',36,'Vitesse'],['weatherCard',37,'Météo'],['headingCard',38,'Cap'],['mapWrap',40,'Carte'],['cam1Card',41,'Caméra Roof'],['cam2Card',42,'Caméra Côté'],['cam3Card',43,'Caméra Fond']];
  const used=new Set(named.map(x=>x[0]));
  // Les commandes et les objets possédant un identifiant conservent un numéro stable.
  const extras=[...document.querySelectorAll('#app [id]')].filter(e=>!used.has(e.id)&&!e.closest('dialog')&&!e.closest('.leaflet-container')&&(/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(e.tagName)||e.classList.contains('mapWidget')));
