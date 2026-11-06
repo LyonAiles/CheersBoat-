@@ -21,6 +21,7 @@ final class DashboardCameras {
  class Tile{
   final String id;final FrameLayout frame;final ImageView mirror;final TextView message,banner,footer,beacon;
   boolean alarm=false,active=false;
+  final CameraGarland garland=new CameraGarland(activity.getResources().getDisplayMetrics().density);
   int dp(float n){return (int)(n*activity.getResources().getDisplayMetrics().density+.5f);}
   TextView overlay(int size){TextView t=new TextView(activity);t.setTextColor(Color.WHITE);t.setTextSize(size);t.setGravity(Gravity.CENTER);t.setPadding(dp(4),dp(3),dp(4),dp(3));t.setBackgroundColor(0xb3075e9f);return t;}
   Tile(String id){this.id=id;frame=new FrameLayout(activity);frame.setBackgroundColor(Color.BLACK);
@@ -39,7 +40,7 @@ final class DashboardCameras {
    if(next!=alarm){alarm=next;beacon.clearAnimation();beacon.setVisibility(alarm?View.VISIBLE:View.GONE);
     if(alarm){android.view.animation.AlphaAnimation blink=new android.view.animation.AlphaAnimation(1f,.12f);blink.setDuration(500);blink.setRepeatMode(android.view.animation.Animation.REVERSE);blink.setRepeatCount(android.view.animation.Animation.INFINITE);beacon.startAnimation(blink);}
    }
-   android.graphics.drawable.GradientDrawable border=new android.graphics.drawable.GradientDrawable();border.setColor(Color.TRANSPARENT);border.setCornerRadius(dp(8));border.setStroke(dp(alarm?6:2),alarm?0xffff2424:data.optBoolean("active",false)?0xff4be0b0:0xff287398);frame.setForeground(border);
+   android.graphics.drawable.GradientDrawable border=new android.graphics.drawable.GradientDrawable();border.setColor(Color.TRANSPARENT);border.setCornerRadius(dp(8));border.setStroke(dp(alarm?6:2),alarm?0xffff2424:data.optBoolean("active",false)?0xff4be0b0:0xff287398);if(active&&!alarm){if(frame.getForeground()!=garland)frame.setForeground(garland);}else frame.setForeground(border);
    // Keep the beacon large but inside even a narrow portrait thumbnail.
    FrameLayout.LayoutParams bp=(FrameLayout.LayoutParams)beacon.getLayoutParams();FrameLayout.LayoutParams fp=(FrameLayout.LayoutParams)frame.getLayoutParams();bp.width=Math.max(24,Math.min(dp(70),fp.width*2/3));bp.height=Math.max(24,Math.min(dp(66),fp.height/2));beacon.setTextSize(Math.max(22,Math.min(42,bp.height/activity.getResources().getDisplayMetrics().density*.7f)));beacon.setLayoutParams(bp);
   }

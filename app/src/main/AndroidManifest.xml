@@ -23,6 +23,7 @@
   <activity android:name=".BoatActivity" android:exported="false"/>
   <service android:name=".TrematageService" android:exported="false"/>
   <service android:name=".Camera42Service" android:exported="false"/>
+  <service android:name=".RemoteTwinService" android:exported="false"/>
   <activity android:name=".CameraActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden"/>
  </application>
 </manifest>

@@ -54,6 +54,7 @@ public class MainActivity extends Activity {
  @Override protected void onStop(){dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
+  if(RemoteTwinService.prefs(this).getBoolean("enabled",false))RemoteTwinService.apply(this);
   notesPad=new NotesPad(this,()->{dashboardVisible=true;js("nauticDashboardResume","");});
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
   web=new WebView(this);
@@ -108,6 +109,7 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
    if(!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
   });}
+  @JavascriptInterface public void openRemoteTwin(){runOnUiThread(()->RemoteTwinSettings.open(MainActivity.this));}
   @JavascriptInterface public void previewAlertSound(String sound){CameraAlertSounds.play(MainActivity.this,"42",sound);}
   @JavascriptInterface public String camera42Status(){return Camera42Access.status(MainActivity.this);}
   @JavascriptInterface public void toggleCamera42(){runOnUiThread(()->{try{js("nauticCamera42Result",Camera42Access.toggle(MainActivity.this));}catch(Exception e){js("nauticCamera42Result",e.getMessage());}});}
