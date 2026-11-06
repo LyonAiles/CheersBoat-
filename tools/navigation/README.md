@@ -54,3 +54,28 @@ perte de focus ou passage en arrière-plan. Un garde-fou évite une pause perman
 Le dernier résultat GPS reçu pendant le geste est traité à la reprise. L'écoute
 native des alertes caméra reste active. La rotation utilisateur est mémorisée à chaque
 événement de rotation, même si le moteur ne fournit pas originalEvent à la fin du geste.
+
+## Catégories et rayon jusqu'à 100 km
+
+Les paramètres proposent huit cases indépendantes : écluses, ports/marinas,
+haltes/amarrages, ponts, barrages, seuils, tunnels et cales de mise à l'eau.
+Le rayon géographique d'affichage est saisi de 1 à 100 km et conservé. Toutes les
+directions autour du bateau sont incluses ; la sélection ne se limite plus à l'avant.
+Les catégories décochées sont exclues de la requête et de l'affichage. Tout décocher
+retire les points et ne lance aucune requête. Les valeurs de rayon sont bornées à
+l'enregistrement et à la lecture.
+
+Pour les grands rayons, Overpass renvoie seulement les centres des points distants.
+Le graphe détaillé des voies d'eau est limité à environ 11,5 km autour du bateau.
+La recherche des ponts est restreinte aux alentours des voies d'eau ; les centres
+lointains restent approximatifs. Les distances lointaines sont donc à vol d'oiseau,
+explicitement indiquées. Un réseau non raccordé n'exclut plus un ouvrage situé dans
+le rayon : il apparaît avec sa distance de proximité. Les requêtes larges peuvent
+être longues ou refusées par le serveur public ; le dernier cache reste disponible.
+La couverture dépend des éléments renseignés dans OpenStreetMap.
+
+MapLibre regroupe les points au dézoom. La carte classique ne crée des marqueurs
+que pour la zone visible, regroupés en cellules de 45 pixels. Toucher un groupe
+classique ouvre sa liste ; le bouton des ouvrages ouvre la liste générale. Chaque
+liste affiche jusqu'à 200 entrées triées par distance. Aucun téléchargement massif
+des géométries de toutes les rivières dans un rayon de 100 km n'est effectué.

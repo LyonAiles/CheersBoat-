@@ -411,8 +411,9 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <label>Moteur de carte<select class="nautic-select" id="settingMapEngine"><option value="vector" ${(state.mapEngine||'vector')==='vector'?'selected':''}>MapLibre · libellés horizontaux</option><option value="legacy" ${state.mapEngine==='legacy'?'selected':''}>Carte classique · retour arrière</option></select></label>
  <p class="muted">MapLibre utilise le fond vectoriel OpenFreeMap. Si le chargement ou WebGL échoue, retour automatique à la carte classique. Les réglages classiques sont conservés.</p>
  <label class="settingRow"><input type="checkbox" id="settingWaterwayWorks" ${state.waterwayWorks===false?'':'checked'}><span>Afficher les ouvrages fluviaux OpenStreetMap</span></label>
- <label>Périmètre de recherche<select class="nautic-select" id="settingWaterwayRadius">${[2000,5000,10000].map(r=>`<option value="${r}" ${(Number(state.waterwayRadius)||5000)===r?'selected':''}>${r/1000} km</option>`).join('')}</select></label>
- <p class="muted">Écluses, ponts, barrages, seuils et tunnels selon les données disponibles. Actualisation après progression ; cache local. Les distances par le réseau ne désignent pas un itinéraire choisi : bifurcations à confirmer. Sans raccordement, distance à vol d’oiseau explicitement indiquée.</p>
+ <p>Ouvrages à positionner :</p>${[['lock','Écluses'],['port','Ports et marinas'],['halt','Haltes et amarrages'],['bridge','Ponts'],['dam','Barrages'],['weir','Seuils'],['tunnel','Tunnels'],['slipway','Cales de mise à l’eau']].map(([type,label])=>`<label class="settingRow"><input type="checkbox" data-waterway-type="${type}" ${state.waterwayTypes?.[type]===false?'':'checked'}><span>${label}</span></label>`).join('')}
+ <label>Rayon d’affichage autour du bateau (km, de 1 à 100)<input id="settingWaterwayRadius" type="number" min="1" max="100" step="1" value="${Math.max(1,Math.min(100,(Number(state.waterwayRadius)||5000)/1000))}"></label>
+ <p class="muted">Sélection autour du bateau, dans toutes les directions. Au-delà de 10 km, les points lointains utilisent des données allégées et des distances à vol d’oiseau. Actualisation après progression ; cache local. Les distances par le réseau ne désignent pas un itinéraire choisi : bifurcations à confirmer. Sans raccordement, distance à vol d’oiseau explicitement indiquée.</p>
  <h3>Bateau</h3>${field('Nom du bateau','settingBoat',state.boatName)}${field('Téléphone de rappel (inclus dans les SMS)','settingContactPhone',state.contactPhone||testNumber,'tel')}
  <p>Carburant estimé consommé : <b>${(typeof fuelUsed==='number'?fuelUsed:0).toFixed(2)} L</b>. La consommation d'un arrêt de moins de ${state.stopMinutes} minutes est ajoutée à la reprise ; après ce délai elle est annulée.</p>
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
@@ -506,7 +507,8 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
   dialog.querySelectorAll('[data-button]').forEach(e=>state.buttons[e.dataset.button]=e.checked);
   state.mapEngine=get('settingMapEngine').value;
   state.waterwayWorks=get('settingWaterwayWorks').checked;
-  state.waterwayRadius=Number(get('settingWaterwayRadius').value);
+  state.waterwayRadius=Math.max(1,Math.min(100,Number(get('settingWaterwayRadius').value)||5))*1000;
+  state.waterwayTypes={};dialog.querySelectorAll('[data-waterway-type]').forEach(e=>{state.waterwayTypes[e.dataset.waterwayType]=e.checked;});
   state.alertSounds={};dialog.querySelectorAll('[data-alert-sound]').forEach(e=>{state.alertSounds[e.dataset.alertSound]=e.value;});
   state.alertTypes={};
   dialog.querySelectorAll('[data-alert-watch]').forEach(e=>{const id=e.dataset.alertWatch;if(!state.alertTypes[id])state.alertTypes[id]={};state.alertTypes[id][e.dataset.alertType]=e.checked;});
