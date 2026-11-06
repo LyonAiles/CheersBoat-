@@ -1,6 +1,6 @@
 /* Optional vector map, with explicit and automatic return to the original Leaflet map. */
 (()=>{
- const $=id=>document.getElementById(id),native=window.NauticAndroid,W=window.NauticWaterways;
+ const $=id=>document.getElementById(id),native=window.NauticAndroid,W=window.NauticWaterways,I=window.NauticWorkIcons;
  const read=()=>{try{return JSON.parse(native?.readSetting('nautic-extensions')||localStorage.getItem('nautic-extensions')||'{}');}catch(_){return {};}};
  let options=read(),vector=null,loading=null,failed=false,active=false,request=0,cache=null,data=null,lastQuery=0,busy=false,lastList=[],lastRender='';
  const wrap=$('mapWrap'),host=document.createElement('div');host.id='nauticVectorMap';host.style.cssText='position:absolute;inset:0;z-index:1;display:none';wrap.appendChild(host);
@@ -13,12 +13,16 @@
   vector.touchZoomRotate?.enableRotation();vector.dragRotate?.enable();
   vector.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');let loaded=false;
   const timeout=setTimeout(()=>{if(!loaded&&generation===request)fallback('Fond vectoriel indisponible');},25000);
-  vector.on('load',()=>{if(generation!==request)return;clearTimeout(timeout);loaded=true;active=true;failed=false;$('map').style.visibility='hidden';map?.eachLayer(l=>{if(window.L&&l instanceof L.TileLayer)map.removeLayer(l);});
+  vector.on('load',async()=>{if(generation!==request)return;clearTimeout(timeout);loaded=true;active=true;failed=false;$('map').style.visibility='hidden';map?.eachLayer(l=>{if(window.L&&l instanceof L.TileLayer)map.removeLayer(l);});
    for(const layer of vector.getStyle().layers||[])if(layer.type==='symbol'&&layer.layout?.['text-field']){vector.setLayoutProperty(layer.id,'text-rotation-alignment','viewport');vector.setLayoutProperty(layer.id,'text-pitch-alignment','viewport');vector.setLayoutProperty(layer.id,'symbol-placement','point');vector.setLayoutProperty(layer.id,'text-rotate',0);}
    vector.addSource('nautic-route',{type:'geojson',data:routeData()});vector.addLayer({id:'nautic-route',type:'line',source:'nautic-route',paint:{'line-color':'#20bce9','line-width':4}});
-   vector.addSource('nautic-works',{type:'geojson',data:worksData(),cluster:true,clusterRadius:45,clusterMaxZoom:12});vector.addLayer({id:'nautic-works',type:'circle',source:'nautic-works',filter:['!', ['has','point_count']],paint:{'circle-radius':6,'circle-color':'#ffe17a','circle-stroke-color':'#163d51','circle-stroke-width':2}});
-   vector.addLayer({id:'nautic-work-clusters',type:'circle',source:'nautic-works',filter:['has','point_count'],paint:{'circle-radius':16,'circle-color':'#ffe17a','circle-stroke-color':'#163d51','circle-stroke-width':2}});
-   vector.addLayer({id:'nautic-work-counts',type:'symbol',source:'nautic-works',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':12,'text-rotation-alignment':'viewport'},paint:{'text-color':'#163d51'}});
+   await I.install(vector,()=>generation===request&&!!vector);if(generation!==request||!vector)return;
+   const iconScale=Math.max(.75,Math.min(1.75,(Number(options.waterwayIconSize)||120)/100));
+   vector.addSource('nautic-works',{type:'geojson',data:worksData(),cluster:true,clusterRadius:32,clusterMaxZoom:10});
+   vector.addLayer({id:'nautic-works',type:'symbol',source:'nautic-works',filter:['!', ['has','point_count']],layout:{'icon-image':['concat','nautic-',['get','category']],'icon-size':['interpolate',['linear'],['zoom'],6,.65*iconScale,12,.85*iconScale,16,iconScale],'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport'}});
+   vector.addLayer({id:'nautic-work-clusters',type:'symbol',source:'nautic-works',filter:['has','point_count'],layout:{'icon-image':'nautic-group','icon-size':iconScale,'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport'}});
+   vector.addLayer({id:'nautic-work-counts',type:'symbol',source:'nautic-works',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':13,'text-offset':[0,1.6],'text-allow-overlap':true,'text-rotation-alignment':'viewport'},paint:{'text-color':'#153f56','text-halo-color':'white','text-halo-width':2}});
+   vector.on('click','nautic-work-clusters',()=>showList());
    vector.on('click','nautic-works',e=>showItem(e.features?.[0]?.properties?.id));sync();
   });
   vector.on('error',e=>{if(!loaded)notice('Chargement vectoriel…');});
@@ -28,9 +32,9 @@
   vector.on('zoomend',e=>{if((e.originalEvent||window.nauticMapInteracting)&&map)map.setZoom(vector.getZoom());});
  }catch(e){if(generation===request)fallback('Carte vectorielle non disponible');}}
  function routeData(){return {type:'FeatureCollection',features:points.length>1?[{type:'Feature',geometry:{type:'LineString',coordinates:points.map(p=>[p.lon,p.lat])},properties:{}}]:[]};}
- function worksData(){return {type:'FeatureCollection',features:(options.waterwayWorks===false?[]:lastList).map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{id:p.id}}))};}
+ function worksData(){return {type:'FeatureCollection',features:(options.waterwayWorks===false?[]:lastList).map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{id:p.id,category:p.category||W.categoryOf(p.type)}}))};}
  let lastLegacyZoom=null;function sync(){if(window.nauticMapInteracting||!active||!vector||vector.isMoving?.())return;const c=smoothCenter||stableFix||latest;const z=map?.getZoom();const zoomChanged=z!==lastLegacyZoom;lastLegacyZoom=z;if(c)vector.jumpTo({...(zoomChanged&&z!=null?{zoom:z}:{}),center:[c.lon,c.lat],bearing:(heading??0)-userMapRotation,pitch:mapPitch,padding:{top:wrap.clientHeight/3,bottom:0,left:0,right:0}});vector.resize();$('compass').style.transform=`rotate(${(heading??0)-userMapRotation}deg)`;}
- function settings(next){options=next||read();lastQuery=0;if((options.mapEngine||'vector')==='legacy'){request++;failed=false;active=false;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}window.nauticRestoreLegacy?.();}else if(!vector){failed=false;start();}lastRender='';renderWorks();}
+ function settings(next){options=next||read();lastQuery=0;if((options.mapEngine||'vector')==='legacy'){request++;failed=false;active=false;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}window.nauticRestoreLegacy?.();}else if(!vector){failed=false;start();}if(active&&vector?.getLayer('nautic-works')){const factor=Math.max(.75,Math.min(1.75,(Number(options.waterwayIconSize)||120)/100));vector.setLayoutProperty('nautic-works','icon-size',['interpolate',['linear'],['zoom'],6,.65*factor,12,.85*factor,16,factor]);vector.setLayoutProperty('nautic-work-clusters','icon-size',factor);}lastRender='';renderWorks();}
  window.nauticApplyNavigation=settings;
  window.addEventListener('nauticmapidle',()=>{sync();updateWorks();});
  window.nauticEvery(sync,100);let routeCount=-1;window.nauticEvery(()=>{if(active&&vector&&points.length!==routeCount){routeCount=points.length;vector.getSource('nautic-route')?.setData(routeData());}updateWorks();},1000);
@@ -59,9 +63,9 @@
   }catch(e){notice(data?'Ouvrages · cache · réseau indisponible':'Ouvrages indisponibles · réessai automatique');}finally{busy=false;}}
  let legacyLayer=null;
  function classicMarkers(){const groups=new Map(),bounds=map.getBounds();for(const p of lastList){if(!bounds.contains([p.lat,p.lon]))continue;const pixel=map.project([p.lat,p.lon],map.getZoom()),key=Math.floor(pixel.x/45)+','+Math.floor(pixel.y/45);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p);}
-  return [...groups.values()].map(group=>{const lat=group.reduce((s,p)=>s+p.lat,0)/group.length,lon=group.reduce((s,p)=>s+p.lon,0)/group.length;const marker=L.circleMarker([lat,lon],{radius:group.length>1?14:6,color:'#163d51',weight:2,fillColor:'#ffe17a',fillOpacity:1});if(group.length>1)marker.bindTooltip(String(group.length),{permanent:true,direction:'center'});return marker.on('click',()=>{if(group.length===1)showItem(group[0].id);else showList(group);});});
+  return [...groups.values()].map(group=>{const lat=group.reduce((s,p)=>s+p.lat,0)/group.length,lon=group.reduce((s,p)=>s+p.lon,0)/group.length,size=I.size(map.getZoom(),Number(options.waterwayIconSize)||120),type=group.length>1?'group':group[0].category||W.categoryOf(group[0].type);const icon=L.divIcon({className:'nautic-work-marker',html:I.svg(type)+(group.length>1?'<span>'+group.length+'</span>':''),iconSize:[size,size],iconAnchor:[size/2,size/2]});return L.marker([lat,lon],{icon}).on('click',()=>{if(group.length===1)showItem(group[0].id);else showList(group);});});
  }
- function renderWorks(){const key=JSON.stringify([active,options.waterwayWorks,!active&&map?map.getBounds().toBBoxString():'',lastList.map(x=>x.id)]);if(key===lastRender)return;lastRender=key;vector?.getSource('nautic-works')?.setData(worksData());if(legacyLayer&&map){map.removeLayer(legacyLayer);legacyLayer=null;}if(!active&&window.L&&map&&options.waterwayWorks!==false)legacyLayer=L.layerGroup(classicMarkers()).addTo(map);}
+ function renderWorks(){const key=JSON.stringify([active,options.waterwayWorks,options.waterwayIconSize,!active&&map?map.getBounds().toBBoxString():'',lastList.map(x=>x.id)]);if(key===lastRender)return;lastRender=key;vector?.getSource('nautic-works')?.setData(worksData());if(legacyLayer&&map){map.removeLayer(legacyLayer);legacyLayer=null;}if(!active&&window.L&&map&&options.waterwayWorks!==false)legacyLayer=L.layerGroup(classicMarkers()).addTo(map);}
 
  const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
  function info(p){return `<b>${esc(p.name)}</b> · ${esc(p.type)}<br>${(p.distance/1000).toFixed(2)} km · ${p.mode==='réseau'?'par le réseau d’eau (branche à confirmer)':'à vol d’oiseau'}${p.clearance?'<br>Hauteur déclarée OSM : '+esc(p.clearance):''}${p.width?'<br>Largeur déclarée : '+esc(p.width):''}${p.length?'<br>Longueur déclarée : '+esc(p.length):''}${p.opening?'<br>Horaires déclarés : '+esc(p.opening):''}`;}

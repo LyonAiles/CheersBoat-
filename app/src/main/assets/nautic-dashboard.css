@@ -114,3 +114,7 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
 #dialog.nautic-settings details[open]{padding-bottom:12px}
 #dialog.nautic-settings details details{background:#10364a;margin:8px 0}
 #dialog.nautic-settings>.nautic-settings-group,#dialog.nautic-settings #dialogContent>.nautic-settings-group{flex:none}
+
+.nautic-work-marker{background:none!important;border:0!important;filter:drop-shadow(0 1px 3px #001b2aaa)}
+.nautic-work-marker svg{display:block;width:100%;height:100%}
+.nautic-work-marker>span{position:absolute;right:-7px;bottom:-7px;background:white;color:#153f56;border:1px solid #153f56;border-radius:10px;min-width:20px;text-align:center;font:bold 12px Arial;padding:2px}

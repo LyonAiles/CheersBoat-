@@ -79,3 +79,16 @@ que pour la zone visible, regroupés en cellules de 45 pixels. Toucher un groupe
 classique ouvre sa liste ; le bouton des ouvrages ouvre la liste générale. Chaque
 liste affiche jusqu'à 200 entrées triées par distance. Aucun téléchargement massif
 des géométries de toutes les rivières dans un rayon de 100 km n'est effectué.
+
+## Pictogrammes des ouvrages
+
+Les points jaunes individuels sont remplacés par huit pictogrammes dessinés en SVG,
+un par catégorie, partagés entre MapLibre et la carte classique. Les icônes sont
+fournies par l'application, sans téléchargement d'images. Elles ont un fond coloré
+et un contour blanc ; elles restent alignées sur l'écran en mode vectoriel.
+Leur taille suit le zoom et le réglage Discrète / Confort / Grande / Très grande.
+Les pictogrammes individuels ne sont pas supprimés par l'évitement des collisions
+MapLibre. Le regroupement vectoriel cesse au-delà du zoom 10, au lieu du zoom 12,
+pour montrer plus tôt les ouvrages séparés. Les groupes ont leur propre pictogramme
+et un nombre ; les toucher ouvre une liste.
+Ces améliorations de lisibilité ne créent pas de nouvelles données géographiques.
