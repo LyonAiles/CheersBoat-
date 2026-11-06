@@ -40,6 +40,9 @@ public class MainActivity extends Activity {
  private static final int PICK_PHONE=201, PICK_IMAGE=202, GPS=100, CAMERA=101, CALLS=103;
  private WebView web;
  private PermissionRequest pendingCamera;
+ private android.content.BroadcastReceiver trematageReceiver;
+ @Override protected void onStart(){super.onStart();trematageReceiver=TrematageAlerts.attach(this);}
+ @Override protected void onStop(){if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);

@@ -42,6 +42,7 @@ public class CameraActivity extends Activity {
  private boolean discovering=false;
  private int cameraIndex=1;
  private CameraControls controls;
+ private android.content.BroadcastReceiver trematageReceiver;
  private boolean mobileAudio=false;
  void toggleMobileAudio(){mobileAudio=!mobileAudio;if(players[1]!=null)players[1].setVolume(mobileAudio?1f:0f);}
  private final org.json.JSONObject scanStatuses=new org.json.JSONObject();
@@ -211,7 +212,7 @@ public class CameraActivity extends Activity {
   commandsLayout.setMargins(dp(8),0,dp(8),dp(8));root.addView(commands,commandsLayout);
   commands.setOnClickListener(v->{
    if(controls!=null)controls.close();
-   controls=new CameraControls(this,Uri.parse(baseUrl).getHost(),credential("username"),credential("password"));controls.show();
+   controls=new CameraControls(this,Uri.parse(baseUrl).getHost(),credential("username"),credential("password"),cameraIndex);controls.show();
   });
   for(int i=0;i<2;i++){retries[i]=0;restart(i,true);}
  }
@@ -407,6 +408,6 @@ public class CameraActivity extends Activity {
  private void releasePreviews(){for(ExoPlayer p:previewPlayers)p.release();previewPlayers.clear();}
  private void release(){for(int i=0;i<2;i++)if(players[i]!=null){views[i].setPlayer(null);players[i].release();players[i]=null;}}
  @Override public void onConfigurationChanged(Configuration config){super.onConfigurationChanged(config);if(controls!=null)controls.close();if(!settingsOnly&&!discovering&&root!=null&&views[0]!=null)buildViews();}
- @Override protected void onStart(){super.onStart();if(root!=null&&!settingsOnly&&!discovering&&views[0]!=null&&players[0]==null)buildViews();}
- @Override protected void onStop(){if(controls!=null)controls.close();release();releasePreviews();super.onStop();}
+ @Override protected void onStart(){super.onStart();trematageReceiver=TrematageAlerts.attach(this);if(root!=null&&!settingsOnly&&!discovering&&views[0]!=null&&players[0]==null)buildViews();}
+ @Override protected void onStop(){if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}if(controls!=null)controls.close();release();releasePreviews();super.onStop();}
 }

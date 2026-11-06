@@ -20,9 +20,11 @@ final class CameraControls {
  private volatile boolean closed=false,listening=false;
  private Element selected;
  private String eventLog="";
+ private final int cameraIndex;
  interface Work{void run()throws Exception;}
- CameraControls(Activity activity,String host,String user,String password){
+ CameraControls(Activity activity,String host,String user,String password,int cameraIndex){
   this.activity=activity;camera=new OnvifCamera(host,user,password);
+  this.cameraIndex=cameraIndex;
   content=new LinearLayout(activity);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(20,10,20,10);
   state=new TextView(activity);state.setPadding(8,8,8,8);state.setText("Recherche des fonctions locales…");content.addView(state);
  }
@@ -119,11 +121,43 @@ final class CameraControls {
     if(home)add(target,"Position d’origine",()->camera.ptz(p,"GotoHomePosition",""));
     add(target,"Lire la position",()->{Document d=camera.ptz(p,"GetStatus","");String position=OnvifCamera.value(d,"MoveStatus");for(Element e:OnvifCamera.elements(d,"PanTilt"))position+=" x="+e.getAttribute("x")+" y="+e.getAttribute("y");final String info=position;ui(()->new AlertDialog.Builder(activity).setTitle("Position de l’objectif").setMessage(info.isEmpty()?"Position non fournie":info).setPositiveButton("Fermer",null).show());});
     if(presets>0){
+     trematage(target,p);
      add(target,"Positions mémorisées",()->showPresets(p));
      add(target,"Mémoriser la position actuelle",()->ui(()->savePreset(p)));
     }
    });
   },"Commandes disponibles affichées");
+ }
+ private void trematage(LinearLayout target,Element p){
+  android.content.SharedPreferences prefs=activity.getSharedPreferences("nautic_trematage",Activity.MODE_PRIVATE);
+  String key=camera.host+"|"+p.getAttribute("token");
+  TrematageSession.Store store=new TrematageSession.Store(){
+   public String backup(){return prefs.getString(key+".return","");}
+   public boolean armed(){return prefs.getBoolean(key+".active",false);}
+   public void save(String backup,boolean armed)throws Exception{if(!prefs.edit().putString(key+".return",backup).putBoolean(key+".active",armed).commit())throw new java.io.IOException("Sauvegarde de la position de retour impossible");}
+  };
+  TrematageSession session=new TrematageSession(camera,p,store);
+  add(target,"Mémoriser cette orientation : Trématage",()->ui(()->new AlertDialog.Builder(activity).setTitle("Position Trématage").setMessage("Mémoriser l’orientation actuelle de l’objectif pour la veille arrière ?").setPositiveButton("Mémoriser",(d,w)->task(()->session.remember(),"Position Trématage mémorisée")).setNegativeButton("Annuler",null).show()));
+  Button toggle=new Button(activity);target.addView(toggle);
+  Runnable refresh=()->toggle.setText(store.armed()?"Désactiver Trématage · revenir":"Activer Trématage");refresh.run();
+  toggle.setOnClickListener(v->{
+   toggle.setEnabled(false);
+   task(()->{
+    try{
+     if(store.armed()){
+      session.deactivate();TrematageService.stop(activity,key);
+     }else{
+      String other=prefs.getString("watchKey","");if(!other.isEmpty()&&!other.equals(key))throw new java.io.IOException("Désactiver d’abord la veille de l’autre caméra");
+      session.activate();TrematageService.start(activity,camera.host,cameraIndex,key);
+     }
+    }finally{ui(()->{toggle.setEnabled(true);refresh.run();});}
+   },"Commande Trématage effectuée");
+  });
+  add(target,"Reprendre l’écoute Trématage",()->{
+   if(!store.armed())throw new java.io.IOException("Activer d’abord Trématage");
+   TrematageService.start(activity,camera.host,cameraIndex,key);
+  });
+  add(target,"État et dernière alerte Trématage",()->ui(()->new AlertDialog.Builder(activity).setTitle("Trématage — test").setMessage((store.armed()?"Position de retour conservée\n":"Mode désactivé\n")+prefs.getString("watchStatus","Écoute non démarrée")+"\n\n"+prefs.getString("lastAlert","Aucune alerte reçue")+"\n\nDernier signal brut :\n"+prefs.getString("lastRawEvent","Aucun")+"\n\nLa catégorie et l’objectif source dépendent des informations transmises par la caméra.").setPositiveButton("Fermer",null).show()));
  }
  private void add(LinearLayout target,String label,Work work){Button b=new Button(activity);b.setText(label);target.addView(b);b.setOnClickListener(v->task(work,"Commande effectuée"));}
  private void moveButton(LinearLayout target,Element p,String label,double x,double y,double z){

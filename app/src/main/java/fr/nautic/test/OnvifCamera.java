@@ -99,12 +99,8 @@ class OnvifCamera {
   subscription=endpoint(value(d,"Address"));
  }
  List<String> pullEvents()throws Exception{
-  Document d=call(subscription,EVENTS,"PullMessages","<c:Timeout>PT3S</c:Timeout><c:MessageLimit>20</c:MessageLimit>");
-  List<String> out=new ArrayList<>();for(Element n:elements(d,"NotificationMessage")){
-   String topic=value(n,"Topic");StringBuilder detail=new StringBuilder();
-   for(Element item:elements(n,"SimpleItem"))detail.append(item.getAttribute("Name")).append("=").append(item.getAttribute("Value")).append(" ");
-   out.add(topic+" — "+detail);
-  }return out;
+  List<String> out=new ArrayList<>();for(CameraEvent event:readEvents())out.add(event.topic+" — "+event.detail);return out;
  }
+ List<CameraEvent> readEvents()throws Exception{return CameraEvent.parse(call(subscription,EVENTS,"PullMessages","<c:Timeout>PT3S</c:Timeout><c:MessageLimit>20</c:MessageLimit>"));}
  void endEvents(){if(!subscription.isEmpty())try{call(subscription,"http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager","Unsubscribe","");}catch(Exception ignored){}finally{subscription="";}}
 }
