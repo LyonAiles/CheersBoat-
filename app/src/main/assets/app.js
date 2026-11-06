@@ -106,13 +106,13 @@ function fuelTick(now,moving){
  localStorage.setItem('nautic-fuel-used',String(fuelUsed));
 }
 setInterval(()=>{fuelTick(Date.now(),!!stableFix&&stationarySince===0);fuelUpdate();},1000);
-function angleDifference(to,from){return ((to-from+540)%360)-180}
+function angleDifference(to,from){return ((to-from+180)%360+360)%360-180}
 function updateCourse(course,now){
  if(!Number.isFinite(course))return;
  course=(course+360)%360;
  if(targetHeading===null){targetHeading=course;heading=course;return;}
  const difference=angleDifference(course,targetHeading);
- if(Math.abs(difference)<2)return;
+ if(Math.abs(difference)<2){headingCandidate=null;return;}
  // A large isolated GPS turn needs a second consistent fix.
  if(Math.abs(difference)>65){
   if(!headingCandidate||now-headingCandidate.t>8000||Math.abs(angleDifference(course,headingCandidate.course))>20){
