@@ -25,6 +25,7 @@
       <label>Transparence <input id="sondeurAlpha" type="range" min="0" max="90"><output id="sondeurAlphaValue"></output></label>
       <label>Profondeur max. <input id="sondeurMax" type="number" min="0.5" max="30" step="0.1"> m</label>
       <label>Seuil de prudence <input id="sondeurCaution" type="number" min="0.1" max="30" step="0.01"> m</label>
+      <label>Tirant d’eau <input id="sondeurDraft" type="number" min="0.1" max="30" step="0.01"> m</label>
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label>Largeur <input id="sondeurWidth" type="range" min="2" max="24"><output id="sondeurWidthValue"></output></label>
@@ -62,6 +63,7 @@
     max: get('sondeurMax'),
     alert: get('sondeurAlert'),
     caution: get('sondeurCaution'),
+    draft: get('sondeurDraft'),
     width: get('sondeurWidth')
   };
   const caution = clamp(saved.caution, 0.1, 30, 2);
@@ -70,6 +72,7 @@
     max: clamp(saved.max, 0.5, 30, 3),
     alert: clamp(saved.critical ?? saved.alert ?? 1.50, 0.1, caution, Math.min(1.50, caution)),
     caution,
+    draft: clamp(saved.draft, 0.1, 30, 1.35),
     width: clamp(saved.width, 2, 24, 5),
     auto: saved.auto === true
   };
@@ -199,7 +202,7 @@
     const level = latest < settings.alert ? 'alert' : latest < settings.caution ? 'caution' : '';
     reading.dataset.level = level;
     plot.dataset.level = level;
-    plot.style.setProperty('--sondeur-alert-position', (settings.alert / settings.max * 100) + '%');
+    plot.style.setProperty('--sondeur-draft-position', (settings.draft / settings.max * 100) + '%');
     if (!plot.hidden) draw();
   }
   auto.addEventListener('change', () => {

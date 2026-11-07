@@ -27,9 +27,11 @@
 .sondeur-reading[data-level='caution'] {color:#ffad55}
 .sondeur-reading[data-level='alert'] {color:#ff7183}
 
-.sondeur-alert-mark {display:none;position:absolute;top:clamp(3px,var(--sondeur-alert-position),calc(100% - 3px));left:50%;transform:translate(-50%,-50%);width:24px;height:3px;border-radius:2px;background:#ff3434}
-.sondeur-plot[data-level='alert'] .sondeur-alert-mark {display:block;animation:sondeur-alert-blink 1s step-end infinite}
+.sondeur-alert-mark {position:absolute;top:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));left:50%;transform:translate(-50%,-50%);width:24px;height:3px;border-radius:2px;background:white;box-shadow:0 0 2px #000}
+.sondeur-plot[data-level='caution'] .sondeur-alert-mark {background:#ffad55}
+.sondeur-plot[data-level='alert'] .sondeur-alert-mark {background:#ff7183}
+.sondeur-plot[data-level]:not([data-level='']) .sondeur-alert-mark {animation:sondeur-alert-blink 1s step-end infinite}
 @keyframes sondeur-alert-blink {50% {opacity:0}}
 @media (prefers-reduced-motion:reduce) {
-  .sondeur-plot[data-level='alert'] .sondeur-alert-mark {animation:none}
+  .sondeur-plot[data-level]:not([data-level='']) .sondeur-alert-mark {animation:none}
 }
