@@ -25,8 +25,6 @@
       <label>Transparence <input id="sondeurAlpha" type="range" min="0" max="90"><output id="sondeurAlphaValue"></output></label>
       <label>Profondeur max. <input id="sondeurMax" type="number" min="0.5" max="30" step="0.1"> m</label>
       <label>Seuil de prudence <input id="sondeurCaution" type="number" min="0.1" max="30" step="0.01"> m</label>
-      <label>Transparence coque <input id="sondeurHullAlpha" type="range" min="0" max="100"><output id="sondeurHullAlphaValue"></output></label>
-      <label>Transparence médaillon GPS <input id="sondeurMarkerAlpha" type="range" min="0" max="100"><output id="sondeurMarkerAlphaValue"></output></label>
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label>Largeur <input id="sondeurWidth" type="range" min="2" max="24"><output id="sondeurWidthValue"></output></label>
@@ -36,9 +34,7 @@
       <div class="sondeur-scale">
         <div class="sondeur-depth-marks" aria-hidden="true"></div>
         <div class="sondeur-bars" aria-hidden="true"></div>
-        <svg class="sondeur-hull" viewBox="0 0 430 135" role="img" aria-label="Coupe schématique de coque, largeur 4,30 m, tirant d’eau 1,35 m">
-          <path d="M0 0H430C426 38 408 70 373 86C333 105 287 105 238 105L232 135H198L192 105C143 105 97 105 57 86C22 70 4 38 0 0Z"/>
-        </svg>
+        <div class="sondeur-alert-mark" aria-hidden="true"></div>
       </div>
     </div>`;
   panel.querySelector('.sondeur-actions').append(toggle);
@@ -56,7 +52,6 @@
   ];
   const plot = panel.querySelector('.sondeur-plot');
   const marks = panel.querySelector('.sondeur-depth-marks');
-  const hull = panel.querySelector('.sondeur-hull');
   const auto = get('sondeurAuto');
   const settingsKey = 'nautic-sondeur-settings';
   let saved = {};
@@ -67,8 +62,6 @@
     max: get('sondeurMax'),
     alert: get('sondeurAlert'),
     caution: get('sondeurCaution'),
-    hullAlpha: get('sondeurHullAlpha'),
-    markerAlpha: get('sondeurMarkerAlpha'),
     width: get('sondeurWidth')
   };
   const caution = clamp(saved.caution, 0.1, 30, 2);
@@ -77,8 +70,6 @@
     max: clamp(saved.max, 0.5, 30, 3),
     alert: clamp(saved.critical ?? saved.alert ?? 1.50, 0.1, caution, Math.min(1.50, caution)),
     caution,
-    hullAlpha: clamp(saved.hullAlpha, 0, 100, 100),
-    markerAlpha: clamp(saved.markerAlpha, 0, 100, 100),
     width: clamp(saved.width, 2, 24, 5),
     auto: saved.auto === true
   };
@@ -114,14 +105,7 @@
     setSound(alertSound, audible && depth < settings.alert);
   }
 
-  function fitHull() {
-    const pixelsPerMetre = plot.clientHeight / settings.max;
-    hull.style.width = (pixelsPerMetre * 4.30) + 'px';
-  }
-  if (window.ResizeObserver) new ResizeObserver(fitHull).observe(plot);
-
   function draw() {
-    fitHull();
     plot.style.opacity = String(1 - settings.alpha / 100);
     const step = settings.max <= 4 ? 0.5 : Math.ceil(settings.max / 8);
     const depths = [0];
@@ -207,16 +191,15 @@
   function refreshView() {
     inputs.alert.max = settings.caution;
     inputs.caution.min = settings.alert;
-    hull.style.opacity = String(1 - settings.hullAlpha / 100);
-    map.style.setProperty('--sondeur-marker-opacity', String(1 - settings.markerAlpha / 100));
-    get('sondeurHullAlphaValue').textContent = settings.hullAlpha + ' %';
-    get('sondeurMarkerAlphaValue').textContent = settings.markerAlpha + ' %';
     const latest = history.at(-1);
     const receiving = timer !== null || get('sondeurTitle').dataset.live;
     plot.hidden = !(manualPlot || (settings.auto && receiving && !autoSuppressed && latest < settings.caution));
     toggle.setAttribute('aria-expanded', String(!plot.hidden));
     reading.textContent = Number.isFinite(latest) ? format.format(latest) : '—';
-    reading.dataset.level = latest < settings.alert ? 'alert' : latest < settings.caution ? 'caution' : '';
+    const level = latest < settings.alert ? 'alert' : latest < settings.caution ? 'caution' : '';
+    reading.dataset.level = level;
+    plot.dataset.level = level;
+    plot.style.setProperty('--sondeur-alert-position', (settings.alert / settings.max * 100) + '%');
     if (!plot.hidden) draw();
   }
   auto.addEventListener('change', () => {

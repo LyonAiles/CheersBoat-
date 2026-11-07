@@ -16,7 +16,6 @@
 .sondeur-reading {color:white;font:bold 16px system-ui;white-space:nowrap;font-variant-numeric:tabular-nums}
 
 .sondeur-scale {position:absolute;inset:0;overflow:hidden}
-.sondeur-hull {position:absolute;top:0;left:50%;transform:translateX(-50%);height:auto;fill:white;pointer-events:none}
 .sondeur-bars span.shallow {background:#43091b}
 
 .sondeur-bars span.caution {background:#5a2404}
@@ -24,7 +23,13 @@
 .sondeur-depth-marks span {position:absolute;right:0;padding:0 5px;color:white;background:#102d40cc;font-size:10px;transform:translateY(-50%);border-left:5px solid #d4e0e5}
 .sondeur-depth-marks span:first-child {transform:none}
 .sondeur-depth-marks span:last-child {transform:translateY(-100%)}
-#mapBoat::before {content:"";position:absolute;left:50%;top:50%;width:38px;height:28px;transform:translate(-50%,-50%);border:1px solid white;opacity:var(--sondeur-marker-opacity,0);border-radius:50%;background:transparent;pointer-events:none}
 
 .sondeur-reading[data-level='caution'] {color:#ffad55}
 .sondeur-reading[data-level='alert'] {color:#ff7183}
+
+.sondeur-alert-mark {display:none;position:absolute;top:clamp(3px,var(--sondeur-alert-position),calc(100% - 3px));left:50%;transform:translate(-50%,-50%);width:24px;height:3px;border-radius:2px;background:#ff3434}
+.sondeur-plot[data-level='alert'] .sondeur-alert-mark {display:block;animation:sondeur-alert-blink 1s step-end infinite}
+@keyframes sondeur-alert-blink {50% {opacity:0}}
+@media (prefers-reduced-motion:reduce) {
+  .sondeur-plot[data-level='alert'] .sondeur-alert-mark {animation:none}
+}
