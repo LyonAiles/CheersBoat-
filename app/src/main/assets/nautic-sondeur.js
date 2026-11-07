@@ -34,6 +34,7 @@
       <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
       <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
+      <label><input type="checkbox" id="sondeurSunRays"> Rayons du soleil</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <label class="sondeur-wide-setting">Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
       <button type="button" id="sondeurAlertList">Alertes sur la carte</button>
@@ -55,8 +56,7 @@
         <div class="sondeur-bars" aria-hidden="true"></div>
         <div class="sondeur-extension" aria-hidden="true"></div>
         <svg class="sondeur-hull-outline" viewBox="0 0 120 60" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M-120 59 H0 C29 59 60 54 83 43 C101 34 111 18 119 1"/>
-          <path class="sondeur-keel-seam" d="M-120 43 H83"/>
+          <path d="M-120 59 H0 C39 59 75 54 96 43 Q109 36 119 24"/>
         </svg>
         <div class="sondeur-alert-mark" aria-hidden="true"></div>
       </div>
@@ -475,6 +475,7 @@
     });
     bars.replaceChildren(...columns);
     const latestBar = columns.at(-1);
+    extension.className = 'sondeur-extension ' + (latestBar?.className || '');
     extension.style.height = latestBar?.style.height || '0';
   }
 
@@ -648,6 +649,7 @@
     blackBars: 'sondeurBlackBars',
     hullOutline: 'sondeurHullOutline',
     shimmer: 'sondeurShimmer',
+    sunRays: 'sondeurSunRays',
     bottomDetail: 'sondeurBottomDetail'
   })) {
     const input = get(id);

@@ -21,9 +21,9 @@
 .sondeur-reading {color:white;font:bold 16px system-ui;white-space:nowrap;font-variant-numeric:tabular-nums}
 
 .sondeur-scale {position:absolute;inset:0;overflow:hidden}
-.sondeur-bars span.shallow {background:#43091b}
+.sondeur-bars span.shallow,.sondeur-extension.shallow {background:#43091b}
 
-.sondeur-bars span.caution {background:#5a2404}
+.sondeur-bars span.caution,.sondeur-extension.caution {background:#5a2404}
 .sondeur-depth-marks {position:absolute;inset:0;z-index:1;pointer-events:none}
 .sondeur-depth-marks span {position:absolute;right:0;padding:0 5px;color:white;background:#102d40cc;font-size:10px;transform:translateY(-50%);border-left:5px solid #d4e0e5}
 .sondeur-depth-marks span:first-child {transform:none}
@@ -41,13 +41,13 @@
   .sondeur-plot[data-level]:not([data-level='']) .sondeur-alert-mark {animation:none}
 }
 
-.sondeur-extension {position:absolute;bottom:0;right:0;left:calc(var(--sondeur-axis) + var(--sondeur-half-bar));opacity:.84}
+.sondeur-extension {position:absolute;bottom:0;right:0;left:calc(var(--sondeur-axis) + var(--sondeur-half-bar))}
 
 .sondeur-replay {display:flex;align-items:center;gap:6px;padding:4px;background:#123b4df2;pointer-events:auto}
 .sondeur-replay[hidden] {display:none}
 .sondeur-replay time {flex:1}
 
-.sondeur-bars span.missing {background:#8b49c9;min-height:3px}
+.sondeur-bars span.missing,.sondeur-extension.missing {background:#8b49c9;min-height:3px}
 .sondeur-reading[data-level="missing"] {color:#dbb4ff}
 
 .sondeur-title {display:flex;align-items:center;gap:4px;min-width:0}
@@ -64,7 +64,7 @@
 .sondeurBlackBars .sondeur-bars span,.sondeurBlackBars .sondeur-extension {background:#000}
 .sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;width:50%;overflow:visible;height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
 .sondeurHullOutline .sondeur-hull-outline {display:block}
-.sondeur-hull-outline path {fill:none;stroke:#000;stroke-width:2;stroke-opacity:.7;vector-effect:non-scaling-stroke}
+.sondeur-hull-outline path {fill:none;stroke:#000;stroke-width:2.5;stroke-opacity:.7;vector-effect:non-scaling-stroke}
 .sondeurShimmer .sondeur-picture::after {content:"";position:absolute;left:50%;top:38%;width:120%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle closest-side,transparent 56%,#dff8ff65 59%,transparent 63%,transparent 72%,#dff8ff40 74%,transparent 77%);animation:sondeur-shimmer 6s ease-out infinite}
 @keyframes sondeur-shimmer {
   0% {transform:translate(-50%,-50%) scale(.08);opacity:0}
@@ -81,5 +81,8 @@
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail="stone"]:not(:last-child)::before {width:8px;height:5px;border-radius:65% 55% 20% 20%;background:#88847a}
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail="plant"]:not(:last-child)::before {width:10px;height:12px;clip-path:polygon(38% 100%,0 27%,40% 64%,48% 0,60% 64%,100% 23%,67% 100%);background:#547a43}
 
-.sondeur-hull-outline .sondeur-keel-seam {stroke-width:1;stroke-opacity:.55}
-.sondeur-picture::before {content:"";position:absolute;inset:0;pointer-events:none;background:conic-gradient(from 144deg at 51% -10%,transparent 0deg,#c3f1ff14 7deg,transparent 10deg,#d7f8ff19 22deg,transparent 25deg,#c3f1ff12 33deg,transparent 39deg 360deg);mask-image:linear-gradient(#000,transparent 85%)}
+.sondeurSunRays .sondeur-picture::before {content:"";position:absolute;inset:0;pointer-events:none;background:conic-gradient(from 142deg at 51% 0%,transparent 0deg,#d7f8ff70 7deg,transparent 12deg,#e6faff85 23deg,transparent 29deg,#d7f8ff65 38deg,transparent 47deg 360deg);mask-image:linear-gradient(#000,transparent 90%);animation:sondeur-sun-rays 4s ease-in-out infinite alternate}
+@keyframes sondeur-sun-rays {from {opacity:.4} to {opacity:1}}
+@media (prefers-reduced-motion:reduce) {
+  .sondeurSunRays .sondeur-picture::before {animation:none}
+}
