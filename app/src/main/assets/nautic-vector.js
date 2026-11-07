@@ -94,6 +94,41 @@
   }
   positionBoat();
  };
+ window.nauticCaptureSondeurMap = async ({lat, lon}) => {
+  if (!(active && vector) && !map) throw Error('Carte indisponible');
+  window.nauticMapFreePan = true;
+  const latDelta = 15000 / 110574;
+  const lonDelta = 15000 / (111320 * Math.cos(lat * Math.PI / 180));
+  const south = Math.max(-85, lat - latDelta), north = Math.min(85, lat + latDelta);
+  if (active && vector) {
+   const camera = vector.cameraForBounds([[lon-lonDelta,south],[lon+lonDelta,north]], {
+    padding:{top:32,bottom:32,left:32,right:32}, bearing:0
+   });
+   vector.jumpTo({center:[lon,lat], zoom:camera.zoom, pitch:0, bearing:0, padding:{top:0,bottom:0,left:0,right:0}});
+  } else {
+   rotateMap();
+   const width = Math.max(1, wrap.clientWidth - 64), height = Math.max(1, wrap.clientHeight - 64);
+   const northwest = map.project([north, lon-lonDelta], 0);
+   const southeast = map.project([south, lon+lonDelta], 0);
+   const zoom = Math.min(map.getMaxZoom(), Math.floor(Math.log2(Math.min(width/(southeast.x-northwest.x),height/(southeast.y-northwest.y)))));
+   const center = map.project([lat, lon], zoom).add(L.point(0, wrap.clientHeight / 6));
+   map.setView(map.unproject(center, zoom), zoom, {animate:false});
+  }
+  const pin = document.createElement('span');
+  pin.className = 'sondeur-map-alert';
+  pin.textContent = '!';
+  pin.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:950;display:grid;place-items:center;pointer-events:none';
+  wrap.append(pin);
+  await new Promise(resolve => {
+   if (!(active && vector)) { setTimeout(resolve, 1600); return; }
+   const engine = vector;
+   const timeout = setTimeout(() => { engine.off('idle', ready); resolve(); }, 2500);
+   function ready() { clearTimeout(timeout); resolve(); }
+   engine.once('idle', ready);
+   engine.triggerRepaint();
+  });
+  return pin;
+ };
  let alertEngine = null;
  let alertMarkers = new Map();
  function syncSondeurAlerts() {

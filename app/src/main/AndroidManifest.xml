@@ -17,6 +17,9 @@
   <package android:name="fr.scssentinel.iscssentinel"/>
  </queries>
  <application android:resizeableActivity="true" android:label="Nautic" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="true">
+  <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.sondeur-files" android:exported="false" android:grantUriPermissions="true">
+   <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/sondeur_attachment_paths"/>
+  </provider>
   <activity android:name=".MainActivity" android:exported="true" android:resizeableActivity="true" android:supportsPictureInPicture="false">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
   </activity>

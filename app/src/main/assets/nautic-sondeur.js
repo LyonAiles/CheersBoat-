@@ -189,7 +189,7 @@
       const date = new Date(entry.time).toLocaleString('fr-FR');
       const depth = format.format(entry.depth) + ' m';
       focus.textContent = (entry.simulated ? '◇ ' : '! ') + date + ' · ' + depth;
-      focus.onclick = () => {
+      const revealMap = () => {
         document.getElementById('dialog').close();
         get('sondeurSettings').hidden = true;
         get('sondeurOptions').setAttribute('aria-expanded', 'false');
@@ -197,8 +197,8 @@
         manualPlot = false;
         autoSuppressed = true;
         refreshView();
-        window.nauticFocusSondeurAlert?.(entry.gps);
       };
+      focus.onclick = () => { revealMap(); window.nauticFocusSondeurAlert?.(entry.gps); };
       row.append(focus);
       const recipient = entry.simulated ? (testEmail.validity.valid ? testEmail.value.trim() : '') : 'uti.valdeloireseine@vnf.fr';
       if (recipient) {
@@ -217,6 +217,23 @@
           'Pouvez-vous vérifier ce point et m’indiquer la suite donnée ?', '', 'Cordialement,', '[Nom et coordonnées]'
         ].join('\r\n');
         mail.href = 'mailto:' + encodeURIComponent(recipient) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+        if (window.NauticAndroid?.composeSondeurMail) {
+          mail.onclick = async event => {
+            event.preventDefault();
+            revealMap();
+            let pin;
+            try {
+              pin = await window.nauticCaptureSondeurMap(entry.gps);
+              const bounds = map.getBoundingClientRect();
+              window.nauticSondeurCaptureDone = () => pin.remove();
+              window.NauticAndroid.composeSondeurMail(recipient, subject, body, bounds.left, bounds.top, bounds.width, bounds.height, window.devicePixelRatio);
+            } catch (_) {
+              pin?.remove();
+              window.location.href = mail.href;
+            }
+          };
+          mail.textContent += ' avec carte (15 km)';
+        }
         row.append(' ', mail);
       } else {
         row.append(' · Renseigne le courriel de test dans les paramètres du sondeur.');

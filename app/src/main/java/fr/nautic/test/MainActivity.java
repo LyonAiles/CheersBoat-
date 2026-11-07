@@ -105,7 +105,66 @@ public class MainActivity extends Activity {
   String escaped=org.json.JSONObject.quote(value==null?"":value);
   runOnUiThread(()->web.evaluateJavascript("window."+name+" && window."+name+"("+escaped+")",null));
  }
+ private void composeSondeurMail(String recipient, String subject, String body, Bitmap image) {
+  js("nauticSondeurCaptureDone", "");
+  try {
+   Intent intent = new Intent(Intent.ACTION_SEND);
+   intent.setType("message/rfc822");
+   intent.putExtra(Intent.EXTRA_EMAIL, new String[]{recipient});
+   intent.putExtra(Intent.EXTRA_SUBJECT, subject);
+   intent.putExtra(Intent.EXTRA_TEXT, body);
+   if (image != null) {
+    java.io.File dir = new java.io.File(getCacheDir(), "sondeur-maps");
+    if (!dir.isDirectory() && !dir.mkdirs()) throw new java.io.IOException("Carte inaccessible");
+    java.io.File file = java.io.File.createTempFile("carte-alerte-15-km-", ".png", dir);
+    try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
+     if (!image.compress(Bitmap.CompressFormat.PNG, 100, out)) throw new java.io.IOException("Carte inaccessible");
+    }
+    Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".sondeur-files", file);
+    intent.putExtra(Intent.EXTRA_STREAM, uri);
+    intent.setClipData(android.content.ClipData.newRawUri("Carte de l’alerte", uri));
+    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+   } else {
+    toast("Capture indisponible, brouillon ouvert sans carte");
+   }
+   startActivity(Intent.createChooser(intent, "Préparer le courriel"));
+  } catch (Exception e) {
+   toast("Impossible de préparer le courriel");
+  } finally {
+   if (image != null) image.recycle();
+  }
+ }
+
+ private void captureSondeurMap(String recipient, String subject, String body, double x, double y, double width, double height, double scale) {
+  int[] position = new int[2];
+  web.getLocationInWindow(position);
+  android.graphics.Rect area = new android.graphics.Rect(
+      position[0] + (int)Math.round(x * scale), position[1] + (int)Math.round(y * scale),
+      position[0] + (int)Math.round((x + width) * scale), position[1] + (int)Math.round((y + height) * scale));
+  if (!area.intersect(position[0], position[1], position[0] + web.getWidth(), position[1] + web.getHeight())) {
+   composeSondeurMail(recipient, subject, body, null);
+   return;
+  }
+  Bitmap image = Bitmap.createBitmap(area.width(), area.height(), Bitmap.Config.ARGB_8888);
+  if (android.os.Build.VERSION.SDK_INT >= 26) {
+   try {
+    android.view.PixelCopy.request(getWindow(), area, image, result -> {
+     if (result == android.view.PixelCopy.SUCCESS) composeSondeurMail(recipient, subject, body, image);
+     else { image.recycle(); composeSondeurMail(recipient, subject, body, null); }
+    }, new android.os.Handler(getMainLooper()));
+    return;
+   } catch (IllegalArgumentException ignored) {}
+  }
+  android.graphics.Canvas canvas = new android.graphics.Canvas(image);
+  canvas.translate(position[0] - area.left, position[1] - area.top);
+  web.draw(canvas);
+  composeSondeurMail(recipient, subject, body, image);
+ }
+
  public class Bridge {
+  @JavascriptInterface public void composeSondeurMail(String recipient, String subject, String body, double x, double y, double width, double height, double scale) {
+   runOnUiThread(() -> captureSondeurMap(recipient, subject, body, x, y, width, height, scale));
+  }
   @JavascriptInterface public void openNotes(){runOnUiThread(()->{dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}notesPad.show();});}
   @JavascriptInterface public void mapInteraction(boolean active){runOnUiThread(()->{mapManipulating=active;if(dashboardCameras!=null)dashboardCameras.pauseForMap(active);});}
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
