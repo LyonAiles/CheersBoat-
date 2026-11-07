@@ -65,6 +65,7 @@
     ...wave(2.10, 0.65), ...wave(1.65, 0.30)
   ];
   const plot = panel.querySelector('.sondeur-plot');
+  for (const index of [18, 19, 72, 138, 139, 140, 267, 356]) samples[index] = null;
   const marks = panel.querySelector('.sondeur-depth-marks');
   const auto = get('sondeurAuto');
   const settingsKey = 'nautic-sondeur-settings';
@@ -102,7 +103,7 @@
   let recordings = [];
   try {
     recordings = JSON.parse(localStorage.getItem(recordingsKey)) || [];
-    recordings = recordings.filter(entry => Number.isFinite(entry?.time) && Number.isFinite(entry.depth) && entry.time >= Date.now() - oneHour);
+    recordings = recordings.filter(entry => Number.isFinite(entry?.time) && (Number.isFinite(entry.depth) || (entry.missing && entry.depth === null)) && entry.time >= Date.now() - oneHour);
   } catch (_) { recordings = []; }
   let lastSave = 0;
   let replay = null;
@@ -116,15 +117,20 @@
 
   function record(depth) {
     const time = Date.now();
-    recordings.push({time, depth, simulated: !get('sondeurTitle').dataset.live});
-    while (recordings[0].time < time - oneHour) recordings.shift();
+    while (recordings.length && recordings[0].time < time - oneHour) recordings.shift();
+    const simulated = !get('sondeurTitle').dataset.live;
+    const missing = depth === null;
+    const previous = missing ? recordings.findLast(entry => entry.simulated === simulated) : null;
+    const entry = {time, depth: missing ? previous?.depth ?? null : depth, simulated, missing};
+    recordings.push(entry);
     if (time - lastSave >= 5000) persistRecordings();
+    return entry;
   }
 
   function renderReplay() {
     const entry = replay.entries[replay.index];
-    history.splice(0, history.length, ...replay.entries.slice(Math.max(0, replay.index - 199), replay.index + 1).map(item => item.depth));
-    get('sondeurReplayTime').textContent = new Date(entry.time).toLocaleTimeString('fr-FR') + (entry.simulated ? ' · simulation' : '');
+    history.splice(0, history.length, ...replay.entries.slice(Math.max(0, replay.index - 199), replay.index + 1));
+    get('sondeurReplayTime').textContent = new Date(entry.time).toLocaleTimeString('fr-FR') + (entry.simulated ? ' · simulation' : '') + (entry.missing ? ' · sans écho' : '');
     refreshView();
   }
 
@@ -151,7 +157,7 @@
       const current = replay.entries[replay.index];
       const upcoming = replay.entries[index];
       const interval = Math.max(100, Math.min(1000, Math.abs(upcoming.time - current.time)));
-      const nearAlert = Math.min(current.depth, upcoming.depth) < settings.alert;
+      const nearAlert = [current, upcoming].some(entry => Number.isFinite(entry.depth) && entry.depth < settings.alert);
       replayTimer = setTimeout(() => {
         replay.index = index;
         renderReplay();
@@ -165,7 +171,7 @@
     if (!replay) return;
     stopReplayPlayback();
     const restored = recordings.filter(entry => entry.time >= Date.now() - oneHour && entry.simulated === !get('sondeurTitle').dataset.live);
-    history.splice(0, history.length, ...restored.slice(-200).map(entry => entry.depth));
+    history.splice(0, history.length, ...restored.slice(-200));
     manualPlot = replay.manualPlot;
     replay = null;
     replayBar.hidden = true;
@@ -242,11 +248,12 @@
     }));
     get('sondeurAlphaValue').textContent = settings.alpha + ' %';
     get('sondeurWidthValue').textContent = settings.width + ' px';
-    const columns = history.map(depth => {
+    const columns = history.map(({depth, missing}) => {
       const bar = document.createElement('span');
-      if (depth < settings.alert) bar.className = 'shallow';
+      if (missing) bar.className = 'missing';
+      else if (depth < settings.alert) bar.className = 'shallow';
       else if (depth < settings.caution) bar.className = 'caution';
-      bar.style.height = (Math.max(0, settings.max - depth) / settings.max * 100) + '%';
+      bar.style.height = Number.isFinite(depth) ? (Math.max(0, settings.max - depth) / settings.max * 100) + '%' : '3px';
       bar.style.width = settings.width + 'px';
       return bar;
     });
@@ -257,14 +264,14 @@
   }
 
   function append(depth) {
-    if (!Number.isFinite(depth) || depth < 0) return false;
-    record(depth);
+    if (depth !== null && (!Number.isFinite(depth) || depth < 0)) return false;
+    const entry = record(depth);
     if (replay) return true;
-    history.push(depth);
+    history.push(entry);
     if (history.length > 200) history.shift();
     if (depth >= settings.caution) autoSuppressed = false;
     refreshView();
-    updateSound(depth);
+    updateSound(entry.depth);
     return true;
   }
 
@@ -314,20 +321,22 @@
       settings[key] = Number(input.value);
       saveSettings();
       refreshView();
-      if (!replay && (timer !== null || get('sondeurTitle').dataset.live)) updateSound(history.at(-1));
+      if (!replay && (timer !== null || get('sondeurTitle').dataset.live)) updateSound(history.at(-1)?.depth);
     });
   }
 
   function refreshView() {
     inputs.alert.max = settings.caution;
     inputs.caution.min = settings.alert;
-    const latest = history.at(-1);
+    const latest = history.at(-1)?.depth;
+    const missing = history.at(-1)?.missing;
     const receiving = timer !== null || get('sondeurTitle').dataset.live;
-    plot.hidden = !(manualPlot || (settings.auto && receiving && !autoSuppressed && latest < settings.caution));
+    plot.hidden = !(manualPlot || (settings.auto && receiving && !autoSuppressed && Number.isFinite(latest) && latest < settings.caution));
     toggle.setAttribute('aria-expanded', String(!plot.hidden));
-    reading.textContent = Number.isFinite(latest) ? format.format(latest) : '—';
-    const level = latest < settings.alert ? 'alert' : latest < settings.caution ? 'caution' : '';
-    reading.dataset.level = level;
+    reading.textContent = Number.isFinite(latest) ? format.format(latest) + (missing ? '*' : '') : '—';
+    reading.title = missing ? 'Sans écho · dernière valeur connue' : '';
+    const level = !Number.isFinite(latest) ? '' : latest < settings.alert ? 'alert' : latest < settings.caution ? 'caution' : '';
+    reading.dataset.level = missing ? 'missing' : level;
     plot.dataset.level = level;
     get('sondeurAxisValue').textContent = settings.axis + ' %';
     plot.style.setProperty('--sondeur-axis', settings.axis + '%');
@@ -350,7 +359,7 @@
   refreshView();
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) updateSound();
-    else if (!replay && (timer !== null || get('sondeurTitle').dataset.live)) updateSound(history.at(-1));
+    else if (!replay && (timer !== null || get('sondeurTitle').dataset.live)) updateSound(history.at(-1)?.depth);
   });
   get('sondeurClose').onclick = () => {
     endReplay();
@@ -368,7 +377,7 @@
   // Entry point for a future sensor adapter. Depth is expressed in metres.
   window.nauticSondeur = {
     addReading(depth) {
-      if (!Number.isFinite(depth) || depth < 0) return false;
+      if (depth !== null && (!Number.isFinite(depth) || depth < 0)) return false;
       if (replay) {
         get('sondeurTitle').dataset.live = '1';
         record(depth);

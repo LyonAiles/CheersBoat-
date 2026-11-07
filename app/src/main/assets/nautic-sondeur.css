@@ -43,3 +43,6 @@
 .sondeur-replay {display:flex;align-items:center;gap:6px;padding:4px;background:#123b4df2;pointer-events:auto}
 .sondeur-replay[hidden] {display:none}
 .sondeur-replay time {flex:1}
+
+.sondeur-bars span.missing,.sondeur-extension.missing {background:#8b49c9;min-height:3px}
+.sondeur-reading[data-level="missing"] {color:#dbb4ff}
