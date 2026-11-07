@@ -31,7 +31,8 @@
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label><input type="checkbox" id="sondeurBlackBars"> Barres uniformes noires</label>
       <label><input type="checkbox" id="sondeurHullOutline"> Contour léger de la coque</label>
-      <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="2">2 pas</option><option value="4">4 pas</option></select></label>
+      <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
+      <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <label class="sondeur-wide-setting">Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
@@ -463,7 +464,7 @@
         const seed = (Math.imul(time | 0, 2654435761) >>> 0) / 4294967296;
         if (seed < .15) bar.dataset.bottomDetail = 'stone';
         else if (seed < .24) bar.dataset.bottomDetail = 'plant';
-        const size = depth < settings.alert ? 1 : .65 + ((seed * 97) % 1) * .85;
+        const size = depth < settings.alert ? 1 : .65 + ((seed * 97) % 1) * 1.65;
         bar.style.setProperty('--sondeur-detail-size', size);
       }
       bar.style.width = settings.width + 'px';
@@ -476,7 +477,7 @@
   }
 
   const scrollSteps = get('sondeurScrollSteps');
-  scrollSteps.value = [2, 4].includes(saved.scrollSteps) ? String(saved.scrollSteps) : '1';
+  scrollSteps.value = saved.scrollSteps === 2 || saved.scrollSteps === 4 ? '4' : '1';
   settings.scrollSteps = Number(scrollSteps.value);
   let scrollAnimation;
   scrollSteps.addEventListener('change', () => {
@@ -491,20 +492,32 @@
     scrollAnimation = bars.animate([
       {transform: 'translateX(' + settings.width + 'px)'},
       {transform: 'translateX(0)'}
-    ], {duration: Math.max(16, Math.min(240, interval * .8)), easing: 'steps(' + settings.scrollSteps + ', end)'});
+    ], {duration: Math.max(16, Math.min(1000, interval * .95)), easing: 'linear'});
   }
 
+  let distanceRemainder = 0;
   function append(depth) {
     if (depth !== null && (!Number.isFinite(depth) || depth < 0)) return false;
     const entry = record(depth);
     if (replay) return true;
     const previous = history.at(-1);
     const wasVisible = !plot.hidden;
-    history.push(entry);
+    const elapsed = previous ? Math.max(0, (entry.time - previous.time) / 1000) : 0;
+    const boatSpeed = typeof speed === 'number' && Number.isFinite(speed) ? Math.max(0, speed) : 0;
+    if (!entry.simulated) {
+      distanceRemainder = boatSpeed > 0 ? distanceRemainder + boatSpeed / 3.6 * Math.min(elapsed, 2) : 0;
+    }
+    const advance = entry.simulated || !previous || distanceRemainder >= .5;
+    if (advance) {
+      distanceRemainder %= .5;
+      history.push(entry);
+    } else {
+      history[history.length - 1] = entry;
+    }
     if (history.length > 200) history.shift();
     if (depth >= settings.caution) autoSuppressed = false;
     refreshView();
-    if (wasVisible && !plot.hidden && previous) animateScroll(entry.time - previous.time);
+    if (advance && wasVisible && !plot.hidden && previous) animateScroll(entry.time - previous.time);
     updateSound(entry.depth);
     return true;
   }
@@ -564,6 +577,32 @@
   });
   refreshTempo();
 
+  const simulationRate = get('sondeurSimulationRate');
+  settings.simulationRate = clamp(saved.simulationRate, .25, 4, 1);
+  simulationRate.value = settings.simulationRate;
+  function refreshSimulationRate() {
+    get('sondeurSimulationRateValue').textContent = '×' + settings.simulationRate.toLocaleString('fr-FR');
+  }
+  refreshSimulationRate();
+  simulationRate.addEventListener('input', () => {
+    settings.simulationRate = Number(simulationRate.value);
+    refreshSimulationRate();
+    saveSettings();
+    if (timer !== null) restartSimulationTimer();
+  });
+
+  function restartSimulationTimer() {
+    clearInterval(timer);
+    const base = settings.tempoMode === 'manual' ? settings.period * 1000 : 500;
+    timer = setInterval(simulationTick, base / settings.simulationRate);
+  }
+  function simulationTick() {
+      if (window.nauticMapInteracting || window.nauticQuietMode || document.hidden) return;
+      const depth = samples[next];
+      next = (next + 1) % samples.length;
+      append(depth);
+  }
+
   function play() {
     endReplay();
     if (timer !== null) { stop(); return; }
@@ -576,18 +615,13 @@
     intervals.length = 0;
     refreshTempo();
     alertRecorded = false;
+    distanceRemainder = 0;
     delete get('sondeurTitle').dataset.live;
-    const tick = () => {
-      if (window.nauticMapInteracting || window.nauticQuietMode || document.hidden) return;
-      const depth = samples[next];
-      next = (next + 1) % samples.length;
-      append(depth);
-    };
     manualPlot = !settings.auto;
     autoSuppressed = false;
     setPlayButton(true);
-    timer = setInterval(tick, settings.tempoMode === 'manual' ? settings.period * 1000 : 500);
-    tick();
+    restartSimulationTimer();
+    simulationTick();
   }
 
   function saveSettings() {

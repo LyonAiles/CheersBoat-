@@ -65,10 +65,14 @@
 .sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;transform:translateX(-50%);width:auto;max-width:100%;aspect-ratio:var(--sondeur-hull-ratio);height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
 .sondeurHullOutline .sondeur-hull-outline {display:block}
 .sondeur-hull-outline path {fill:none;stroke:#000;stroke-width:2;stroke-opacity:.7;vector-effect:non-scaling-stroke}
-.sondeurShimmer .sondeur-picture::after {content:"";position:absolute;inset:0;background:repeating-linear-gradient(165deg,transparent 0 24px,#dff8ff55 30px,transparent 39px);background-size:180% 180%;animation:sondeur-shimmer 5s ease-in-out infinite alternate}
-@keyframes sondeur-shimmer {from {background-position:0% 0%;opacity:.4} to {background-position:100% 100%;opacity:.85}}
+.sondeurShimmer .sondeur-picture::after {content:"";position:absolute;left:50%;top:38%;width:120%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle closest-side,transparent 56%,#dff8ff65 59%,transparent 63%,transparent 72%,#dff8ff40 74%,transparent 77%);animation:sondeur-shimmer 16s ease-out infinite}
+@keyframes sondeur-shimmer {
+  0% {transform:translate(-50%,-50%) scale(.08);opacity:0}
+  12% {opacity:.65}
+  65%,100% {transform:translate(-50%,-50%) scale(2);opacity:0}
+}
 @media (prefers-reduced-motion:reduce) {
-  .sondeurShimmer .sondeur-picture::after {animation:none;background-position:center;opacity:.3}
+  .sondeurShimmer .sondeur-picture::after {animation:none;transform:translate(-50%,-50%);opacity:.3}
 }
 
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail]:not(:last-child) {position:relative}
