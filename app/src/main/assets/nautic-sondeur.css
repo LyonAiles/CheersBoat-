@@ -27,7 +27,7 @@
 .sondeur-reading[data-level='caution'] {color:#ffad55}
 .sondeur-reading[data-level='alert'] {color:#ff7183}
 
-.sondeur-alert-mark {position:absolute;top:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));left:var(--sondeur-axis);transform:translate(-50%,-50%);width:24px;height:3px;border-radius:2px;background:white;box-shadow:0 0 2px #000}
+.sondeur-alert-mark {position:absolute;top:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));left:50%;transform:translate(-50%,-50%);width:24px;height:3px;border-radius:2px;background:white;box-shadow:0 0 2px #000}
 .sondeur-plot[data-level='caution'] .sondeur-alert-mark {background:#ffad55}
 .sondeur-plot[data-level='alert'] .sondeur-alert-mark {background:#ff7183}
 .sondeur-plot[data-level]:not([data-level='']) .sondeur-alert-mark {animation:sondeur-alert-blink 1s step-end infinite}
@@ -37,3 +37,9 @@
 }
 
 .sondeur-extension {position:absolute;bottom:0;right:0;left:calc(var(--sondeur-axis) + var(--sondeur-half-bar));opacity:.42}
+
+.sondeur-settings .sondeur-axis-setting {flex:1 0 100%}
+.sondeur-settings .sondeur-axis-setting input {flex:1;min-width:0}
+.sondeur-replay {display:flex;align-items:center;gap:6px;padding:4px;background:#123b4df2;pointer-events:auto}
+.sondeur-replay[hidden] {display:none}
+.sondeur-replay time {flex:1}
