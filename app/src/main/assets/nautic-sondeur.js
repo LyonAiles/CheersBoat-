@@ -127,7 +127,6 @@
     });
     bars.replaceChildren(...columns);
     const latest = history.at(-1);
-    plot.classList.toggle('sondeur-low-water', latest < 2);
     reading.textContent = history.length ? format.format(latest) + ' m' : '— m';
   }
 
