@@ -28,6 +28,7 @@
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label class="sondeur-axis-setting">Position du relevé <input id="sondeurAxis" type="range" min="10" max="95" step="1"><output id="sondeurAxisValue"></output></label>
+      <button type="button" id="sondeurAlertList">Alertes sur la carte</button>
       <label>Cadence <select id="sondeurTempoMode"><option value="auto">Automatique</option><option value="manual">Manuelle</option></select></label>
       <label>Intervalle <input id="sondeurPeriod" type="number" min="0.1" max="60" step="0.01"> s</label>
       <output id="sondeurTempoStatus"></output>
@@ -132,7 +133,70 @@
     };
   }
 
-  window.nauticSondeurAlertPoints = () => recordings.filter(entry => entry.gps && entry.time >= Date.now() - oneHour);
+  const alertsKey = 'nautic-sondeur-map-alerts';
+  let savedAlerts = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(alertsKey));
+    if (Array.isArray(saved)) savedAlerts = saved.filter(entry => entry?.gps && !entry.simulated);
+  } catch (_) {}
+  const alerts = new Map(savedAlerts.map(entry => [entry.time, entry]));
+  for (const entry of recordings) {
+    if (entry.gps && !entry.simulated) alerts.set(entry.time, entry);
+  }
+
+  function saveAlerts() {
+    try { localStorage.setItem(alertsKey, JSON.stringify([...alerts.values()])); } catch (_) {}
+  }
+  saveAlerts();
+
+  window.nauticSondeurAlertPoints = () => [
+    ...alerts.values(),
+    ...recordings.filter(entry => entry.simulated && entry.gps && entry.time >= Date.now() - oneHour)
+  ];
+
+  get('sondeurAlertList').onclick = () => {
+    modal('Alertes du sondeur', '<div id="sondeurSavedAlerts"></div>');
+    const list = document.getElementById('sondeurSavedAlerts');
+    const entries = window.nauticSondeurAlertPoints().sort((a, b) => b.time - a.time);
+    if (!entries.length) list.textContent = 'Aucune alerte localisée.';
+    for (const entry of entries) {
+      const row = document.createElement('p');
+      const focus = document.createElement('button');
+      focus.type = 'button';
+      const date = new Date(entry.time).toLocaleString('fr-FR');
+      const depth = format.format(entry.depth) + ' m';
+      focus.textContent = (entry.simulated ? '◇ ' : '! ') + date + ' · ' + depth;
+      focus.onclick = () => {
+        document.getElementById('dialog').close();
+        get('sondeurSettings').hidden = true;
+        get('sondeurOptions').setAttribute('aria-expanded', 'false');
+        endReplay();
+        manualPlot = false;
+        autoSuppressed = true;
+        refreshView();
+        window.nauticFocusSondeurAlert?.(entry.gps);
+      };
+      row.append(focus);
+      if (!entry.simulated) {
+        const mail = document.createElement('a');
+        mail.textContent = 'Préparer le courriel VNF';
+        const subject = 'Signalement à vérifier — haut-fond ou anomalie de profondeur';
+        const body = [
+          'Bonjour,', '',
+          'Je vous signale une faible profondeur relevée au sondeur, susceptible d’indiquer un haut-fond ou une anomalie.',
+          'Voie d’eau, commune et PK : [à préciser]',
+          'Date et heure locales : ' + date,
+          'Position GPS du bateau au relevé : ' + entry.gps.lat.toFixed(6) + ', ' + entry.gps.lon.toFixed(6),
+          'Profondeur affichée par le sondeur : ' + depth,
+          'Conditions et observations : [à compléter]', '',
+          'Pouvez-vous vérifier ce point et m’indiquer la suite donnée ?', '', 'Cordialement,', '[Nom et coordonnées]'
+        ].join('\r\n');
+        mail.href = 'mailto:uti.valdeloireseine@vnf.fr?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+        row.append(' ', mail);
+      }
+      list.append(row);
+    }
+  };
   let replay = null;
   let replayTimer = null;
   const replayBar = panel.querySelector('.sondeur-replay');
@@ -155,6 +219,10 @@
         const gps = alertPosition(simulated);
         if (gps) {
           entry.gps = gps;
+          if (!simulated) {
+            alerts.set(entry.time, entry);
+            saveAlerts();
+          }
           alertRecorded = true;
         }
       }

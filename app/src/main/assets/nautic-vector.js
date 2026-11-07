@@ -87,7 +87,11 @@
  window.nauticFocusSondeurAlert = ({lat, lon}) => {
   window.nauticMapFreePan = true;
   if (active && vector) vector.easeTo({center:[lon, lat], padding:{top:0,bottom:0,left:0,right:0}});
-  else if (map) { rotateMap(); map.panTo([lat, lon]); }
+  else if (map) {
+   rotateMap();
+   const viewportCenter = map.project([lat, lon]).add(L.point(0, wrap.clientHeight / 6));
+   map.panTo(map.unproject(viewportCenter));
+  }
   positionBoat();
  };
  let alertEngine = null;
