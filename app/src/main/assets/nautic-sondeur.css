@@ -62,7 +62,7 @@
 .sondeur-mail-map .nautic-work-marker {scale:.65}
 
 .sondeurBlackBars .sondeur-bars span,.sondeurBlackBars .sondeur-extension {background:#000}
-.sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;width:50%;overflow:visible;height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
+.sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;width:calc(50% - var(--sondeur-bow-gap));overflow:visible;height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
 .sondeurHullOutline .sondeur-hull-outline {display:block}
 .sondeur-hull-outline path {fill:none;stroke:#000;stroke-width:2.5;stroke-opacity:.7;vector-effect:non-scaling-stroke}
 .sondeurShimmer .sondeur-picture::after {content:"";position:absolute;left:50%;top:38%;width:120%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle closest-side,transparent 56%,#dff8ff65 59%,transparent 63%,transparent 72%,#dff8ff40 74%,transparent 77%);animation:sondeur-shimmer 6s ease-out infinite}
@@ -83,7 +83,7 @@
 
 .sondeur-sun-rays {display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .sondeurSunRays .sondeur-sun-rays {display:block}
-.sondeur-sun-rays i {position:absolute;top:0;left:51%;width:13%;height:95%;transform-origin:50% 0;clip-path:polygon(48% 0,52% 0,100% 100%,0 100%);background:linear-gradient(#d8f7ff80, #d8f7ff38 48%, transparent);animation:sondeur-sun-ray var(--ray-duration) linear var(--ray-delay) infinite}
+.sondeur-sun-rays i {position:absolute;top:0;left:var(--ray-origin);width:14%;height:95%;transform-origin:50% 0;clip-path:polygon(38% 0,62% 0,100% 100%,0 100%);background:linear-gradient(#d8f7ff80, #d8f7ff38 48%, transparent);animation:sondeur-sun-ray var(--ray-duration) linear var(--ray-delay) infinite}
 @keyframes sondeur-sun-ray {
   0%,100% {transform:translateX(-50%) rotate(var(--ray-angle));opacity:.08}
   17% {opacity:.14}
@@ -99,3 +99,9 @@
 }
 
 #app #mapWrap #compass {top:calc(var(--sondeur-toolbar-height, 36px) + 6px)!important}
+
+.sondeur-plot {--sondeur-bow-gap:max(64px,12.5%)}
+.sondeur-anchor-hole {display:none;position:absolute;right:calc(var(--sondeur-bow-gap) + 12px);top:calc(var(--sondeur-draft-position) * .65);width:7px;height:7px;border:1.5px solid #000b;border-radius:50%;pointer-events:none}
+.sondeurHullOutline .sondeur-anchor-hole {display:block}
+#app #mapWrap #mapRecenter {top:calc(var(--sondeur-toolbar-height, 36px) + 60px)!important}
+#app #mapWrap #mapLayers {top:calc(var(--sondeur-toolbar-height, 36px) + 112px)!important}

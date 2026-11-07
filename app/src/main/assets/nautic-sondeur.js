@@ -53,11 +53,12 @@
       <div class="sondeur-picture">
         <div class="sondeur-sun-rays" aria-hidden="true">
           ${Array.from({length: 12}, (_, index) => {
+            const origin = 46 + index * .9;
             const angle = -44 + index * 8;
             const duration = 5.3 + index * .83;
             const delay = (index * 2.37) % duration;
             const intensity = .32 + ((index * 7) % 12) * .047;
-            return `<i style="--ray-angle:${angle}deg;--ray-duration:${duration}s;--ray-delay:-${delay}s;--ray-intensity:${intensity}"></i>`;
+            return `<i style="--ray-origin:${origin}%;--ray-angle:${angle}deg;--ray-duration:${duration}s;--ray-delay:-${delay}s;--ray-intensity:${intensity}"></i>`;
           }).join('')}
         </div>
       </div>
@@ -66,8 +67,9 @@
         <div class="sondeur-bars" aria-hidden="true"></div>
         <div class="sondeur-extension" aria-hidden="true"></div>
         <svg class="sondeur-hull-outline" viewBox="0 0 120 60" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M-120 59 H0 C35 59 68 56 90 43"/>
+          <path d="M-600 59 H0 Q18 59 120 43"/>
         </svg>
+        <div class="sondeur-anchor-hole" aria-hidden="true"></div>
         <div class="sondeur-alert-mark" aria-hidden="true"></div>
       </div>
     </div>`;
