@@ -608,6 +608,7 @@
     get('sondeurAxisValue').textContent = settings.axis + ' %';
     plot.style.setProperty('--sondeur-axis', settings.axis + '%');
     plot.style.setProperty('--sondeur-half-bar', (settings.width / 2) + 'px');
+    plot.style.setProperty('--sondeur-hull-ratio', '4.30 / ' + settings.draft);
     plot.style.setProperty('--sondeur-draft-position', (settings.draft / settings.max * 100) + '%');
     if (!plot.hidden) draw();
   }

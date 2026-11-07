@@ -36,7 +36,7 @@
   .sondeur-plot[data-level]:not([data-level='']) .sondeur-alert-mark {animation:none}
 }
 
-.sondeur-extension {position:absolute;bottom:0;right:0;left:calc(var(--sondeur-axis) + var(--sondeur-half-bar));opacity:.42}
+.sondeur-extension {position:absolute;bottom:0;right:0;left:calc(var(--sondeur-axis) + var(--sondeur-half-bar));opacity:.72}
 
 .sondeur-settings .sondeur-axis-setting {flex:1 0 100%}
 .sondeur-settings .sondeur-axis-setting input {flex:1;min-width:0}
@@ -59,11 +59,11 @@
 .sondeur-mail-map .nautic-work-marker {scale:.65}
 
 .sondeurBlackBars .sondeur-bars span,.sondeurBlackBars .sondeur-extension {background:#000}
-.sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;transform:translateX(-50%);width:min(120px,40%);height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
+.sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;transform:translateX(-50%);width:auto;max-width:100%;aspect-ratio:var(--sondeur-hull-ratio);height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
 .sondeurHullOutline .sondeur-hull-outline {display:block}
-.sondeur-hull-outline path {fill:none;stroke:#fff;stroke-width:1;stroke-opacity:.28;vector-effect:non-scaling-stroke}
-.sondeurShimmer .sondeur-picture::after {content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 35% 35%,#d2f3ff26,transparent 65%);animation:sondeur-shimmer 6s ease-in-out infinite alternate}
-@keyframes sondeur-shimmer {from {opacity:.15} to {opacity:.7}}
+.sondeur-hull-outline path {fill:none;stroke:#000;stroke-width:1.4;stroke-opacity:.7;vector-effect:non-scaling-stroke}
+.sondeurShimmer .sondeur-picture::after {content:"";position:absolute;inset:0;background:radial-gradient(ellipse at center,#e6faff80,transparent 66%);background-size:70% 75%;background-repeat:no-repeat;animation:sondeur-shimmer 5s ease-in-out infinite alternate}
+@keyframes sondeur-shimmer {from {background-position:0% 25%;opacity:.35} to {background-position:100% 75%;opacity:.9}}
 @media (prefers-reduced-motion:reduce) {
-  .sondeurShimmer .sondeur-picture::after {animation:none;opacity:.3}
+  .sondeurShimmer .sondeur-picture::after {animation:none;background-position:center;opacity:.3}
 }
