@@ -205,35 +205,72 @@
         const mail = document.createElement('a');
         mail.textContent = entry.simulated ? 'Préparer le courriel de test' : 'Préparer le courriel VNF';
         const subject = (entry.simulated ? '[TEST] ' : '') + 'Signalement à vérifier — haut-fond ou anomalie de profondeur';
-        const body = [
-          'Bonjour,', '',
-          ...(entry.simulated ? ['Simulation Nautic — position et profondeur fictives.', ''] : []),
-          'Je vous signale une faible profondeur relevée au sondeur, susceptible d’indiquer un haut-fond ou une anomalie.',
-          'Voie d’eau, commune et PK : [à préciser]',
-          'Date et heure locales : ' + date,
-          'Position GPS du bateau au relevé : ' + entry.gps.lat.toFixed(6) + ', ' + entry.gps.lon.toFixed(6),
-          'Profondeur affichée par le sondeur : ' + depth,
-          'Conditions et observations : [à compléter]', '',
-          'Pouvez-vous vérifier ce point et m’indiquer la suite donnée ?', '', 'Cordialement,', '[Nom et coordonnées]'
-        ].join('\r\n');
-        mail.href = 'mailto:' + encodeURIComponent(recipient) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-        if (window.NauticAndroid?.composeSondeurMail) {
-          mail.onclick = async event => {
-            event.preventDefault();
-            revealMap();
-            let pin;
+        const coordinates = entry.gps.lat.toFixed(6) + ',' + entry.gps.lon.toFixed(6);
+        const mapLink = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(coordinates);
+        const attachMap = Boolean(window.NauticAndroid?.composeSondeurMail);
+        if (attachMap) mail.textContent += ' avec carte (5 km)';
+        mail.href = 'mailto:' + recipient;
+        let preparing = false;
+        mail.onclick = async event => {
+          event.preventDefault();
+          if (preparing) return;
+          preparing = true;
+          let commune = '[à préciser]';
+          let boat = {};
+          try {
+            const key = 'nautic-extensions';
+            boat = JSON.parse(window.NauticAndroid?.readSetting?.(key) || localStorage.getItem(key) || '{}') || {};
+          } catch (_) {}
+          if (!entry.simulated) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
             try {
-              pin = await window.nauticCaptureSondeurMap(entry.gps);
-              const bounds = map.getBoundingClientRect();
-              window.nauticSondeurCaptureDone = () => pin.remove();
-              window.NauticAndroid.composeSondeurMail(recipient, subject, body, bounds.left, bounds.top, bounds.width, bounds.height, window.devicePixelRatio);
+              const {lat, lon} = entry.gps;
+              const response = await fetch('https://geo.api.gouv.fr/communes?lat=' + lat + '&lon=' + lon + '&fields=nom', {signal: controller.signal});
+              if (response.ok) {
+                const communes = await response.json();
+                if (communes.length === 1 && communes[0].nom) commune = communes[0].nom;
+              }
             } catch (_) {
-              pin?.remove();
-              window.location.href = mail.href;
+              // Keep the editable commune field if the lookup is unavailable.
+            } finally {
+              clearTimeout(timeout);
             }
-          };
-          mail.textContent += ' avec carte (15 km)';
-        }
+          }
+          const body = [
+            'Bonjour,', '',
+            ...(entry.simulated ? ['Simulation Nautic — position et profondeur fictives.', ''] : []),
+            'Je vous signale une faible profondeur relevée au sondeur, susceptible d’indiquer un haut-fond ou une anomalie.',
+            'Voie d’eau : [à préciser]',
+            'Commune : ' + commune,
+            'PK : [à confirmer]',
+            'Date et heure locales : ' + date,
+            'Position GPS du bateau au relevé : ' + coordinates,
+            mapLink,
+            'Profondeur affichée par le sondeur : ' + depth, '',
+            'Pouvez-vous vérifier ce point et m’indiquer la suite donnée ?', '', 'Cordialement,',
+            'Bateau : ' + (boat.boatName?.trim() || '[à préciser]'),
+            'Téléphone : ' + (boat.contactPhone?.trim() || '[à préciser]')
+          ].join('\r\n');
+          const mailto = 'mailto:' + recipient + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+          let restoreMap;
+          try {
+            if (!attachMap) {
+              window.location.href = mailto;
+              return;
+            }
+            revealMap();
+            restoreMap = await window.nauticCaptureSondeurMap(entry.gps);
+            const bounds = map.getBoundingClientRect();
+            window.nauticSondeurCaptureDone = restoreMap;
+            window.NauticAndroid.composeSondeurMail(recipient, subject, body, bounds.left, bounds.top, bounds.width, bounds.height, window.devicePixelRatio);
+          } catch (_) {
+            restoreMap?.();
+            window.location.href = mailto;
+          } finally {
+            preparing = false;
+          }
+        };
         row.append(' ', mail);
       } else {
         row.append(' · Renseigne le courriel de test dans les paramètres du sondeur.');

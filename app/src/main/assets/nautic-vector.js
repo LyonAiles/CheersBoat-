@@ -97,8 +97,9 @@
  window.nauticCaptureSondeurMap = async ({lat, lon}) => {
   if (!(active && vector) && !map) throw Error('Carte indisponible');
   window.nauticMapFreePan = true;
-  const latDelta = 15000 / 110574;
-  const lonDelta = 15000 / (111320 * Math.cos(lat * Math.PI / 180));
+  const radius = 5000;
+  const latDelta = radius / 110574;
+  const lonDelta = radius / (111320 * Math.cos(lat * Math.PI / 180));
   const south = Math.max(-85, lat - latDelta), north = Math.min(85, lat + latDelta);
   if (active && vector) {
    const camera = vector.cameraForBounds([[lon-lonDelta,south],[lon+lonDelta,north]], {
@@ -118,6 +119,12 @@
   pin.className = 'sondeur-map-alert';
   pin.textContent = '!';
   pin.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:950;display:grid;place-items:center;pointer-events:none';
+  const captureEngine = active ? vector : null;
+  const workLayer = 'nautic-works';
+  const originalIconSize = captureEngine?.getLayer(workLayer)
+   ? captureEngine.getLayoutProperty(workLayer, 'icon-size') : null;
+  if (originalIconSize != null) captureEngine.setLayoutProperty(workLayer, 'icon-size', ['*', 0.65, originalIconSize]);
+  wrap.classList.add('sondeur-mail-map');
   wrap.append(pin);
   await new Promise(resolve => {
    if (!(active && vector)) { setTimeout(resolve, 1600); return; }
@@ -127,7 +134,13 @@
    engine.once('idle', ready);
    engine.triggerRepaint();
   });
-  return pin;
+  return () => {
+   pin.remove();
+   wrap.classList.remove('sondeur-mail-map');
+   if (originalIconSize != null && vector === captureEngine && vector.getLayer(workLayer)) {
+    vector.setLayoutProperty(workLayer, 'icon-size', originalIconSize);
+   }
+  };
  };
  let alertEngine = null;
  let alertMarkers = new Map();
@@ -151,7 +164,7 @@
    const pin = document.createElement('button');
    pin.type = 'button';
    pin.className = 'sondeur-map-alert' + (entry.simulated ? ' simulated' : '');
-   pin.textContent = entry.simulated ? '◇' : '!';
+   pin.textContent = '!';
    pin.title = (entry.simulated ? 'Alerte fictive' : 'Alerte de profondeur') + ' · ' + new Date(entry.time).toLocaleTimeString('fr-FR') + ' · ' + entry.depth.toLocaleString('fr-FR') + ' m';
    pin.setAttribute('aria-label', pin.title);
    pin.onclick = event => { event.stopPropagation(); window.nauticFocusSondeurAlert(entry.gps); };

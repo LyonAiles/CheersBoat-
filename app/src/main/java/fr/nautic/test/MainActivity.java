@@ -116,7 +116,7 @@ public class MainActivity extends Activity {
    if (image != null) {
     java.io.File dir = new java.io.File(getCacheDir(), "sondeur-maps");
     if (!dir.isDirectory() && !dir.mkdirs()) throw new java.io.IOException("Carte inaccessible");
-    java.io.File file = java.io.File.createTempFile("carte-alerte-15-km-", ".png", dir);
+    java.io.File file = java.io.File.createTempFile("carte-alerte-5-km-", ".png", dir);
     try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
      if (!image.compress(Bitmap.CompressFormat.PNG, 100, out)) throw new java.io.IOException("Carte inaccessible");
     }

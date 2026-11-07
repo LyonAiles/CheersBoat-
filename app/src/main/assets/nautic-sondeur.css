@@ -54,3 +54,6 @@
 #sondeurReplayGps[hidden] {display:none}
 
 #sondeurTestEmail {width:min(50vw,240px)}
+
+.sondeur-mail-map .sondeur-map-alert {width:16px;height:16px;font-size:11px}
+.sondeur-mail-map .nautic-work-marker {scale:.65}
