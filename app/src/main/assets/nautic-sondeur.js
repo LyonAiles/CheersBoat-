@@ -29,6 +29,7 @@
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label><input type="checkbox" id="sondeurBlackBars"> Barres uniformes noires</label>
       <label><input type="checkbox" id="sondeurHullOutline"> Contour léger de la coque</label>
+      <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <label class="sondeur-axis-setting">Position du relevé <input id="sondeurAxis" type="range" min="10" max="95" step="1"><output id="sondeurAxisValue"></output></label>
       <label>Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
@@ -457,6 +458,7 @@
       else if (depth < settings.alert) bar.className = 'shallow';
       else if (depth < settings.caution) bar.className = 'caution';
       bar.style.height = Number.isFinite(depth) ? (Math.max(0, settings.max - depth) / settings.max * 100) + '%' : '3px';
+      if (!missing && depth < settings.max) bar.dataset.bottomDetail = 'true';
       bar.style.width = settings.width + 'px';
       return bar;
     });
@@ -580,7 +582,8 @@
   for (const [key, id] of Object.entries({
     blackBars: 'sondeurBlackBars',
     hullOutline: 'sondeurHullOutline',
-    shimmer: 'sondeurShimmer'
+    shimmer: 'sondeurShimmer',
+    bottomDetail: 'sondeurBottomDetail'
   })) {
     const input = get(id);
     settings[key] = input.checked = saved[key] === true;
