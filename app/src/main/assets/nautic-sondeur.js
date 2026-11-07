@@ -44,7 +44,10 @@
   const reading = panel.querySelector('.sondeur-reading');
   const wave = (mean, amplitude) => Array.from({length: 100}, (_, i) =>
     Math.round((mean + amplitude * Math.sin(i * Math.PI / 50)) * 100) / 100);
-  const samples = [...wave(2.30, 0.80), ...wave(1.55, 0.20)];
+  const samples = [
+    ...wave(2.30, 0.80), ...wave(1.55, 0.20),
+    ...wave(2.10, 0.65), ...wave(1.65, 0.30)
+  ];
   const plot = panel.querySelector('.sondeur-plot');
   const marks = panel.querySelector('.sondeur-depth-marks');
   const hull = panel.querySelector('.sondeur-hull');
@@ -142,7 +145,7 @@
   function append(depth) {
     if (!Number.isFinite(depth) || depth < 0) return false;
     history.push(depth);
-    if (history.length > samples.length) history.shift();
+    if (history.length > 200) history.shift();
     if (!panel.hidden) draw();
     updateSound(depth);
     return true;
@@ -152,12 +155,12 @@
     if (timer !== null) clearInterval(timer);
     timer = null;
     updateSound();
-    get('sondeurPlay').textContent = next === samples.length ? 'Rejouer' : next ? 'Reprendre' : 'Démarrer';
+    get('sondeurPlay').textContent = history.length ? 'Reprendre' : 'Démarrer';
   }
 
   function play() {
     if (timer !== null) { stop(); return; }
-    if (next === samples.length || get('sondeurTitle').dataset.live) {
+    if (get('sondeurTitle').dataset.live) {
       next = 0;
       history.length = 0;
     }
@@ -165,8 +168,9 @@
     get('sondeurTitle').textContent = 'Sondeur · simulation';
     const tick = () => {
       if (window.nauticMapInteracting || window.nauticQuietMode || document.hidden) return;
-      append(samples[next++]);
-      if (next === samples.length) stop();
+      const depth = samples[next];
+      next = (next + 1) % samples.length;
+      append(depth);
     };
     get('sondeurPlay').textContent = 'Pause';
     timer = setInterval(tick, 500);
