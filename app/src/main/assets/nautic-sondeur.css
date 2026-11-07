@@ -83,12 +83,15 @@
 
 .sondeur-sun-rays {display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .sondeurSunRays .sondeur-sun-rays {display:block}
-.sondeur-sun-rays i {position:absolute;inset:0;opacity:0;clip-path:polygon(calc(var(--ray-origin) - var(--ray-width) / 3) 0,calc(var(--ray-origin) + var(--ray-width) / 3) 0,calc(51% + var(--ray-spread) + var(--ray-width)) 100%,calc(51% + var(--ray-spread) - var(--ray-width)) 100%);background:linear-gradient(#d8f7ffb0,#d8f7ff55 45%,transparent 90%);animation:sondeur-sun-ray 17s linear var(--ray-delay) infinite}
+.sondeur-sun-rays i {position:absolute;inset:0;opacity:0;clip-path:polygon(calc(var(--ray-origin) - var(--ray-width) / 3) 0,calc(var(--ray-origin) + var(--ray-width) / 3) 0,calc(51% + var(--ray-spread) + var(--ray-width)) 100%,calc(51% + var(--ray-spread) - var(--ray-width)) 100%);background:linear-gradient(#d8f7ffb0,#d8f7ff55 45%,transparent 90%);animation:var(--ray-animation) 9.6s linear var(--ray-delay) infinite}
 @keyframes sondeur-sun-ray {
   0%,5%,100% {opacity:0}
-  1% {opacity:var(--ray-intensity)}
-  2.1% {opacity:.12}
-  3% {opacity:calc(var(--ray-intensity) * .65)}
+  1.1% {opacity:var(--ray-intensity)}
+}
+@keyframes sondeur-sun-hold {
+  0%,9%,100% {opacity:0}
+  1.1% {opacity:var(--ray-intensity)}
+  5% {opacity:calc(var(--ray-intensity) * .65)}
 }
 @media (prefers-reduced-motion:reduce) {
   .sondeur-sun-rays i {animation:none}

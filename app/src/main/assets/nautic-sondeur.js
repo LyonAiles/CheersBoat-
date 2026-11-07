@@ -55,10 +55,10 @@
           ${[0, 7, 3, 10, 5, 1, 9, 4, 11, 2, 8, 6].map((index, order) => {
             const origin = 35 + index * 2.7;
             const spread = (index - 5.5) * 7.4;
-            const start = [0, 1.1, 2.8, 3.8, 5.4, 6.5, 7.9, 9.8, 10.8, 12.2, 13.5, 15.2][order];
+            const start = [0, 1.8, 1.86, 1.94, 2.03, 2.15, 3.4, 3.47, 3.63, 6.2, 6.37, 7.6][order];
             const width = .75 + ((index * 7) % 12) * .2;
             const intensity = .38 + ((index * 5) % 12) * .054;
-            return `<i style="--ray-origin:${origin}%;--ray-spread:${spread}%;--ray-delay:${start}s;--ray-width:${width}%;--ray-intensity:${intensity}"></i>`;
+            return `<i style="--ray-origin:${origin}%;--ray-spread:${spread}%;--ray-delay:${start}s;--ray-width:${width}%;--ray-intensity:${intensity};--ray-animation:${order === 7 ? "sondeur-sun-hold" : "sondeur-sun-ray"}"></i>`;
           }).join('')}
         </div>
       </div>
