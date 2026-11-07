@@ -38,7 +38,7 @@ header{gap:clamp(4px,1vw,12px)!important}#nauticExitButton{padding:7px 9px;font-
 
 /* Lisibilité, visibilité et affichage de navigation */
 .nautic-hidden,.card.nautic-hidden,.camCard.nautic-hidden,.gauge.nautic-hidden,[hidden]{display:none!important}
-#windWidget{background:rgba(6,32,49,.53)!important;backdrop-filter:blur(2px);border-color:#7dc2d180}
+#windWidget{background:rgba(6,32,49,.28)!important;backdrop-filter:blur(1px);border-color:#7dc2d150}
 #speedCard{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
 #speedValue{font-size:clamp(25px,3.6vw,48px)!important;font-weight:800;line-height:1.12;letter-spacing:.3px;margin:auto 0 5px}
 #speedCard .arc{margin:3px auto 6px}
