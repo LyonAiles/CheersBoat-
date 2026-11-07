@@ -81,16 +81,17 @@
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail="stone"]:not(:last-child)::before {width:8px;height:5px;border-radius:65% 55% 20% 20%;background:#88847a}
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail="plant"]:not(:last-child)::before {width:10px;height:12px;clip-path:polygon(38% 100%,0 27%,40% 64%,48% 0,60% 64%,100% 23%,67% 100%);background:#547a43}
 
-.sondeur-sun-rays {display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.sondeur-sun-rays {display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none;filter:blur(1.5px)}
 .sondeurSunRays .sondeur-sun-rays {display:block}
-.sondeur-sun-rays i {position:absolute;inset:0;opacity:0;clip-path:polygon(calc(var(--ray-origin) - var(--ray-width) / 3) 0,calc(var(--ray-origin) + var(--ray-width) / 3) 0,calc(51% + var(--ray-spread) + var(--ray-width)) 100%,calc(51% + var(--ray-spread) - var(--ray-width)) 100%);background:linear-gradient(#d8f7ffb0,#d8f7ff55 45%,transparent 90%);animation:var(--ray-animation) 9.6s linear var(--ray-delay) infinite}
+.sondeur-sun-rays i {position:absolute;inset:0;opacity:0;--ray-open:polygon(calc(var(--ray-origin) - var(--ray-width) / 3) 0,calc(var(--ray-origin) + var(--ray-width) / 3) 0,calc(51% + var(--ray-spread) + var(--ray-width)) 100%,calc(51% + var(--ray-spread) - var(--ray-width)) 100%);--ray-narrow:polygon(calc(var(--ray-origin) - var(--ray-width) / 5) 0,calc(var(--ray-origin) + var(--ray-width) / 5) 0,calc(50.6% + var(--ray-spread) + var(--ray-width) * .55) 100%,calc(50.6% + var(--ray-spread) - var(--ray-width) * .55) 100%);clip-path:var(--ray-open);background:linear-gradient(#d8f7ff94,#c4efff4d 32%,#a8e5ff1c 62%,transparent 88%);animation:var(--ray-animation) 9.6s ease-in-out var(--ray-delay) infinite}
 @keyframes sondeur-sun-ray {
-  0%,5%,100% {opacity:0}
-  1.1% {opacity:var(--ray-intensity)}
+  0%,6%,100% {opacity:0;clip-path:var(--ray-narrow)}
+  1.5% {opacity:var(--ray-intensity);clip-path:var(--ray-open)}
+  3.2% {opacity:calc(var(--ray-intensity) * .48)}
 }
 @keyframes sondeur-sun-hold {
-  0%,9%,100% {opacity:0}
-  1.1% {opacity:var(--ray-intensity)}
+  0%,10%,100% {opacity:0;clip-path:var(--ray-narrow)}
+  1.5% {opacity:var(--ray-intensity);clip-path:var(--ray-open)}
   5% {opacity:calc(var(--ray-intensity) * .65)}
 }
 @media (prefers-reduced-motion:reduce) {
