@@ -52,13 +52,13 @@
     <div class="sondeur-plot" hidden>
       <div class="sondeur-picture">
         <div class="sondeur-sun-rays" aria-hidden="true">
-          ${Array.from({length: 12}, (_, index) => {
-            const origin = 46 + index * .9;
-            const spread = (index - 5.5) * 6.8;
-            const duration = 5.3 + index * .83;
-            const delay = (index * 2.37) % duration;
-            const intensity = .32 + ((index * 7) % 12) * .047;
-            return `<i style="--ray-origin:${origin}%;--ray-spread:${spread}%;--ray-duration:${duration}s;--ray-delay:-${delay}s;--ray-intensity:${intensity}"></i>`;
+          ${[0, 7, 3, 10, 5, 1, 9, 4, 11, 2, 8, 6].map((index, order) => {
+            const origin = 35 + index * 2.7;
+            const spread = (index - 5.5) * 7.4;
+            const start = [0, 1.1, 2.8, 3.8, 5.4, 6.5, 7.9, 9.8, 10.8, 12.2, 13.5, 15.2][order];
+            const width = .75 + ((index * 7) % 12) * .2;
+            const intensity = .38 + ((index * 5) % 12) * .054;
+            return `<i style="--ray-origin:${origin}%;--ray-spread:${spread}%;--ray-delay:${start}s;--ray-width:${width}%;--ray-intensity:${intensity}"></i>`;
           }).join('')}
         </div>
       </div>
