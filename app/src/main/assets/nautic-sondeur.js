@@ -21,23 +21,24 @@
       </div>
     </div>
     <div class="sondeur-settings" id="sondeurSettings" hidden>
-      <label>Transparence <input id="sondeurAlpha" type="range" min="0" max="90"><output id="sondeurAlphaValue"></output></label>
       <label>Profondeur max. <input id="sondeurMax" type="number" min="0.5" max="30" step="0.1"> m</label>
       <label>Seuil de prudence <input id="sondeurCaution" type="number" min="0.1" max="30" step="0.01"> m</label>
       <label>Tirant d’eau <input id="sondeurDraft" type="number" min="0.1" max="30" step="0.01"> m</label>
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
+      <label class="sondeur-slider">Transparence <output id="sondeurAlphaValue"></output><input id="sondeurAlpha" type="range" min="0" max="90"></label>
+      <label class="sondeur-slider">Position du relevé <output id="sondeurAxisValue"></output><input id="sondeurAxis" type="range" min="10" max="95" step="1"></label>
+      <label class="sondeur-slider">Largeur <output id="sondeurWidthValue"></output><input id="sondeurWidth" type="range" min="2" max="24"></label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label><input type="checkbox" id="sondeurBlackBars"> Barres uniformes noires</label>
       <label><input type="checkbox" id="sondeurHullOutline"> Contour léger de la coque</label>
+      <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="2">2 pas</option><option value="4">4 pas</option></select></label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
-      <label class="sondeur-axis-setting">Position du relevé <input id="sondeurAxis" type="range" min="10" max="95" step="1"><output id="sondeurAxisValue"></output></label>
-      <label>Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
+      <label class="sondeur-wide-setting">Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
       <button type="button" id="sondeurAlertList">Alertes sur la carte</button>
       <label>Cadence <select id="sondeurTempoMode"><option value="auto">Automatique</option><option value="manual">Manuelle</option></select></label>
       <label>Intervalle <input id="sondeurPeriod" type="number" min="0.1" max="60" step="0.01"> s</label>
       <output id="sondeurTempoStatus"></output>
-      <label>Largeur <input id="sondeurWidth" type="range" min="2" max="24"><output id="sondeurWidthValue"></output></label>
     </div>
     <div class="sondeur-replay" hidden>
       <button type="button" id="sondeurBack" aria-label="Retour rapide vers les alertes">⏪</button>
@@ -452,13 +453,19 @@
     }));
     get('sondeurAlphaValue').textContent = settings.alpha + ' %';
     get('sondeurWidthValue').textContent = settings.width + ' px';
-    const columns = history.map(({depth, missing}) => {
+    const columns = history.map(({depth, missing, time}) => {
       const bar = document.createElement('span');
       if (missing) bar.className = 'missing';
       else if (depth < settings.alert) bar.className = 'shallow';
       else if (depth < settings.caution) bar.className = 'caution';
       bar.style.height = Number.isFinite(depth) ? (Math.max(0, settings.max - depth) / settings.max * 100) + '%' : '3px';
-      if (!missing && depth < settings.max) bar.dataset.bottomDetail = 'true';
+      if (!missing && depth < settings.max) {
+        const seed = (Math.imul(time | 0, 2654435761) >>> 0) / 4294967296;
+        if (seed < .15) bar.dataset.bottomDetail = 'stone';
+        else if (seed < .24) bar.dataset.bottomDetail = 'plant';
+        const size = depth < settings.alert ? 1 : .65 + ((seed * 97) % 1) * .85;
+        bar.style.setProperty('--sondeur-detail-size', size);
+      }
       bar.style.width = settings.width + 'px';
       return bar;
     });
@@ -468,14 +475,36 @@
     extension.style.height = latestBar?.style.height || '0';
   }
 
+  const scrollSteps = get('sondeurScrollSteps');
+  scrollSteps.value = [2, 4].includes(saved.scrollSteps) ? String(saved.scrollSteps) : '1';
+  settings.scrollSteps = Number(scrollSteps.value);
+  let scrollAnimation;
+  scrollSteps.addEventListener('change', () => {
+    scrollAnimation?.cancel();
+    settings.scrollSteps = Number(scrollSteps.value);
+    saveSettings();
+  });
+
+  function animateScroll(interval) {
+    scrollAnimation?.cancel();
+    if (settings.scrollSteps === 1 || !bars.animate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    scrollAnimation = bars.animate([
+      {transform: 'translateX(' + settings.width + 'px)'},
+      {transform: 'translateX(0)'}
+    ], {duration: Math.max(16, Math.min(240, interval * .8)), easing: 'steps(' + settings.scrollSteps + ', end)'});
+  }
+
   function append(depth) {
     if (depth !== null && (!Number.isFinite(depth) || depth < 0)) return false;
     const entry = record(depth);
     if (replay) return true;
+    const previous = history.at(-1);
+    const wasVisible = !plot.hidden;
     history.push(entry);
     if (history.length > 200) history.shift();
     if (depth >= settings.caution) autoSuppressed = false;
     refreshView();
+    if (wasVisible && !plot.hidden && previous) animateScroll(entry.time - previous.time);
     updateSound(entry.depth);
     return true;
   }

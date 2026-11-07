@@ -5,9 +5,14 @@
 .sondeur-actions {display:flex;justify-content:end;gap:3px}
 .sondeur-tools strong {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sondeur-tools button {padding:3px 6px;font-size:12px}
-.sondeur-settings {flex-wrap:wrap}
+.sondeur-settings {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:3px 8px;min-height:0;overflow:auto;overscroll-behavior:contain}
 .sondeur-settings label {display:flex;align-items:center;gap:4px;font-size:11px}
-.sondeur-settings input:not([type="checkbox"]) {width:65px}
+.sondeur-settings input[type="number"] {width:4em;padding:3px 4px;min-width:0}
+.sondeur-settings input[type="checkbox"] {width:14px;height:14px;flex:none;margin:0}
+.sondeur-settings select,.sondeur-settings button {font-size:11px;min-width:0}
+.sondeur-settings .sondeur-wide-setting,.sondeur-settings .sondeur-slider {grid-column:1/-1}
+.sondeur-settings .sondeur-slider {display:grid;grid-template-columns:1fr auto;gap:0 4px}
+.sondeur-slider input[type="range"] {grid-column:1/-1;width:100%;min-width:0;margin:0;height:18px}
 .sondeur-plot {flex:1;min-height:0;position:relative;overflow:hidden}
 .sondeur-picture,.sondeur-bars {position:absolute;inset:0}
 .sondeur-picture {background:linear-gradient(#06172566,#06172599),url('sondeur-eau.jpg') center center/cover}
@@ -38,8 +43,6 @@
 
 .sondeur-extension {position:absolute;bottom:0;right:0;left:calc(var(--sondeur-axis) + var(--sondeur-half-bar));opacity:.84}
 
-.sondeur-settings .sondeur-axis-setting {flex:1 0 100%}
-.sondeur-settings .sondeur-axis-setting input {flex:1;min-width:0}
 .sondeur-replay {display:flex;align-items:center;gap:6px;padding:4px;background:#123b4df2;pointer-events:auto}
 .sondeur-replay[hidden] {display:none}
 .sondeur-replay time {flex:1}
@@ -69,7 +72,7 @@
 }
 
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail]:not(:last-child) {position:relative}
-.sondeurBottomDetail .sondeur-bars span[data-bottom-detail]:not(:last-child):nth-child(7n+2)::before,
-.sondeurBottomDetail .sondeur-bars span[data-bottom-detail]:not(:last-child):nth-child(11n+5)::before {content:"";position:absolute;bottom:100%;left:50%;transform:translateX(-50%);pointer-events:none}
-.sondeurBottomDetail .sondeur-bars span[data-bottom-detail]:not(:last-child):nth-child(7n+2)::before {width:8px;height:5px;border-radius:65% 55% 20% 20%;background:#88847a}
-.sondeurBottomDetail .sondeur-bars span[data-bottom-detail]:not(:last-child):nth-child(11n+5)::before {width:10px;height:12px;clip-path:polygon(38% 100%,0 27%,40% 64%,48% 0,60% 64%,100% 23%,67% 100%);background:#547a43}
+.sondeurBottomDetail .sondeur-bars span[data-bottom-detail="stone"]:not(:last-child)::before,
+.sondeurBottomDetail .sondeur-bars span[data-bottom-detail="plant"]:not(:last-child)::before {content:"";position:absolute;bottom:100%;left:50%;transform:translateX(-50%) scale(var(--sondeur-detail-size,1));transform-origin:bottom center;pointer-events:none}
+.sondeurBottomDetail .sondeur-bars span[data-bottom-detail="stone"]:not(:last-child)::before {width:8px;height:5px;border-radius:65% 55% 20% 20%;background:#88847a}
+.sondeurBottomDetail .sondeur-bars span[data-bottom-detail="plant"]:not(:last-child)::before {width:10px;height:12px;clip-path:polygon(38% 100%,0 27%,40% 64%,48% 0,60% 64%,100% 23%,67% 100%);background:#547a43}
