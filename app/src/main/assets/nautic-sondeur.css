@@ -1,0 +1,15 @@
+#sondeurToggle {position:absolute;right:10px;top:242px;z-index:746;padding:5px 8px;background:#123b4de8;color:white;font-size:12px}
+#nauticSondeur {position:absolute;inset:8px 8px auto;z-index:850;color:white;border-radius:10px;overflow:hidden;font:13px system-ui}
+#nauticSondeur[hidden], #sondeurSettings[hidden] {display:none}
+.sondeur-tools,.sondeur-settings {display:flex;align-items:center;gap:5px;padding:5px;background:#123b4df2}
+.sondeur-tools strong {margin-right:auto}
+.sondeur-tools button {padding:3px 6px;font-size:12px}
+.sondeur-settings {flex-wrap:wrap}
+.sondeur-settings label {display:flex;align-items:center;gap:4px;font-size:11px}
+.sondeur-settings input {width:65px}
+.sondeur-plot {height:clamp(64px,25vh,155px);position:relative;overflow:hidden}
+.sondeur-picture,.sondeur-bars {position:absolute;inset:0}
+.sondeur-picture {background:url('sondeur-eau.jpg') center center/cover}
+.sondeur-bars {display:flex;align-items:end;justify-content:end;overflow:hidden}
+.sondeur-bars span {flex:none;background:#6b7378}
+.sondeur-reading {position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);background:#f5fafae8;color:#4b5358;border-radius:7px;padding:4px 9px;font:bold 24px system-ui;white-space:nowrap;pointer-events:none}
