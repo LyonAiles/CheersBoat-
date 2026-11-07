@@ -30,7 +30,7 @@ public class CameraMosaicActivity extends Activity {
  private FrameLayout tile(int index){
   FrameLayout frame=new FrameLayout(this);frame.setBackgroundColor(Color.BLACK);frame.setClipChildren(true);frame.setClipToPadding(true);frame.setContentDescription("Caméra "+(40+index));
   TextureView view=new TextureView(this);final float[] ratio={16f/9f};
-  final int alignment=index==1?Gravity.RIGHT:index==3?Gravity.LEFT:Gravity.CENTER_HORIZONTAL;
+  final int alignment=index==1?Gravity.LEFT:index==3?Gravity.RIGHT:Gravity.CENTER_HORIZONTAL;
   Runnable resize=()->{int h=frame.getHeight();if(h<=0)return;int w=Math.max(1,Math.round(h*ratio[0]));FrameLayout.LayoutParams layout=new FrameLayout.LayoutParams(w,h,Gravity.TOP|alignment);view.setLayoutParams(layout);};
   frame.addView(view,new FrameLayout.LayoutParams(-1,-1));frame.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot)resize.run();});
   final int sourceIndex=CameraDisplaySource.index(this,index);

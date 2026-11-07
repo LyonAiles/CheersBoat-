@@ -437,6 +437,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <div id="settingCam${i}ScanResults" class="muted"></div>
  </section>`).join('')}
 
+ <h3>Hauteur d’eau</h3><button type="button" id="settingWaterLevel">Saisir un relevé de hauteur d’eau</button>
  <h3>Liaison avec une jumelle distante</h3><button type="button" id="settingRemoteTwin">Configurer / activer la liaison</button><p class="muted">Module préparatoire : appareil à bord et appareil distant, relais HTTPS à configurer. États et dernières alertes uniquement.</p>
  <h3>Alertes des caméras</h3><p class="muted">Choisis les types reçus pour chaque veille. Active ou arrête ensuite la veille depuis son bouton sur l’accueil. Seuls les événements transmis par la caméra peuvent déclencher une alerte.</p>
  ${[['44','Trématage · caméra mobile'],['42','Caméra '+esc(state.camera2.name)]].map(([id,name])=>`<section class="emPanel"><h3>${name}</h3><label>Son d’alerte<select class="nautic-select" data-alert-sound="${id}">${[['ding','Ding'],['dingding','Ding-ding'],['bell','Cloche'],['warning','Warning'],['horn','Klaxon du bateau'],['silent','Silencieux']].map(([value,label])=>`<option value="${value}" ${(state.alertSounds?.[id]??(id==='42'?'ding':'horn'))===value?'selected':''}>${label}</option>`).join('')}</select></label><button type="button" data-preview-sound="${id}">▶ Écouter</button>${[['vehicle','Véhicule'],['person','Personne'],['motion','Mouvement général']].map(([type,label])=>`<label class="settingRow"><input type="checkbox" data-alert-watch="${id}" data-alert-type="${type}" ${(state.alertTypes?.[id]?.[type]??(type==='vehicle'))?'checked':''}><span>${label}</span></label>`).join('')}</section>`).join('')}
@@ -463,6 +464,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
 
  dialog.addEventListener('close',()=>window.nauticPreviewWorkSize?.(Number(state.waterwayIconSize)||120),{once:true});
  get('settingWaterwayIconSize').oninput=e=>{get('settingWorkSizeValue').textContent=e.target.value+'%';window.nauticPreviewWorkSize?.(Number(e.target.value));};
+ get('settingWaterLevel').onclick=()=>nativeCall('openWaterLevel');
  get('settingRemoteTwin').onclick=()=>nativeCall('openRemoteTwin');
  get('settingPlugsButton').onclick=()=>equipmentDialog();
  get('settingDiscoverDevices').onclick=()=>scanEquipment(get('settingDiscoverResults'));

@@ -208,6 +208,7 @@ public class MainActivity extends Activity {
     }else startActivity(launch);
    }catch(Exception e){toast("Ouvre Tapo pour choisir la double vue");}
   });}
+  @JavascriptInterface public void openWaterLevel(){runOnUiThread(()->WaterLevelDialog.open(MainActivity.this));}
   @JavascriptInterface public void openBoat(){runOnUiThread(()->{
    Intent i=new Intent(MainActivity.this,BoatActivity.class);startActivity(i);
   });}
