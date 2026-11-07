@@ -23,11 +23,17 @@
     <div class="sondeur-settings" id="sondeurSettings" hidden>
       <label>Transparence <input id="sondeurAlpha" type="range" min="0" max="90"><output id="sondeurAlphaValue"></output></label>
       <label>Profondeur max. <input id="sondeurMax" type="number" min="0.5" max="30" step="0.1"> m</label>
+      <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="30" step="0.01"> m</label>
       <label>Largeur <input id="sondeurWidth" type="range" min="2" max="24"><output id="sondeurWidthValue"></output></label>
     </div>
     <div class="sondeur-plot">
       <div class="sondeur-picture"></div>
-      <div class="sondeur-bars" aria-hidden="true"></div>
+      <div class="sondeur-scale">
+        <div class="sondeur-bars" aria-hidden="true"></div>
+        <svg class="sondeur-hull" viewBox="0 0 430 135" role="img" aria-label="Coupe schématique de coque, largeur 4,30 m, tirant d’eau 1,35 m">
+          <path d="M0 0H430C427 48 406 88 366 110Q328 129 244 130L237 135H193L186 130Q102 129 64 110C24 88 3 48 0 0Z"/>
+        </svg>
+      </div>
       <output class="sondeur-reading">— m</output>
     </div>`;
   map.append(panel);
@@ -36,7 +42,12 @@
   const bars = panel.querySelector('.sondeur-bars');
   const picture = panel.querySelector('.sondeur-picture');
   const reading = panel.querySelector('.sondeur-reading');
-  const samples = Array.from({length: 100}, (_, i) => Math.round((2.30 + 0.80 * Math.sin(i * Math.PI / 50)) * 100) / 100);
+  const wave = (mean, amplitude) => Array.from({length: 100}, (_, i) =>
+    Math.round((mean + amplitude * Math.sin(i * Math.PI / 50)) * 100) / 100);
+  const samples = [...wave(2.30, 0.80), ...wave(1.55, 0.20)];
+  const plot = panel.querySelector('.sondeur-plot');
+  const scale = panel.querySelector('.sondeur-scale');
+  const hull = panel.querySelector('.sondeur-hull');
   const settingsKey = 'nautic-sondeur-settings';
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(settingsKey)) || {}; } catch (_) {}
@@ -44,11 +55,13 @@
   const inputs = {
     alpha: get('sondeurAlpha'),
     max: get('sondeurMax'),
+    alert: get('sondeurAlert'),
     width: get('sondeurWidth')
   };
   let settings = {
     alpha: clamp(saved.alpha, 0, 90, 25),
     max: clamp(saved.max, 0.5, 30, 3),
+    alert: clamp(saved.alert, 0.1, 30, 1.45),
     width: clamp(saved.width, 2, 24, 5)
   };
   for (const [key, input] of Object.entries(inputs)) input.value = settings[key];
@@ -58,12 +71,52 @@
   let timer = null;
   const format = new Intl.NumberFormat('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
+  let audio = null;
+  let lastPing = -Infinity;
+
+  function enableAudio() {
+    try {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) return;
+      audio ||= new Audio();
+      if (audio.state === 'suspended') audio.resume().catch(() => {});
+    } catch (_) {}
+  }
+
+  function ping(depth) {
+    if (panel.hidden || document.hidden || depth > settings.alert ||
+        !audio || audio.state !== 'running' || audio.currentTime - lastPing < 2) return;
+    const now = audio.currentTime;
+    lastPing = now;
+    const tone = audio.createOscillator();
+    const volume = audio.createGain();
+    tone.frequency.setValueAtTime(970, now);
+    tone.frequency.exponentialRampToValueAtTime(720, now + 0.18);
+    volume.gain.setValueAtTime(0.001, now);
+    volume.gain.exponentialRampToValueAtTime(0.18, now + 0.025);
+    volume.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+    tone.connect(volume);
+    volume.connect(audio.destination);
+    tone.start(now);
+    tone.stop(now + 0.7);
+    tone.onended = () => { tone.disconnect(); volume.disconnect(); };
+  }
+
+  function fitHull() {
+    const pixelsPerMetre = Math.min(plot.clientHeight / settings.max, plot.clientWidth * 0.84 / 4.30);
+    scale.style.height = (pixelsPerMetre * settings.max) + 'px';
+    hull.style.width = (pixelsPerMetre * 4.30) + 'px';
+  }
+  if (window.ResizeObserver) new ResizeObserver(fitHull).observe(plot);
+
   function draw() {
+    fitHull();
     picture.style.opacity = bars.style.opacity = String(1 - settings.alpha / 100);
     get('sondeurAlphaValue').textContent = settings.alpha + ' %';
     get('sondeurWidthValue').textContent = settings.width + ' px';
     const columns = history.map(depth => {
       const bar = document.createElement('span');
+      if (depth <= settings.alert) bar.className = 'shallow';
       bar.style.height = (Math.max(0, settings.max - depth) / settings.max * 100) + '%';
       bar.style.width = settings.width + 'px';
       return bar;
@@ -75,20 +128,22 @@
   function append(depth) {
     if (!Number.isFinite(depth) || depth < 0) return false;
     history.push(depth);
-    if (history.length > 100) history.shift();
+    if (history.length > samples.length) history.shift();
     if (!panel.hidden) draw();
+    ping(depth);
     return true;
   }
 
   function stop() {
     if (timer !== null) clearInterval(timer);
     timer = null;
-    get('sondeurPlay').textContent = next === 100 ? 'Rejouer' : next ? 'Reprendre' : 'Démarrer';
+    get('sondeurPlay').textContent = next === samples.length ? 'Rejouer' : next ? 'Reprendre' : 'Démarrer';
   }
 
   function play() {
     if (timer !== null) { stop(); return; }
-    if (next === 100 || get('sondeurTitle').dataset.live) {
+    enableAudio();
+    if (next === samples.length || get('sondeurTitle').dataset.live) {
       next = 0;
       history.length = 0;
     }
@@ -97,7 +152,7 @@
     const tick = () => {
       if (window.nauticMapInteracting || window.nauticQuietMode || document.hidden) return;
       append(samples[next++]);
-      if (next === 100) stop();
+      if (next === samples.length) stop();
     };
     get('sondeurPlay').textContent = 'Pause';
     timer = setInterval(tick, 500);
@@ -119,7 +174,7 @@
     if (visible) draw();
     else stop();
   }
-  toggle.onclick = () => show(panel.hidden);
+  toggle.onclick = () => { if (panel.hidden) enableAudio(); show(panel.hidden); };
   get('sondeurClose').onclick = () => show(false);
   get('sondeurPlay').onclick = play;
   get('sondeurOptions').onclick = () => {
