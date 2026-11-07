@@ -50,13 +50,23 @@
       <button type="button" id="sondeurReplayClose">Quitter</button>
     </div>
     <div class="sondeur-plot" hidden>
-      <div class="sondeur-picture"></div>
+      <div class="sondeur-picture">
+        <div class="sondeur-sun-rays" aria-hidden="true">
+          ${Array.from({length: 12}, (_, index) => {
+            const angle = -44 + index * 8;
+            const duration = 5.3 + index * .83;
+            const delay = (index * 2.37) % duration;
+            const intensity = .32 + ((index * 7) % 12) * .047;
+            return `<i style="--ray-angle:${angle}deg;--ray-duration:${duration}s;--ray-delay:-${delay}s;--ray-intensity:${intensity}"></i>`;
+          }).join('')}
+        </div>
+      </div>
       <div class="sondeur-scale">
         <div class="sondeur-depth-marks" aria-hidden="true"></div>
         <div class="sondeur-bars" aria-hidden="true"></div>
         <div class="sondeur-extension" aria-hidden="true"></div>
         <svg class="sondeur-hull-outline" viewBox="0 0 120 60" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M-120 59 H0 C39 59 75 54 96 43 Q109 36 119 24"/>
+          <path d="M-120 59 H0 C35 59 68 56 90 43"/>
         </svg>
         <div class="sondeur-alert-mark" aria-hidden="true"></div>
       </div>
@@ -69,6 +79,10 @@
   panel.querySelector('.sondeur-title').append(replayButton);
   panel.querySelector('.sondeur-actions').prepend(toggle);
   map.append(panel);
+  const toolbar = panel.querySelector('.sondeur-tools');
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => map.style.setProperty('--sondeur-toolbar-height', toolbar.offsetHeight + 'px')).observe(toolbar);
+  }
 
   const get = id => panel.querySelector('#' + id);
   const extension = panel.querySelector('.sondeur-extension');

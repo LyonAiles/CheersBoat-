@@ -81,8 +81,21 @@
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail="stone"]:not(:last-child)::before {width:8px;height:5px;border-radius:65% 55% 20% 20%;background:#88847a}
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail="plant"]:not(:last-child)::before {width:10px;height:12px;clip-path:polygon(38% 100%,0 27%,40% 64%,48% 0,60% 64%,100% 23%,67% 100%);background:#547a43}
 
-.sondeurSunRays .sondeur-picture::before {content:"";position:absolute;inset:0;pointer-events:none;background:conic-gradient(from 142deg at 51% 0%,transparent 0deg,#d7f8ff70 7deg,transparent 12deg,#e6faff85 23deg,transparent 29deg,#d7f8ff65 38deg,transparent 47deg 360deg);mask-image:linear-gradient(#000,transparent 90%);animation:sondeur-sun-rays 4s ease-in-out infinite alternate}
-@keyframes sondeur-sun-rays {from {opacity:.4} to {opacity:1}}
-@media (prefers-reduced-motion:reduce) {
-  .sondeurSunRays .sondeur-picture::before {animation:none}
+.sondeur-sun-rays {display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.sondeurSunRays .sondeur-sun-rays {display:block}
+.sondeur-sun-rays i {position:absolute;top:0;left:51%;width:13%;height:95%;transform-origin:50% 0;clip-path:polygon(48% 0,52% 0,100% 100%,0 100%);background:linear-gradient(#d8f7ff80, #d8f7ff38 48%, transparent);animation:sondeur-sun-ray var(--ray-duration) linear var(--ray-delay) infinite}
+@keyframes sondeur-sun-ray {
+  0%,100% {transform:translateX(-50%) rotate(var(--ray-angle));opacity:.08}
+  17% {opacity:.14}
+  21% {opacity:var(--ray-intensity)}
+  26% {opacity:.22}
+  52% {transform:translateX(-50%) rotate(calc(var(--ray-angle) + 5deg));opacity:.35}
+  68% {opacity:.11}
+  73% {opacity:calc(var(--ray-intensity) * .65)}
+  80% {opacity:.18}
 }
+@media (prefers-reduced-motion:reduce) {
+  .sondeur-sun-rays i {animation:none;transform:translateX(-50%) rotate(var(--ray-angle));opacity:.3}
+}
+
+#app #mapWrap #compass {top:calc(var(--sondeur-toolbar-height, 36px) + 6px)!important}
