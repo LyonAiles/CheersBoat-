@@ -55,7 +55,7 @@
         <div class="sondeur-bars" aria-hidden="true"></div>
         <div class="sondeur-extension" aria-hidden="true"></div>
         <svg class="sondeur-hull-outline" viewBox="0 0 120 60" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M2 5 C8 27 23 50 51 53 L55 59 H65 L69 53 C97 50 112 27 118 5"/>
+          <path d="M2 18 C5 34 18 41 37 44 L44 54 Q51 59 60 59 C73 58 88 52 99 40 Q110 28 118 3"/>
         </svg>
         <div class="sondeur-alert-mark" aria-hidden="true"></div>
       </div>
@@ -117,6 +117,7 @@
   let manualPlot = false;
   let autoSuppressed = false;
   const history = [];
+  const historyLimit = 512;
   const recordingsKey = 'nautic-sondeur-recordings';
   const oneHour = 3600000;
   let recordings = [];
@@ -325,7 +326,7 @@
 
   function renderReplay() {
     const entry = replay.entries[replay.index];
-    history.splice(0, history.length, ...replay.entries.slice(Math.max(0, replay.index - 199), replay.index + 1));
+    history.splice(0, history.length, ...replay.entries.slice(Math.max(0, replay.index - historyLimit + 1), replay.index + 1));
     get('sondeurReplayGps').hidden = !entry.gps;
     get('sondeurReplayTime').textContent = new Date(entry.time).toLocaleTimeString('fr-FR') + (entry.simulated ? ' · ◇' : '') + (entry.missing ? ' · sans écho' : '');
     refreshView();
@@ -368,7 +369,7 @@
     if (!replay) return;
     stopReplayPlayback();
     const restored = recordings.filter(entry => entry.time >= Date.now() - oneHour && entry.simulated === !get('sondeurTitle').dataset.live);
-    history.splice(0, history.length, ...restored.slice(-200));
+    history.splice(0, history.length, ...restored.slice(-historyLimit));
     manualPlot = replay.manualPlot;
     replay = null;
     replayBar.hidden = true;
@@ -454,7 +455,8 @@
     }));
     get('sondeurAlphaValue').textContent = settings.alpha + ' %';
     get('sondeurWidthValue').textContent = settings.width + ' px';
-    const columns = history.map(({depth, missing, time}) => {
+    const visibleColumns = Math.ceil(bars.clientWidth / settings.width) + 1;
+    const columns = history.slice(-visibleColumns).map(({depth, missing, time}) => {
       const bar = document.createElement('span');
       if (missing) bar.className = 'missing';
       else if (depth < settings.alert) bar.className = 'shallow';
@@ -472,7 +474,6 @@
     });
     bars.replaceChildren(...columns);
     const latestBar = columns.at(-1);
-    extension.className = 'sondeur-extension ' + (latestBar?.className || '');
     extension.style.height = latestBar?.style.height || '0';
   }
 
@@ -514,7 +515,7 @@
     } else {
       history[history.length - 1] = entry;
     }
-    if (history.length > 200) history.shift();
+    if (history.length > historyLimit) history.shift();
     if (depth >= settings.caution) autoSuppressed = false;
     refreshView();
     if (advance && wasVisible && !plot.hidden && previous) animateScroll(entry.time - previous.time);
@@ -673,8 +674,9 @@
     plot.dataset.level = level;
     get('sondeurAxisValue').textContent = settings.axis + ' %';
     plot.style.setProperty('--sondeur-axis', settings.axis + '%');
+    plot.style.setProperty('--sondeur-bar-width', settings.width + 'px');
     plot.style.setProperty('--sondeur-half-bar', (settings.width / 2) + 'px');
-    plot.style.setProperty('--sondeur-hull-ratio', '4.30 / ' + settings.draft);
+    plot.style.setProperty('--sondeur-hull-ratio', '13.4 / ' + settings.draft);
     plot.style.setProperty('--sondeur-draft-position', (settings.draft / settings.max * 100) + '%');
     if (!plot.hidden) draw();
   }

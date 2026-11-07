@@ -16,14 +16,14 @@
 .sondeur-plot {flex:1;min-height:0;position:relative;overflow:hidden}
 .sondeur-picture,.sondeur-bars {position:absolute;inset:0}
 .sondeur-picture {background:linear-gradient(#06172566,#06172599),url('sondeur-eau.jpg') center center/cover}
-.sondeur-bars {right:max(0px,calc(100% - var(--sondeur-axis) - var(--sondeur-half-bar)));display:flex;align-items:end;justify-content:end;overflow:hidden}
+.sondeur-bars {left:calc(-1 * var(--sondeur-bar-width));right:max(0px,calc(100% - var(--sondeur-axis) - var(--sondeur-half-bar)));display:flex;align-items:end;justify-content:end;overflow:hidden}
 .sondeur-bars span,.sondeur-extension {flex:none;background:#000}
 .sondeur-reading {color:white;font:bold 16px system-ui;white-space:nowrap;font-variant-numeric:tabular-nums}
 
 .sondeur-scale {position:absolute;inset:0;overflow:hidden}
-.sondeur-bars span.shallow,.sondeur-extension.shallow {background:#43091b}
+.sondeur-bars span.shallow {background:#43091b}
 
-.sondeur-bars span.caution,.sondeur-extension.caution {background:#5a2404}
+.sondeur-bars span.caution {background:#5a2404}
 .sondeur-depth-marks {position:absolute;inset:0;z-index:1;pointer-events:none}
 .sondeur-depth-marks span {position:absolute;right:0;padding:0 5px;color:white;background:#102d40cc;font-size:10px;transform:translateY(-50%);border-left:5px solid #d4e0e5}
 .sondeur-depth-marks span:first-child {transform:none}
@@ -47,7 +47,7 @@
 .sondeur-replay[hidden] {display:none}
 .sondeur-replay time {flex:1}
 
-.sondeur-bars span.missing,.sondeur-extension.missing {background:#8b49c9;min-height:3px}
+.sondeur-bars span.missing {background:#8b49c9;min-height:3px}
 .sondeur-reading[data-level="missing"] {color:#dbb4ff}
 
 .sondeur-title {display:flex;align-items:center;gap:4px;min-width:0}
@@ -65,7 +65,7 @@
 .sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;transform:translateX(-50%);width:auto;max-width:100%;aspect-ratio:var(--sondeur-hull-ratio);height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
 .sondeurHullOutline .sondeur-hull-outline {display:block}
 .sondeur-hull-outline path {fill:none;stroke:#000;stroke-width:2;stroke-opacity:.7;vector-effect:non-scaling-stroke}
-.sondeurShimmer .sondeur-picture::after {content:"";position:absolute;left:50%;top:38%;width:120%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle closest-side,transparent 56%,#dff8ff65 59%,transparent 63%,transparent 72%,#dff8ff40 74%,transparent 77%);animation:sondeur-shimmer 16s ease-out infinite}
+.sondeurShimmer .sondeur-picture::after {content:"";position:absolute;left:50%;top:38%;width:120%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle closest-side,transparent 56%,#dff8ff65 59%,transparent 63%,transparent 72%,#dff8ff40 74%,transparent 77%);animation:sondeur-shimmer 6s ease-out infinite}
 @keyframes sondeur-shimmer {
   0% {transform:translate(-50%,-50%) scale(.08);opacity:0}
   12% {opacity:.65}
