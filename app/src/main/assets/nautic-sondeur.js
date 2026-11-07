@@ -27,6 +27,9 @@
       <label>Tirant d’eau <input id="sondeurDraft" type="number" min="0.1" max="30" step="0.01"> m</label>
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
+      <label><input type="checkbox" id="sondeurBlackBars"> Barres uniformes noires</label>
+      <label><input type="checkbox" id="sondeurHullOutline"> Contour léger de la coque</label>
+      <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <label class="sondeur-axis-setting">Position du relevé <input id="sondeurAxis" type="range" min="10" max="95" step="1"><output id="sondeurAxisValue"></output></label>
       <label>Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
       <button type="button" id="sondeurAlertList">Alertes sur la carte</button>
@@ -48,6 +51,9 @@
         <div class="sondeur-depth-marks" aria-hidden="true"></div>
         <div class="sondeur-bars" aria-hidden="true"></div>
         <div class="sondeur-extension" aria-hidden="true"></div>
+        <svg class="sondeur-hull-outline" viewBox="0 0 120 60" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M2 5 C8 27 23 50 51 53 L55 59 H65 L69 53 C97 50 112 27 118 5"/>
+        </svg>
         <div class="sondeur-alert-mark" aria-hidden="true"></div>
       </div>
     </div>`;
@@ -568,6 +574,21 @@
       saveSettings();
       refreshView();
       if (!replay && (timer !== null || get('sondeurTitle').dataset.live)) updateSound(history.at(-1)?.depth);
+    });
+  }
+
+  for (const [key, id] of Object.entries({
+    blackBars: 'sondeurBlackBars',
+    hullOutline: 'sondeurHullOutline',
+    shimmer: 'sondeurShimmer'
+  })) {
+    const input = get(id);
+    settings[key] = input.checked = saved[key] === true;
+    plot.classList.toggle(id, input.checked);
+    input.addEventListener('change', () => {
+      settings[key] = input.checked;
+      plot.classList.toggle(id, input.checked);
+      saveSettings();
     });
   }
 

@@ -57,3 +57,13 @@
 
 .sondeur-mail-map .sondeur-map-alert {width:16px;height:16px;font-size:11px}
 .sondeur-mail-map .nautic-work-marker {scale:.65}
+
+.sondeurBlackBars .sondeur-bars span,.sondeurBlackBars .sondeur-extension {background:#000}
+.sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;transform:translateX(-50%);width:min(120px,40%);height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
+.sondeurHullOutline .sondeur-hull-outline {display:block}
+.sondeur-hull-outline path {fill:none;stroke:#fff;stroke-width:1;stroke-opacity:.28;vector-effect:non-scaling-stroke}
+.sondeurShimmer .sondeur-picture::after {content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 35% 35%,#d2f3ff26,transparent 65%);animation:sondeur-shimmer 6s ease-in-out infinite alternate}
+@keyframes sondeur-shimmer {from {opacity:.15} to {opacity:.7}}
+@media (prefers-reduced-motion:reduce) {
+  .sondeurShimmer .sondeur-picture::after {animation:none;opacity:.3}
+}
