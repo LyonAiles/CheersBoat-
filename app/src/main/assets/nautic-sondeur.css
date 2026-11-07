@@ -1,7 +1,9 @@
 #nauticSondeur {position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;z-index:850;color:white;border-radius:10px;overflow:hidden;font:13px system-ui}
 #sondeurSettings[hidden], .sondeur-plot[hidden] {display:none}
 .sondeur-tools,.sondeur-settings {display:flex;align-items:center;pointer-events:auto;gap:5px;padding:5px;background:#123b4df2}
-.sondeur-tools strong {margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sondeur-tools {display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+.sondeur-actions {display:flex;justify-content:end;gap:3px}
+.sondeur-tools strong {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sondeur-tools button {padding:3px 6px;font-size:12px}
 .sondeur-settings {flex-wrap:wrap}
 .sondeur-settings label {display:flex;align-items:center;gap:4px;font-size:11px}
@@ -14,7 +16,7 @@
 .sondeur-reading {color:white;font:bold 16px system-ui;white-space:nowrap;font-variant-numeric:tabular-nums}
 
 .sondeur-scale {position:absolute;inset:0;overflow:hidden}
-.sondeur-hull {position:absolute;top:0;left:50%;transform:translateX(-50%);height:auto;fill:none;pointer-events:none}
+.sondeur-hull {position:absolute;top:0;left:50%;transform:translateX(-50%);height:auto;fill:white;pointer-events:none}
 .sondeur-bars span.shallow {background:#43091b}
 
 .sondeur-bars span.caution {background:#5a2404}
@@ -22,4 +24,7 @@
 .sondeur-depth-marks span {position:absolute;right:0;padding:0 5px;color:white;background:#102d40cc;font-size:10px;transform:translateY(-50%);border-left:5px solid #d4e0e5}
 .sondeur-depth-marks span:first-child {transform:none}
 .sondeur-depth-marks span:last-child {transform:translateY(-100%)}
-#mapBoat::before {content:"";position:absolute;left:50%;top:50%;width:38px;height:28px;transform:translate(-50%,-50%);border:1px solid #008093b3;border-radius:50%;background:transparent;pointer-events:none}
+#mapBoat::before {content:"";position:absolute;left:50%;top:50%;width:38px;height:28px;transform:translate(-50%,-50%);border:1px solid white;opacity:var(--sondeur-marker-opacity,0);border-radius:50%;background:transparent;pointer-events:none}
+
+.sondeur-reading[data-level='caution'] {color:#ffad55}
+.sondeur-reading[data-level='alert'] {color:#ff7183}

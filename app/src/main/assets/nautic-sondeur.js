@@ -15,15 +15,20 @@
     <div class="sondeur-tools">
       <strong id="sondeurTitle">Sondeur · simulation</strong>
       <output class="sondeur-reading" aria-label="Profondeur">—</output>
-      <button type="button" id="sondeurPlay">Démarrer</button>
+      <div class="sondeur-actions">
+        <button type="button" id="sondeurPlay" aria-label="Démarrer la simulation">▶</button>
       <button type="button" id="sondeurOptions" aria-label="Réglages du sondeur" aria-expanded="false">⚙</button>
       <button type="button" id="sondeurClose" aria-label="Replier le fond et arrêter la simulation">×</button>
+      </div>
     </div>
     <div class="sondeur-settings" id="sondeurSettings" hidden>
       <label>Transparence <input id="sondeurAlpha" type="range" min="0" max="90"><output id="sondeurAlphaValue"></output></label>
       <label>Profondeur max. <input id="sondeurMax" type="number" min="0.5" max="30" step="0.1"> m</label>
+      <label>Seuil de prudence <input id="sondeurCaution" type="number" min="0.1" max="30" step="0.01"> m</label>
+      <label>Transparence coque <input id="sondeurHullAlpha" type="range" min="0" max="100"><output id="sondeurHullAlphaValue"></output></label>
+      <label>Transparence médaillon GPS <input id="sondeurMarkerAlpha" type="range" min="0" max="100"><output id="sondeurMarkerAlphaValue"></output></label>
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
-      <label><input id="sondeurAuto" type="checkbox"> Fond automatique sous 2 m</label>
+      <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label>Largeur <input id="sondeurWidth" type="range" min="2" max="24"><output id="sondeurWidthValue"></output></label>
     </div>
     <div class="sondeur-plot" hidden>
@@ -36,11 +41,12 @@
         </svg>
       </div>
     </div>`;
-  panel.querySelector('.sondeur-tools').append(toggle);
+  panel.querySelector('.sondeur-actions').append(toggle);
   map.append(panel);
 
   const get = id => panel.querySelector('#' + id);
   const bars = panel.querySelector('.sondeur-bars');
+  const playButton = get('sondeurPlay');
   const reading = panel.querySelector('.sondeur-reading');
   const wave = (mean, amplitude) => Array.from({length: 100}, (_, i) =>
     Math.round((mean + amplitude * Math.sin(i * Math.PI / 50)) * 100) / 100);
@@ -60,12 +66,19 @@
     alpha: get('sondeurAlpha'),
     max: get('sondeurMax'),
     alert: get('sondeurAlert'),
+    caution: get('sondeurCaution'),
+    hullAlpha: get('sondeurHullAlpha'),
+    markerAlpha: get('sondeurMarkerAlpha'),
     width: get('sondeurWidth')
   };
-  let settings = {
+  const caution = clamp(saved.caution, 0.1, 30, 2);
+  const settings = {
     alpha: clamp(saved.alpha, 0, 90, 25),
     max: clamp(saved.max, 0.5, 30, 3),
-    alert: clamp(saved.critical, 0.1, 2, 1.50),
+    alert: clamp(saved.critical ?? saved.alert ?? 1.50, 0.1, caution, Math.min(1.50, caution)),
+    caution,
+    hullAlpha: clamp(saved.hullAlpha, 0, 100, 100),
+    markerAlpha: clamp(saved.markerAlpha, 0, 100, 100),
     width: clamp(saved.width, 2, 24, 5),
     auto: saved.auto === true
   };
@@ -97,7 +110,7 @@
 
   function updateSound(depth) {
     const audible = !document.hidden && Number.isFinite(depth);
-    setSound(cautionSound, audible && depth < 2);
+    setSound(cautionSound, audible && depth < settings.caution);
     setSound(alertSound, audible && depth < settings.alert);
   }
 
@@ -125,7 +138,7 @@
     const columns = history.map(depth => {
       const bar = document.createElement('span');
       if (depth < settings.alert) bar.className = 'shallow';
-      else if (depth < 2) bar.className = 'caution';
+      else if (depth < settings.caution) bar.className = 'caution';
       bar.style.height = (Math.max(0, settings.max - depth) / settings.max * 100) + '%';
       bar.style.width = settings.width + 'px';
       return bar;
@@ -137,10 +150,15 @@
     if (!Number.isFinite(depth) || depth < 0) return false;
     history.push(depth);
     if (history.length > 200) history.shift();
-    if (depth >= 2) autoSuppressed = false;
+    if (depth >= settings.caution) autoSuppressed = false;
     refreshView();
     updateSound(depth);
     return true;
+  }
+
+  function setPlayButton(running) {
+    playButton.textContent = running ? '⏸' : '▶';
+    playButton.setAttribute('aria-label', running ? 'Mettre la simulation en pause' : 'Démarrer ou reprendre la simulation');
   }
 
   function stop() {
@@ -148,7 +166,7 @@
     timer = null;
     updateSound();
     refreshView();
-    get('sondeurPlay').textContent = history.length ? 'Reprendre' : 'Démarrer';
+    setPlayButton(false);
   }
 
   function play() {
@@ -167,7 +185,7 @@
     };
     manualPlot = !settings.auto;
     autoSuppressed = false;
-    get('sondeurPlay').textContent = 'Pause';
+    setPlayButton(true);
     timer = setInterval(tick, 500);
     tick();
   }
@@ -187,11 +205,18 @@
   }
 
   function refreshView() {
+    inputs.alert.max = settings.caution;
+    inputs.caution.min = settings.alert;
+    hull.style.opacity = String(1 - settings.hullAlpha / 100);
+    map.style.setProperty('--sondeur-marker-opacity', String(1 - settings.markerAlpha / 100));
+    get('sondeurHullAlphaValue').textContent = settings.hullAlpha + ' %';
+    get('sondeurMarkerAlphaValue').textContent = settings.markerAlpha + ' %';
     const latest = history.at(-1);
     const receiving = timer !== null || get('sondeurTitle').dataset.live;
-    plot.hidden = !(manualPlot || (settings.auto && receiving && !autoSuppressed && latest < 2));
+    plot.hidden = !(manualPlot || (settings.auto && receiving && !autoSuppressed && latest < settings.caution));
     toggle.setAttribute('aria-expanded', String(!plot.hidden));
     reading.textContent = Number.isFinite(latest) ? format.format(latest) : '—';
+    reading.dataset.level = latest < settings.alert ? 'alert' : latest < settings.caution ? 'caution' : '';
     if (!plot.hidden) draw();
   }
   auto.addEventListener('change', () => {
@@ -216,7 +241,7 @@
     autoSuppressed = true;
     stop();
   };
-  get('sondeurPlay').onclick = play;
+  playButton.onclick = play;
   get('sondeurOptions').onclick = () => {
     const options = get('sondeurSettings');
     options.hidden = !options.hidden;
@@ -232,7 +257,6 @@
         next = 0;
         get('sondeurTitle').dataset.live = '1';
         get('sondeurTitle').textContent = 'Sondeur';
-        get('sondeurPlay').textContent = 'Simulation';
       }
       return append(depth);
     }
