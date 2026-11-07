@@ -28,6 +28,7 @@
       <label>Tirant d’eau <input id="sondeurDraft" type="number" min="0.1" max="30" step="0.01"> m</label>
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
+      <label>Position du relevé <input id="sondeurAxis" type="range" min="10" max="95" step="1"><output id="sondeurAxisValue"></output></label>
       <label>Largeur <input id="sondeurWidth" type="range" min="2" max="24"><output id="sondeurWidthValue"></output></label>
     </div>
     <div class="sondeur-plot" hidden>
@@ -35,6 +36,7 @@
       <div class="sondeur-scale">
         <div class="sondeur-depth-marks" aria-hidden="true"></div>
         <div class="sondeur-bars" aria-hidden="true"></div>
+        <div class="sondeur-extension" aria-hidden="true"></div>
         <div class="sondeur-alert-mark" aria-hidden="true"></div>
       </div>
     </div>`;
@@ -42,6 +44,7 @@
   map.append(panel);
 
   const get = id => panel.querySelector('#' + id);
+  const extension = panel.querySelector('.sondeur-extension');
   const bars = panel.querySelector('.sondeur-bars');
   const playButton = get('sondeurPlay');
   const reading = panel.querySelector('.sondeur-reading');
@@ -64,6 +67,7 @@
     alert: get('sondeurAlert'),
     caution: get('sondeurCaution'),
     draft: get('sondeurDraft'),
+    axis: get('sondeurAxis'),
     width: get('sondeurWidth')
   };
   const caution = clamp(saved.caution, 0.1, 30, 2);
@@ -72,6 +76,7 @@
     max: clamp(saved.max, 0.5, 30, 3),
     alert: clamp(saved.critical ?? saved.alert ?? 1.50, 0.1, caution, Math.min(1.50, caution)),
     caution,
+    axis: clamp(saved.axis, 10, 95, 50),
     draft: clamp(saved.draft, 0.1, 30, 1.35),
     width: clamp(saved.width, 2, 24, 5),
     auto: saved.auto === true
@@ -131,6 +136,9 @@
       return bar;
     });
     bars.replaceChildren(...columns);
+    const latestBar = columns.at(-1);
+    extension.className = 'sondeur-extension ' + (latestBar?.className || '');
+    extension.style.height = latestBar?.style.height || '0';
   }
 
   function append(depth) {
@@ -202,6 +210,9 @@
     const level = latest < settings.alert ? 'alert' : latest < settings.caution ? 'caution' : '';
     reading.dataset.level = level;
     plot.dataset.level = level;
+    get('sondeurAxisValue').textContent = settings.axis + ' %';
+    plot.style.setProperty('--sondeur-axis', settings.axis + '%');
+    plot.style.setProperty('--sondeur-half-bar', (settings.width / 2) + 'px');
     plot.style.setProperty('--sondeur-draft-position', (settings.draft / settings.max * 100) + '%');
     if (!plot.hidden) draw();
   }
