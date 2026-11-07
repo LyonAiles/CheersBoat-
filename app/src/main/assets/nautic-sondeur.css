@@ -101,7 +101,7 @@
 #app #mapWrap #compass {top:calc(var(--sondeur-toolbar-height, 36px) + 6px)!important}
 
 .sondeur-plot {--sondeur-bow-gap:max(64px,12.5%)}
-.sondeur-anchor-hole {display:none;position:absolute;right:calc(var(--sondeur-bow-gap) + 12px);top:calc(var(--sondeur-draft-position) * .65);width:7px;height:7px;border:1.5px solid #000b;border-radius:50%;pointer-events:none}
+.sondeur-anchor-hole {display:none;position:absolute;right:calc(var(--sondeur-bow-gap) + 12px);top:calc(var(--sondeur-draft-position) * .65);width:9px;height:9px;border:1.5px solid #000b;border-radius:50%;pointer-events:none}
 .sondeurHullOutline .sondeur-anchor-hole {display:block}
 #app #mapWrap #mapRecenter {top:calc(var(--sondeur-toolbar-height, 36px) + 60px)!important}
 #app #mapWrap #mapLayers {top:calc(var(--sondeur-toolbar-height, 36px) + 112px)!important}

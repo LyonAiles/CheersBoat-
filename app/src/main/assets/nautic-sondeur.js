@@ -67,7 +67,7 @@
         <div class="sondeur-bars" aria-hidden="true"></div>
         <div class="sondeur-extension" aria-hidden="true"></div>
         <svg class="sondeur-hull-outline" viewBox="0 0 120 60" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M-600 59 H0 Q18 59 120 43"/>
+          <path d="M-600 59 H0 Q18 59 120 0"/>
         </svg>
         <div class="sondeur-anchor-hole" aria-hidden="true"></div>
         <div class="sondeur-alert-mark" aria-hidden="true"></div>
