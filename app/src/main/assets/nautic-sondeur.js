@@ -54,11 +54,11 @@
         <div class="sondeur-sun-rays" aria-hidden="true">
           ${Array.from({length: 12}, (_, index) => {
             const origin = 46 + index * .9;
-            const angle = -44 + index * 8;
+            const spread = (index - 5.5) * 6.8;
             const duration = 5.3 + index * .83;
             const delay = (index * 2.37) % duration;
             const intensity = .32 + ((index * 7) % 12) * .047;
-            return `<i style="--ray-origin:${origin}%;--ray-angle:${angle}deg;--ray-duration:${duration}s;--ray-delay:-${delay}s;--ray-intensity:${intensity}"></i>`;
+            return `<i style="--ray-origin:${origin}%;--ray-spread:${spread}%;--ray-duration:${duration}s;--ray-delay:-${delay}s;--ray-intensity:${intensity}"></i>`;
           }).join('')}
         </div>
       </div>

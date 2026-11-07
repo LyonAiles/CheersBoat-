@@ -83,19 +83,19 @@
 
 .sondeur-sun-rays {display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .sondeurSunRays .sondeur-sun-rays {display:block}
-.sondeur-sun-rays i {position:absolute;top:0;left:var(--ray-origin);width:14%;height:95%;transform-origin:50% 0;clip-path:polygon(38% 0,62% 0,100% 100%,0 100%);background:linear-gradient(#d8f7ff80, #d8f7ff38 48%, transparent);animation:sondeur-sun-ray var(--ray-duration) linear var(--ray-delay) infinite}
+.sondeur-sun-rays i {position:absolute;inset:0;clip-path:polygon(calc(var(--ray-origin) - .32%) 0,calc(var(--ray-origin) + .32%) 0,calc(51% + var(--ray-spread) + 2.6%) 100%,calc(51% + var(--ray-spread) - 2.6%) 100%);background:linear-gradient(#d8f7ff85,#d8f7ff45 45%,transparent 90%);animation:sondeur-sun-ray var(--ray-duration) linear var(--ray-delay) infinite}
 @keyframes sondeur-sun-ray {
-  0%,100% {transform:translateX(-50%) rotate(var(--ray-angle));opacity:.08}
+  0%,100% {opacity:.08}
   17% {opacity:.14}
   21% {opacity:var(--ray-intensity)}
   26% {opacity:.22}
-  52% {transform:translateX(-50%) rotate(calc(var(--ray-angle) + 5deg));opacity:.35}
+  52% {opacity:.35}
   68% {opacity:.11}
   73% {opacity:calc(var(--ray-intensity) * .65)}
   80% {opacity:.18}
 }
 @media (prefers-reduced-motion:reduce) {
-  .sondeur-sun-rays i {animation:none;transform:translateX(-50%) rotate(var(--ray-angle));opacity:.3}
+  .sondeur-sun-rays i {animation:none;opacity:.3}
 }
 
 #app #mapWrap #compass {top:calc(var(--sondeur-toolbar-height, 36px) + 6px)!important}
