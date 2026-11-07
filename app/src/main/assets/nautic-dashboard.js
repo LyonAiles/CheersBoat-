@@ -35,7 +35,7 @@
  function numberButtons(){
   let enabled=true;try{enabled=JSON.parse(call('readSetting','nautic-extensions')||localStorage.getItem('nautic-extensions')||'{}').objectNumbers!==false;}catch(_){}
   if(!enabled){document.querySelectorAll('.nautic-object-tag').forEach(e=>e.remove());document.querySelectorAll('[data-object-number]').forEach(e=>e.dataset.objectNumber='');}
-  const fixed={clock:10,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,sondeurToggle:297};
+  const fixed={clock:10,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
   const reservedNumbers=new Set(Object.values(fixed));
   const zoomIn=document.querySelector('.leaflet-control-zoom-in'),zoomOut=document.querySelector('.leaflet-control-zoom-out');if(zoomIn)zoomIn.id='mapZoomIn';if(zoomOut)zoomOut.id='mapZoomOut';
   const elements=new Set(Object.keys(fixed).map($).filter(Boolean));for(const e of document.querySelectorAll('#app button,#app [role=button],#app .leaflet-bar a,#dialog button'))if(e.id!=='dashboardPhone')elements.add(e);

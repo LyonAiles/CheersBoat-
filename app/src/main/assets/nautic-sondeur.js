@@ -13,12 +13,11 @@
   panel.setAttribute('aria-label', 'Sondeur');
   panel.innerHTML = `
     <div class="sondeur-tools">
-      <strong id="sondeurTitle">Sondeur · simulation</strong>
+      <div class="sondeur-title"><strong id="sondeurTitle">Sondeur</strong></div>
       <output class="sondeur-reading" aria-label="Profondeur">—</output>
       <div class="sondeur-actions">
         <button type="button" id="sondeurPlay" aria-label="Démarrer la simulation">▶</button>
-      <button type="button" id="sondeurOptions" aria-label="Réglages du sondeur" aria-expanded="false">⚙</button>
-      <button type="button" id="sondeurClose" aria-label="Replier le fond et arrêter la simulation">×</button>
+        <button type="button" id="sondeurOptions" aria-label="Réglages du sondeur" aria-expanded="false">⚙</button>
       </div>
     </div>
     <div class="sondeur-settings" id="sondeurSettings" hidden>
@@ -29,12 +28,16 @@
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label class="sondeur-axis-setting">Position du relevé <input id="sondeurAxis" type="range" min="10" max="95" step="1"><output id="sondeurAxisValue"></output></label>
+      <label>Cadence <select id="sondeurTempoMode"><option value="auto">Automatique</option><option value="manual">Manuelle</option></select></label>
+      <label>Intervalle <input id="sondeurPeriod" type="number" min="0.1" max="60" step="0.01"> s</label>
+      <output id="sondeurTempoStatus"></output>
       <label>Largeur <input id="sondeurWidth" type="range" min="2" max="24"><output id="sondeurWidthValue"></output></label>
     </div>
     <div class="sondeur-replay" hidden>
       <button type="button" id="sondeurBack" aria-label="Retour rapide vers les alertes">⏪</button>
       <button type="button" id="sondeurReplayPlay" aria-label="Lire les relevés">▶</button>
       <time id="sondeurReplayTime"></time>
+      <button type="button" id="sondeurReplayGps" aria-label="Centrer la carte sur l’alerte" hidden>⌖</button>
       <button type="button" id="sondeurReplayClose">Quitter</button>
     </div>
     <div class="sondeur-plot" hidden>
@@ -47,10 +50,12 @@
       </div>
     </div>`;
   const replayButton = document.createElement('button');
+  replayButton.id = 'sondeurReplay';
   replayButton.type = 'button';
   replayButton.textContent = '↶';
   replayButton.setAttribute('aria-label', 'Relire la dernière heure');
-  panel.querySelector('.sondeur-actions').append(toggle, replayButton);
+  panel.querySelector('.sondeur-title').append(replayButton);
+  panel.querySelector('.sondeur-actions').prepend(toggle);
   map.append(panel);
 
   const get = id => panel.querySelector('#' + id);
@@ -79,6 +84,7 @@
     caution: get('sondeurCaution'),
     draft: get('sondeurDraft'),
     axis: get('sondeurAxis'),
+    period: get('sondeurPeriod'),
     width: get('sondeurWidth')
   };
   const caution = clamp(saved.caution, 0.1, 30, 2);
@@ -88,6 +94,8 @@
     alert: clamp(saved.critical ?? saved.alert ?? 1.50, 0.1, caution, Math.min(1.50, caution)),
     caution,
     axis: clamp(saved.axis, 10, 95, 50),
+    period: clamp(saved.period, 0.1, 60, 0.5),
+    tempoMode: saved.tempoMode === 'manual' ? 'manual' : 'auto',
     draft: clamp(saved.draft, 0.1, 30, 1.35),
     width: clamp(saved.width, 2, 24, 5),
     auto: saved.auto === true
@@ -106,6 +114,25 @@
     recordings = recordings.filter(entry => Number.isFinite(entry?.time) && (Number.isFinite(entry.depth) || (entry.missing && entry.depth === null)) && entry.time >= Date.now() - oneHour);
   } catch (_) { recordings = []; }
   let lastSave = 0;
+  let alertRecorded = false;
+  let simulatedAlertCount = 0;
+
+  function alertPosition(simulated) {
+    const fix = typeof latest === 'undefined' ? null : latest;
+    if (!Number.isFinite(fix?.lat) || !Number.isFinite(fix.lon)) return null;
+    if (!simulated) {
+      return {lat: fix.lat, lon: fix.lon};
+    }
+    const index = simulatedAlertCount++;
+    const distance = [150, 500, 1500, 3500][index % 4];
+    const angle = index * 1.4;
+    return {
+      lat: Math.max(-90, Math.min(90, fix.lat + Math.cos(angle) * distance / 111320)),
+      lon: ((fix.lon + Math.sin(angle) * distance / (111320 * Math.max(0.01, Math.cos(fix.lat * Math.PI / 180))) + 540) % 360) - 180
+    };
+  }
+
+  window.nauticSondeurAlertPoints = () => recordings.filter(entry => entry.gps && entry.time >= Date.now() - oneHour);
   let replay = null;
   let replayTimer = null;
   const replayBar = panel.querySelector('.sondeur-replay');
@@ -122,7 +149,18 @@
     const missing = depth === null;
     const previous = missing ? recordings.findLast(entry => entry.simulated === simulated) : null;
     const entry = {time, depth: missing ? previous?.depth ?? null : depth, simulated, missing};
+    if (!missing) {
+      if (depth >= settings.alert) alertRecorded = false;
+      else if (!alertRecorded) {
+        const gps = alertPosition(simulated);
+        if (gps) {
+          entry.gps = gps;
+          alertRecorded = true;
+        }
+      }
+    }
     recordings.push(entry);
+    if (entry.gps) persistRecordings();
     if (time - lastSave >= 5000) persistRecordings();
     return entry;
   }
@@ -130,7 +168,8 @@
   function renderReplay() {
     const entry = replay.entries[replay.index];
     history.splice(0, history.length, ...replay.entries.slice(Math.max(0, replay.index - 199), replay.index + 1));
-    get('sondeurReplayTime').textContent = new Date(entry.time).toLocaleTimeString('fr-FR') + (entry.simulated ? ' · simulation' : '') + (entry.missing ? ' · sans écho' : '');
+    get('sondeurReplayGps').hidden = !entry.gps;
+    get('sondeurReplayTime').textContent = new Date(entry.time).toLocaleTimeString('fr-FR') + (entry.simulated ? ' · ◇' : '') + (entry.missing ? ' · sans écho' : '');
     refreshView();
   }
 
@@ -192,6 +231,15 @@
     replayBar.hidden = false;
     manualPlot = true;
     renderReplay();
+  };
+  get('sondeurReplayGps').onclick = () => {
+    const gps = replay?.entries[replay.index]?.gps;
+    if (!gps) return;
+    endReplay();
+    manualPlot = false;
+    autoSuppressed = true;
+    refreshView();
+    window.nauticFocusSondeurAlert?.(gps);
   };
   get('sondeurBack').onclick = () => replayInDirection(-1);
   get('sondeurReplayPlay').onclick = () => {
@@ -289,6 +337,47 @@
     setPlayButton(false);
   }
 
+  const tempoMode = get('sondeurTempoMode');
+  tempoMode.value = settings.tempoMode;
+  const intervals = [];
+  let lastArrival = null;
+  let missingTimer = null;
+
+  function estimatedPeriod() {
+    if (intervals.length < 3) return null;
+    const sorted = intervals.slice().sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  }
+
+  function refreshTempo() {
+    const manual = settings.tempoMode === 'manual';
+    inputs.period.disabled = !manual;
+    const period = manual ? settings.period * 1000 : estimatedPeriod();
+    get('sondeurTempoStatus').textContent = period
+      ? format.format(60000 / period) + ' relevés/min'
+      : 'Cadence en attente de relevés';
+  }
+
+  function watchForMissingReading() {
+    clearTimeout(missingTimer);
+    if (lastArrival === null) return;
+    const period = settings.tempoMode === 'manual' ? settings.period * 1000 : estimatedPeriod();
+    if (!period) return;
+    function markMissing() {
+      append(null);
+      missingTimer = setTimeout(markMissing, period);
+    }
+    missingTimer = setTimeout(markMissing, Math.max(0, lastArrival + period * 1.5 - performance.now()));
+  }
+
+  tempoMode.addEventListener('change', () => {
+    settings.tempoMode = tempoMode.value;
+    saveSettings();
+    refreshTempo();
+    watchForMissingReading();
+  });
+  refreshTempo();
+
   function play() {
     endReplay();
     if (timer !== null) { stop(); return; }
@@ -296,8 +385,12 @@
       next = 0;
       history.length = 0;
     }
+    clearTimeout(missingTimer);
+    lastArrival = null;
+    intervals.length = 0;
+    refreshTempo();
+    alertRecorded = false;
     delete get('sondeurTitle').dataset.live;
-    get('sondeurTitle').textContent = 'Sondeur · simulation';
     const tick = () => {
       if (window.nauticMapInteracting || window.nauticQuietMode || document.hidden) return;
       const depth = samples[next];
@@ -307,7 +400,7 @@
     manualPlot = !settings.auto;
     autoSuppressed = false;
     setPlayButton(true);
-    timer = setInterval(tick, 500);
+    timer = setInterval(tick, settings.tempoMode === 'manual' ? settings.period * 1000 : 500);
     tick();
   }
 
@@ -319,6 +412,10 @@
     input.addEventListener('input', () => {
       if (!input.value || !input.validity.valid) return;
       settings[key] = Number(input.value);
+      if (key === 'period') {
+        refreshTempo();
+        watchForMissingReading();
+      }
       saveSettings();
       refreshView();
       if (!replay && (timer !== null || get('sondeurTitle').dataset.live)) updateSound(history.at(-1)?.depth);
@@ -361,13 +458,6 @@
     if (document.hidden) updateSound();
     else if (!replay && (timer !== null || get('sondeurTitle').dataset.live)) updateSound(history.at(-1)?.depth);
   });
-  get('sondeurClose').onclick = () => {
-    endReplay();
-    replayBar.hidden = true;
-    manualPlot = false;
-    autoSuppressed = true;
-    stop();
-  };
   playButton.onclick = play;
   get('sondeurOptions').onclick = () => {
     const options = get('sondeurSettings');
@@ -378,18 +468,24 @@
   window.nauticSondeur = {
     addReading(depth) {
       if (depth !== null && (!Number.isFinite(depth) || depth < 0)) return false;
-      if (replay) {
-        get('sondeurTitle').dataset.live = '1';
-        record(depth);
-        return true;
-      }
       if (!get('sondeurTitle').dataset.live) {
         stop();
         history.length = 0;
         next = 0;
+        alertRecorded = false;
         get('sondeurTitle').dataset.live = '1';
-        get('sondeurTitle').textContent = 'Sondeur';
       }
+      const now = performance.now();
+      if (lastArrival !== null) {
+        const interval = now - lastArrival;
+        if (interval >= 50 && interval <= 60000) {
+          intervals.push(interval);
+          if (intervals.length > 9) intervals.shift();
+        }
+      }
+      lastArrival = now;
+      refreshTempo();
+      watchForMissingReading();
       return append(depth);
     }
   };

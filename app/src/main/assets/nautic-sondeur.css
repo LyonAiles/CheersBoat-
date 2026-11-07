@@ -46,3 +46,9 @@
 
 .sondeur-bars span.missing,.sondeur-extension.missing {background:#8b49c9;min-height:3px}
 .sondeur-reading[data-level="missing"] {color:#dbb4ff}
+
+.sondeur-title {display:flex;align-items:center;gap:4px;min-width:0}
+
+.sondeur-map-alert {width:24px;height:24px;padding:0;border:1px solid white;border-radius:50%;background:#a71937;color:white;font:bold 15px system-ui}
+.sondeur-map-alert.simulated {background:#66429a}
+#sondeurReplayGps[hidden] {display:none}

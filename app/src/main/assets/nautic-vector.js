@@ -84,6 +84,45 @@
  function showItem(id){const p=lastList.find(x=>x.id===id);if(!p)return;modal('Ouvrage fluvial',info(p)+'<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');}
  function showList(list=lastList){modal('Ouvrages autour du bateau',`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();
  try{cache=JSON.parse(localStorage.getItem('nautic-waterways-cache')||'null');if(cache&&Array.isArray(cache.elements))data=W.parse(cache.elements);else cache=null;}catch(_){cache=null;}
+ window.nauticFocusSondeurAlert = ({lat, lon}) => {
+  window.nauticMapFreePan = true;
+  if (active && vector) vector.easeTo({center:[lon, lat], padding:{top:0,bottom:0,left:0,right:0}});
+  else if (map) { rotateMap(); map.panTo([lat, lon]); }
+  positionBoat();
+ };
+ let alertEngine = null;
+ let alertMarkers = new Map();
+ function syncSondeurAlerts() {
+  const engine = active && vector ? vector : map;
+  if (engine !== alertEngine) {
+   for (const marker of alertMarkers.values()) marker.remove();
+   alertMarkers.clear();
+   alertEngine = engine;
+  }
+  if (!engine) return;
+  const entries = window.nauticSondeurAlertPoints?.() || [];
+  const keys = new Set(entries.map(entry => entry.time));
+  for (const [key, marker] of alertMarkers) {
+   if (!keys.has(key)) { marker.remove(); alertMarkers.delete(key); }
+  }
+  for (const entry of entries) {
+   if (alertMarkers.has(entry.time)) continue;
+   const {lat, lon} = entry.gps;
+   if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+   const pin = document.createElement('button');
+   pin.type = 'button';
+   pin.className = 'sondeur-map-alert' + (entry.simulated ? ' simulated' : '');
+   pin.textContent = entry.simulated ? '◇' : '!';
+   pin.title = (entry.simulated ? 'Alerte fictive' : 'Alerte de profondeur') + ' · ' + new Date(entry.time).toLocaleTimeString('fr-FR') + ' · ' + entry.depth.toLocaleString('fr-FR') + ' m';
+   pin.setAttribute('aria-label', pin.title);
+   pin.onclick = event => { event.stopPropagation(); window.nauticFocusSondeurAlert(entry.gps); };
+   const marker = active && vector
+    ? new maplibregl.Marker({element:pin}).setLngLat([lon, lat]).addTo(vector)
+    : L.marker([lat, lon], {icon:L.divIcon({className:'sondeur-alert-icon',html:pin,iconSize:[24,24]})}).addTo(map);
+   alertMarkers.set(entry.time, marker);
+  }
+ }
+ window.nauticEvery(syncSondeurAlerts, 1000, true);
  window.nauticVectorStatus=()=>({active,failed,engine:options.mapEngine||'vector'});
  settings(options);
 })();
