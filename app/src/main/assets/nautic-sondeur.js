@@ -55,7 +55,8 @@
         <div class="sondeur-bars" aria-hidden="true"></div>
         <div class="sondeur-extension" aria-hidden="true"></div>
         <svg class="sondeur-hull-outline" viewBox="0 0 120 60" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M2 18 C5 34 18 41 37 44 L44 54 Q51 59 60 59 C73 58 88 52 99 40 Q110 28 118 3"/>
+          <path d="M-120 59 H0 C29 59 60 54 83 43 C101 34 111 18 119 1"/>
+          <path class="sondeur-keel-seam" d="M-120 43 H83"/>
         </svg>
         <div class="sondeur-alert-mark" aria-hidden="true"></div>
       </div>
@@ -676,7 +677,6 @@
     plot.style.setProperty('--sondeur-axis', settings.axis + '%');
     plot.style.setProperty('--sondeur-bar-width', settings.width + 'px');
     plot.style.setProperty('--sondeur-half-bar', (settings.width / 2) + 'px');
-    plot.style.setProperty('--sondeur-hull-ratio', '13.4 / ' + settings.draft);
     plot.style.setProperty('--sondeur-draft-position', (settings.draft / settings.max * 100) + '%');
     if (!plot.hidden) draw();
   }

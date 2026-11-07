@@ -32,7 +32,7 @@
 .sondeur-reading[data-level='caution'] {color:#ffad55}
 .sondeur-reading[data-level='alert'] {color:#ff7183}
 
-.sondeur-alert-mark {position:absolute;top:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));left:50%;transform:translate(-50%,-50%);width:24px;height:3px;border-radius:2px;background:white;box-shadow:0 0 2px #000}
+.sondeur-alert-mark {position:absolute;top:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));left:50%;transform:translateX(-50%);width:24px;height:3px;border-radius:2px;background:white;box-shadow:0 0 2px #000}
 .sondeur-plot[data-level='caution'] .sondeur-alert-mark {background:#ffad55}
 .sondeur-plot[data-level='alert'] .sondeur-alert-mark {background:#ff7183}
 .sondeur-plot[data-level]:not([data-level='']) .sondeur-alert-mark {animation:sondeur-alert-blink 1s step-end infinite}
@@ -62,7 +62,7 @@
 .sondeur-mail-map .nautic-work-marker {scale:.65}
 
 .sondeurBlackBars .sondeur-bars span,.sondeurBlackBars .sondeur-extension {background:#000}
-.sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;transform:translateX(-50%);width:auto;max-width:100%;aspect-ratio:var(--sondeur-hull-ratio);height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
+.sondeur-hull-outline {display:none;position:absolute;top:0;left:50%;width:50%;overflow:visible;height:clamp(3px,var(--sondeur-draft-position),calc(100% - 3px));pointer-events:none}
 .sondeurHullOutline .sondeur-hull-outline {display:block}
 .sondeur-hull-outline path {fill:none;stroke:#000;stroke-width:2;stroke-opacity:.7;vector-effect:non-scaling-stroke}
 .sondeurShimmer .sondeur-picture::after {content:"";position:absolute;left:50%;top:38%;width:120%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle closest-side,transparent 56%,#dff8ff65 59%,transparent 63%,transparent 72%,#dff8ff40 74%,transparent 77%);animation:sondeur-shimmer 6s ease-out infinite}
@@ -80,3 +80,6 @@
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail="plant"]:not(:last-child)::before {content:"";position:absolute;bottom:100%;left:50%;transform:translateX(-50%) scale(var(--sondeur-detail-size,1));transform-origin:bottom center;pointer-events:none}
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail="stone"]:not(:last-child)::before {width:8px;height:5px;border-radius:65% 55% 20% 20%;background:#88847a}
 .sondeurBottomDetail .sondeur-bars span[data-bottom-detail="plant"]:not(:last-child)::before {width:10px;height:12px;clip-path:polygon(38% 100%,0 27%,40% 64%,48% 0,60% 64%,100% 23%,67% 100%);background:#547a43}
+
+.sondeur-hull-outline .sondeur-keel-seam {stroke-width:1;stroke-opacity:.55}
+.sondeur-picture::before {content:"";position:absolute;inset:0;pointer-events:none;background:conic-gradient(from 144deg at 51% -10%,transparent 0deg,#c3f1ff14 7deg,transparent 10deg,#d7f8ff19 22deg,transparent 25deg,#c3f1ff12 33deg,transparent 39deg 360deg);mask-image:linear-gradient(#000,transparent 85%)}
