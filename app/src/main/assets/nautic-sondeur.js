@@ -28,6 +28,7 @@
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label class="sondeur-axis-setting">Position du relevé <input id="sondeurAxis" type="range" min="10" max="95" step="1"><output id="sondeurAxisValue"></output></label>
+      <label>Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
       <button type="button" id="sondeurAlertList">Alertes sur la carte</button>
       <label>Cadence <select id="sondeurTempoMode"><option value="auto">Automatique</option><option value="manual">Manuelle</option></select></label>
       <label>Intervalle <input id="sondeurPeriod" type="number" min="0.1" max="60" step="0.01"> s</label>
@@ -154,10 +155,32 @@
     ...recordings.filter(entry => entry.simulated && entry.gps && entry.time >= Date.now() - oneHour)
   ];
 
+  const testEmail = get('sondeurTestEmail');
+  const testEmailKey = 'nautic-sondeur-test-email';
+  try { testEmail.value = localStorage.getItem(testEmailKey) || ''; } catch (_) {}
+  testEmail.addEventListener('input', () => {
+    if (testEmail.validity.valid) {
+      try { localStorage.setItem(testEmailKey, testEmail.value); } catch (_) {}
+    }
+  });
+
   get('sondeurAlertList').onclick = () => {
-    modal('Alertes du sondeur', '<div id="sondeurSavedAlerts"></div>');
+    modal('Alertes du sondeur', '<button type="button" id="sondeurResetAlerts">Remettre les points à zéro</button><div id="sondeurSavedAlerts"></div>');
+    const reset = document.getElementById('sondeurResetAlerts');
+    reset.onclick = () => {
+      if (!window.confirm('Supprimer tous les points d’alerte enregistrés sur la carte ?')) return;
+      alerts.clear();
+      for (const entry of recordings) delete entry.gps;
+      for (const entry of replay?.entries || []) delete entry.gps;
+      get('sondeurReplayGps').hidden = true;
+      saveAlerts();
+      persistRecordings();
+      list.textContent = 'Aucune alerte localisée.';
+      reset.disabled = true;
+    };
     const list = document.getElementById('sondeurSavedAlerts');
     const entries = window.nauticSondeurAlertPoints().sort((a, b) => b.time - a.time);
+    reset.disabled = !entries.length;
     if (!entries.length) list.textContent = 'Aucune alerte localisée.';
     for (const entry of entries) {
       const row = document.createElement('p');
@@ -177,12 +200,14 @@
         window.nauticFocusSondeurAlert?.(entry.gps);
       };
       row.append(focus);
-      if (!entry.simulated) {
+      const recipient = entry.simulated ? (testEmail.validity.valid ? testEmail.value.trim() : '') : 'uti.valdeloireseine@vnf.fr';
+      if (recipient) {
         const mail = document.createElement('a');
-        mail.textContent = 'Préparer le courriel VNF';
-        const subject = 'Signalement à vérifier — haut-fond ou anomalie de profondeur';
+        mail.textContent = entry.simulated ? 'Préparer le courriel de test' : 'Préparer le courriel VNF';
+        const subject = (entry.simulated ? '[TEST] ' : '') + 'Signalement à vérifier — haut-fond ou anomalie de profondeur';
         const body = [
           'Bonjour,', '',
+          ...(entry.simulated ? ['Simulation Nautic — position et profondeur fictives.', ''] : []),
           'Je vous signale une faible profondeur relevée au sondeur, susceptible d’indiquer un haut-fond ou une anomalie.',
           'Voie d’eau, commune et PK : [à préciser]',
           'Date et heure locales : ' + date,
@@ -191,8 +216,10 @@
           'Conditions et observations : [à compléter]', '',
           'Pouvez-vous vérifier ce point et m’indiquer la suite donnée ?', '', 'Cordialement,', '[Nom et coordonnées]'
         ].join('\r\n');
-        mail.href = 'mailto:uti.valdeloireseine@vnf.fr?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+        mail.href = 'mailto:' + encodeURIComponent(recipient) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
         row.append(' ', mail);
+      } else {
+        row.append(' · Renseigne le courriel de test dans les paramètres du sondeur.');
       }
       list.append(row);
     }

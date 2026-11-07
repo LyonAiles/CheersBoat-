@@ -82,7 +82,7 @@
  const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
  function info(p){return `<b>${esc(p.name)}</b> · ${esc(p.type)}<br>${(p.distance/1000).toFixed(2)} km · ${p.mode==='réseau'?'par le réseau d’eau (branche à confirmer)':'à vol d’oiseau'}${p.clearance?'<br>Hauteur déclarée OSM : '+esc(p.clearance):''}${p.width?'<br>Largeur déclarée : '+esc(p.width):''}${p.length?'<br>Longueur déclarée : '+esc(p.length):''}${p.opening?'<br>Horaires déclarés : '+esc(p.opening):''}`;}
  function showItem(id){const p=lastList.find(x=>x.id===id);if(!p)return;modal('Ouvrage fluvial',info(p)+'<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');}
- function showList(list=lastList){modal('Ouvrages autour du bateau',`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();
+ function showList(list=lastList){modal('Ouvrages autour du bateau', (options.waterwayTypes?.sondeurAlert === false ? '' : '<button type="button" id="waterwaySondeurAlerts">Points d’alerte du sondeur</button>')+`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));const alertsButton=$('waterwaySondeurAlerts');if(alertsButton)alertsButton.onclick=()=>{$('dialog').close();$('sondeurAlertList')?.click();};$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();
  try{cache=JSON.parse(localStorage.getItem('nautic-waterways-cache')||'null');if(cache&&Array.isArray(cache.elements))data=W.parse(cache.elements);else cache=null;}catch(_){cache=null;}
  window.nauticFocusSondeurAlert = ({lat, lon}) => {
   window.nauticMapFreePan = true;
@@ -104,7 +104,7 @@
    alertEngine = engine;
   }
   if (!engine) return;
-  const entries = window.nauticSondeurAlertPoints?.() || [];
+  const entries = options.waterwayTypes?.sondeurAlert === false ? [] : (window.nauticSondeurAlertPoints?.() || []);
   const keys = new Set(entries.map(entry => entry.time));
   for (const [key, marker] of alertMarkers) {
    if (!keys.has(key)) { marker.remove(); alertMarkers.delete(key); }
