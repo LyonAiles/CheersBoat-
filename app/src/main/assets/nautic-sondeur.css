@@ -10,15 +10,16 @@
 .sondeur-plot {flex:1;min-height:0;position:relative;overflow:hidden}
 .sondeur-picture,.sondeur-bars {position:absolute;inset:0}
 .sondeur-picture {background:linear-gradient(#06172566,#06172599),url('sondeur-eau.jpg') center center/cover}
+.sondeur-low-water .sondeur-picture {background:#000}
 .sondeur-bars {display:flex;align-items:end;justify-content:end;overflow:hidden}
 .sondeur-bars span {flex:none;background:#6b7378}
 .sondeur-reading {position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);background:#f5fafae8;color:#4b5358;border-radius:7px;padding:4px 9px;font:bold 24px system-ui;white-space:nowrap;pointer-events:none}
 
 .sondeur-scale {position:absolute;inset:0;overflow:hidden}
 .sondeur-hull {position:absolute;top:0;left:50%;transform:translateX(-50%);height:auto;fill:#747b80;pointer-events:none}
-.sondeur-bars span.shallow {background:#e13239}
+.sondeur-bars span.shallow {background:#680e29}
 
-.sondeur-bars span.caution {background:#e7a030}
+.sondeur-bars span.caution {background:#8a3b08}
 .sondeur-depth-marks {position:absolute;inset:0;z-index:1;pointer-events:none}
 .sondeur-depth-marks span {position:absolute;right:0;padding:0 5px;color:white;background:#102d40cc;font-size:10px;transform:translateY(-50%);border-left:5px solid #d4e0e5}
 .sondeur-depth-marks span:first-child {transform:none}

@@ -78,10 +78,8 @@
   const alertSound = new Audio('alertefond.mp3');
   for (const sound of [cautionSound, alertSound]) {
     sound.preload = 'auto';
+    sound.loop = true;
   }
-
-  alertSound.loop = true;
-  let cautionTriggered = false;
 
   function setSound(sound, shouldPlay) {
     if (shouldPlay) {
@@ -94,18 +92,7 @@
 
   function updateSound(depth) {
     const audible = !panel.hidden && !document.hidden && Number.isFinite(depth);
-    if (!audible) {
-      cautionTriggered = false;
-      setSound(cautionSound, false);
-    } else if (depth >= 2) {
-      cautionTriggered = false;
-    } else if (!cautionTriggered) {
-      cautionTriggered = true;
-      if (cautionSound.paused) {
-        cautionSound.currentTime = 0;
-        cautionSound.play().catch(() => {});
-      }
-    }
+    setSound(cautionSound, audible && depth < 2);
     setSound(alertSound, audible && depth < settings.alert);
   }
 
@@ -139,7 +126,9 @@
       return bar;
     });
     bars.replaceChildren(...columns);
-    reading.textContent = history.length ? format.format(history.at(-1)) + ' m' : '— m';
+    const latest = history.at(-1);
+    plot.classList.toggle('sondeur-low-water', latest < 2);
+    reading.textContent = history.length ? format.format(latest) + ' m' : '— m';
   }
 
   function append(depth) {
