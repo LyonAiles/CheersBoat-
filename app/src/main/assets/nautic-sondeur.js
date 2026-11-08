@@ -34,7 +34,8 @@
       <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
       <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
-      <label>Fond du sondeur <select id="sondeurWaveBackground"><option value="photo">Photo actuelle</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option><option value="none">Sans image</option></select></label>
+      <label>Vision sous-marine <select id="sondeurScene"><option value="photo">Photo d’origine</option><option value="clear">Eau claire</option><option value="deep">Eau profonde</option><option value="none">Sans image</option></select></label>
+      <label>Voile d’ondes sur la carte <select id="sondeurWaveBackground"><option value="none">Désactivé</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option></select></label>
       <label><input type="checkbox" id="sondeurSunRays"> Rayons du soleil</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <label class="sondeur-wide-setting">Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
@@ -81,7 +82,11 @@
   replayButton.setAttribute('aria-label', 'Relire la dernière heure');
   panel.querySelector('.sondeur-title').append(replayButton);
   panel.querySelector('.sondeur-actions').prepend(toggle);
-  map.append(panel);
+  const mapVeil = document.createElement('div');
+  mapVeil.className = 'sondeur-map-veil';
+  mapVeil.hidden = true;
+  mapVeil.setAttribute('aria-hidden', 'true');
+  map.append(mapVeil, panel);
   const toolbar = panel.querySelector('.sondeur-tools');
   if (typeof ResizeObserver === 'function') {
     new ResizeObserver(() => map.style.setProperty('--sondeur-toolbar-height', toolbar.offsetHeight + 'px')).observe(toolbar);
@@ -679,13 +684,21 @@
     });
   }
 
+  const scene = get('sondeurScene');
+  settings.scene = ['clear', 'deep', 'none'].includes(saved.scene) ? saved.scene : 'photo';
+  scene.value = plot.dataset.scene = settings.scene;
+  scene.addEventListener('change', () => {
+    settings.scene = plot.dataset.scene = scene.value;
+    saveSettings();
+  });
+
   const waveBackground = get('sondeurWaveBackground');
-  waveBackground.value = ['fine', 'wide', 'none'].includes(saved.waveBackground) ? saved.waveBackground : 'photo';
-  settings.waveBackground = waveBackground.value;
-  plot.dataset.waveBackground = waveBackground.value;
+  const savedWaves = saved.mapWaves ?? saved.waveBackground;
+  settings.mapWaves = ['fine', 'wide'].includes(savedWaves) ? savedWaves : 'none';
+  waveBackground.value = mapVeil.dataset.waves = settings.mapWaves;
   waveBackground.addEventListener('change', () => {
-    settings.waveBackground = waveBackground.value;
-    plot.dataset.waveBackground = waveBackground.value;
+    settings.mapWaves = mapVeil.dataset.waves = waveBackground.value;
+    mapVeil.hidden = plot.hidden || settings.mapWaves === 'none';
     saveSettings();
   });
 
@@ -696,6 +709,7 @@
     const missing = history.at(-1)?.missing;
     const receiving = timer !== null || get('sondeurTitle').dataset.live;
     plot.hidden = !(manualPlot || (settings.auto && receiving && !autoSuppressed && Number.isFinite(latest) && latest < settings.caution));
+    mapVeil.hidden = plot.hidden || settings.mapWaves === 'none';
     toggle.setAttribute('aria-expanded', String(!plot.hidden));
     reading.textContent = Number.isFinite(latest) ? format.format(latest) + (missing ? '*' : '') : '—';
     reading.title = missing ? 'Sans écho · dernière valeur connue' : '';
