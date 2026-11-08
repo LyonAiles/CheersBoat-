@@ -152,7 +152,13 @@ final class DashboardCameras {
     boolean inMap=isMapView(id);
     if(inMap){tile.frame.setAlpha(mapAlpha);tile.frame.bringToFront();}
     if(!inMap)tile.decorate(item);
-    boolean mobile=id.equals("trematagePreview");int index=mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,inMap?(id.equals("mapCameraPort")?3-mapCameraIndex:id.equals("mapCameraPreview")?mapCameraIndex:2):id.charAt(3)-'0');
+    boolean mobile=id.equals("trematagePreview");
+    int index;
+    if(inMap){
+     index=id.equals("mapCameraPort")?3-mapCameraIndex:id.equals("mapCameraPreview")?mapCameraIndex:2;
+    }else{
+     index=mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
+    }
     String url=TrematageAccess.address(activity,index);
     if(!url.startsWith("rtsp://")){tile.message.setText("📷");continue;}
     Uri uri=Uri.parse(url);android.content.SharedPreferences p=activity.getSharedPreferences("nautic_camera_private",0);

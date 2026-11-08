@@ -132,7 +132,7 @@
 #mapWrap:has(#sondeurSettings:not([hidden])) #nauticSondeur {z-index:852}
 
 .sondeur-tools {gap:8px;padding:2px 6px}
-.sondeur-title,.sondeur-actions {gap:10px}
+.sondeur-title,.sondeur-actions {gap:clamp(10px,4vw,22px)}
 .sondeur-tools button {min-width:34px;min-height:32px;padding:2px 5px}
 .sondeur-settings:not([hidden]) {
  position:fixed;
@@ -156,7 +156,3 @@
 .sondeur-settings label {flex-wrap:wrap;min-width:0}
 .sondeur-settings select {max-width:100%}
 .sondeur-settings #sondeurTempoStatus {grid-column:1/-1}
-@media(max-width:360px) {
- .sondeur-title {gap:4px}
- .sondeur-actions {gap:5px}
-}

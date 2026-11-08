@@ -1,5 +1,5 @@
 /* Dashboard controls share the same frame, spacing and preview area. */
-#app header #nauticHeaderControls{right:6px!important;gap:5px!important}
+#app header #nauticHeaderControls{right:6px!important;gap:14px!important}
 #app header #nauticHeaderControls button{width:38px!important;height:36px!important;min-width:0!important;margin:0!important;padding:3px!important;font-size:23px!important;line-height:1!important}
 #app header #nauticContactsButton{order:99!important}
 #app .gauges #nauticCallsSlot{flex:0 0 12%!important;order:0;align-items:center}
