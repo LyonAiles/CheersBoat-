@@ -34,6 +34,7 @@
       <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
       <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
+      <label>Fond du sondeur <select id="sondeurWaveBackground"><option value="photo">Photo actuelle</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option><option value="none">Sans image</option></select></label>
       <label><input type="checkbox" id="sondeurSunRays"> Rayons du soleil</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <label class="sondeur-wide-setting">Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
@@ -677,6 +678,16 @@
       saveSettings();
     });
   }
+
+  const waveBackground = get('sondeurWaveBackground');
+  waveBackground.value = ['fine', 'wide', 'none'].includes(saved.waveBackground) ? saved.waveBackground : 'photo';
+  settings.waveBackground = waveBackground.value;
+  plot.dataset.waveBackground = waveBackground.value;
+  waveBackground.addEventListener('change', () => {
+    settings.waveBackground = waveBackground.value;
+    plot.dataset.waveBackground = waveBackground.value;
+    saveSettings();
+  });
 
   function refreshView() {
     inputs.alert.max = settings.caution;

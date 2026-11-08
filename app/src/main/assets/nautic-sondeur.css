@@ -102,7 +102,15 @@
 #app #mapWrap #compass {top:calc(var(--sondeur-toolbar-height, 36px) + 6px)!important}
 
 .sondeur-plot {--sondeur-bow-gap:max(64px,12.5%)}
-.sondeur-anchor-hole {display:none;position:absolute;right:calc(var(--sondeur-bow-gap) + 12px);top:calc(var(--sondeur-draft-position) * .65);width:9px;height:9px;border:1.5px solid #000b;border-radius:50%;pointer-events:none}
+.sondeur-anchor-hole {display:none;position:absolute;right:calc(var(--sondeur-bow-gap) + 22px);top:calc(var(--sondeur-draft-position) * .48);width:14px;height:14px;border:1.5px solid #000b;border-radius:50%;pointer-events:none}
 .sondeurHullOutline .sondeur-anchor-hole {display:block}
 #app #mapWrap #mapRecenter {top:calc(var(--sondeur-toolbar-height, 36px) + 60px)!important}
 #app #mapWrap #mapLayers {top:calc(var(--sondeur-toolbar-height, 36px) + 112px)!important}
+
+.sondeur-tools button,.sondeur-settings button,.sondeur-replay button {-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.sondeur-plot[data-wave-background="none"] .sondeur-picture {background:none}
+.sondeur-plot[data-wave-background="fine"] .sondeur-picture,.sondeur-plot[data-wave-background="wide"] .sondeur-picture {
+  background-image:linear-gradient(#12364a24,#041925a8),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='36' viewBox='0 0 180 36'%3E%3Cpath d='M0 7 Q45 -3 90 7 T180 7 M0 20 Q45 30 90 20 T180 20 M0 31 Q45 22 90 31 T180 31' fill='none' stroke='%23b5eaf9' stroke-opacity='.32' stroke-width='2'/%3E%3C/svg%3E"),linear-gradient(#397d99,#102d42);
+  background-size:cover,180px 36px,cover;
+}
+.sondeur-plot[data-wave-background="wide"] .sondeur-picture {background-size:cover,330px 76px,cover}
