@@ -34,8 +34,8 @@
       <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
       <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
-      <label>Vision sous-marine <select id="sondeurScene"><option value="photo">Photo d’origine</option><option value="clear">Eau claire</option><option value="deep">Eau profonde</option><option value="none">Sans image</option></select></label>
-      <label>Voile d’ondes sur la carte <select id="sondeurWaveBackground"><option value="none">Désactivé</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option></select></label>
+      <label>Vision sous-marine <select id="sondeurScene"><option value="photo">Photo d’origine</option><option value="clear">Eau claire</option><option value="deep">Eau profonde</option><option value="blue-surface">Surface bleue</option><option value="deep-rays">Rayons en profondeur</option><option value="none">Sans image</option></select></label>
+      <label>Voile d’ondes sur la carte <select id="sondeurWaveBackground"><option value="none">Désactivé</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option><option value="green">Vert diffus</option><option value="turquoise">Turquoise diffus</option><option value="deep-blue">Bleu profond</option><option value="blue-waves">Vagues bleues</option></select></label>
       <label><input type="checkbox" id="sondeurSunRays"> Rayons du soleil</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <label class="sondeur-wide-setting">Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
@@ -685,7 +685,7 @@
   }
 
   const scene = get('sondeurScene');
-  settings.scene = ['clear', 'deep', 'none'].includes(saved.scene) ? saved.scene : 'photo';
+  settings.scene = Array.from(scene.options).some(option => option.value === saved.scene) ? saved.scene : 'photo';
   scene.value = plot.dataset.scene = settings.scene;
   scene.addEventListener('change', () => {
     settings.scene = plot.dataset.scene = scene.value;
@@ -694,7 +694,7 @@
 
   const waveBackground = get('sondeurWaveBackground');
   const savedWaves = saved.mapWaves ?? saved.waveBackground;
-  settings.mapWaves = ['fine', 'wide'].includes(savedWaves) ? savedWaves : 'none';
+  settings.mapWaves = Array.from(waveBackground.options).some(option => option.value === savedWaves) ? savedWaves : 'none';
   waveBackground.value = mapVeil.dataset.waves = settings.mapWaves;
   waveBackground.addEventListener('change', () => {
     settings.mapWaves = mapVeil.dataset.waves = waveBackground.value;

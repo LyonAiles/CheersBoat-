@@ -119,3 +119,12 @@
 .sondeur-map-veil[hidden] {display:none}
 .sondeur-plot[data-scene="clear"] .sondeur-picture {background:linear-gradient(#6ec6ca24,#0a484761),url('sondeur-eau.jpg') center 25%/cover}
 .sondeur-plot[data-scene="deep"] .sondeur-picture {background:linear-gradient(#0b28435c,#020914dd),url('sondeur-eau.jpg') center bottom/cover}
+
+.sondeur-map-veil[data-waves="green"] {background:center/cover no-repeat url('voile-vert.jpg')}
+.sondeur-map-veil[data-waves="turquoise"] {background:center/cover no-repeat url('voile-turquoise.jpg')}
+.sondeur-map-veil[data-waves="deep-blue"] {background:center/cover no-repeat url('voile-bleu-profond.jpg')}
+.sondeur-map-veil[data-waves="blue-waves"] {overflow:hidden;background:#07518b}
+.sondeur-map-veil[data-waves="blue-waves"]::before {content:"";position:absolute;inset:-27% 0 0;background:center bottom/cover no-repeat url('voile-vagues-bleues.jpg')}
+
+.sondeur-plot[data-scene="blue-surface"] .sondeur-picture {background:#05264a url('sondeur-surface-bleue.jpg') center top/cover no-repeat}
+.sondeur-plot[data-scene="deep-rays"] .sondeur-picture {background:#061a27 url('sondeur-rayons-profonds.jpg') center/cover no-repeat}
