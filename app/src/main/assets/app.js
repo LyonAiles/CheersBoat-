@@ -256,11 +256,15 @@ function weatherDialog(){
   popup.setAttribute('aria-labelledby','nauticWeatherTitle');
   popup.innerHTML='<div class="dialogTop"><strong id="nauticWeatherTitle">Vent — prochaines 10 heures</strong><button type="button" aria-label="Fermer la météo">×</button></div><div id="localWeatherForecast"></div>';
   popup.querySelector('button').onclick=()=>popup.close();
-  popup.addEventListener('close',()=>$('weatherCard').setAttribute('aria-expanded','false'));
+  popup.addEventListener('close',()=>{
+   $('weatherCard').setAttribute('aria-expanded','false');
+   window.nauticDashboardResume?.();
+  });
   document.body.append(popup);
  }
  if(popup.open){popup.close();return;}
- popup.show();
+ popup.showModal();
+ window.nauticDashboardResume?.();
  $('weatherCard').setAttribute('aria-expanded','true');
  renderWeatherForecast();
  if(!weatherForecast&&latest)$('localWeatherForecast').textContent='Chargement de la météo locale…';

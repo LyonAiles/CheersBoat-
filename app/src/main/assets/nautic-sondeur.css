@@ -131,9 +131,9 @@
 #mapWrap.sondeur-deployed #compass,#mapWrap.sondeur-deployed #mapRecenter,#mapWrap.sondeur-deployed #mapLayers {z-index:851!important}
 #mapWrap:has(#sondeurSettings:not([hidden])) #nauticSondeur {z-index:852}
 
-.sondeur-tools {gap:6px}
-.sondeur-title,.sondeur-actions {gap:8px}
-.sondeur-tools button {min-width:44px;min-height:44px}
+.sondeur-tools {gap:8px;padding:2px 6px}
+.sondeur-title,.sondeur-actions {gap:10px}
+.sondeur-tools button {min-width:34px;min-height:32px;padding:2px 5px}
 .sondeur-settings:not([hidden]) {
  position:fixed;
  inset:auto 4px 4px;
@@ -153,7 +153,7 @@
  padding-bottom:4px;
  border-bottom:1px solid #4184a4;
 }
-.sondeur-settings label {flex-wrap:wrap}
+.sondeur-settings label {flex-wrap:wrap;min-width:0}
 .sondeur-settings select {max-width:100%}
 .sondeur-settings #sondeurTempoStatus {grid-column:1/-1}
 @media(max-width:360px) {

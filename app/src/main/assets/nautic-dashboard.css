@@ -142,8 +142,8 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
 #app #nauticSettingsButton {min-width:44px;min-height:44px;margin-inline-end:6px}
 #nauticWeatherPopup {
  position:fixed;
- inset:8px 8px auto;
- margin:0 auto;
+ inset:auto 8px 8px auto;
+ margin:0;
  width:min(calc(100vw - 16px), 610px);
  max-height:min(62dvh, 420px);
  overflow:auto;
