@@ -30,7 +30,7 @@
       <label class="sondeur-slider">Largeur <output id="sondeurWidthValue"></output><input id="sondeurWidth" type="range" min="2" max="24"></label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label><input type="checkbox" id="sondeurBlackBars"> Barres uniformes noires</label>
-      <label><input type="checkbox" id="sondeurHullOutline"> Contour léger de la coque</label>
+      <label><input type="checkbox" id="sondeurHullOutline"> Ligne de coque</label>
       <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
       <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
@@ -71,7 +71,6 @@
         <svg class="sondeur-hull-outline" viewBox="0 0 120 60" preserveAspectRatio="none" aria-hidden="true">
           <path d="M-600 59 H0 Q18 59 120 0"/>
         </svg>
-        <div class="sondeur-anchor-hole" aria-hidden="true"></div>
         <div class="sondeur-alert-mark" aria-hidden="true"></div>
       </div>
     </div>`;
@@ -703,6 +702,7 @@
   });
 
   let gesture = null;
+  let lastTap = null;
   function cycleBackground(select) {
     select.selectedIndex = (select.selectedIndex + 1) % select.options.length;
     select.dispatchEvent(new Event('change'));
@@ -729,9 +729,18 @@
     const {x, moved} = gesture;
     gesture = null;
     if (moved) saveSettings();
-    else if (event.type === 'pointerup') {
-      if (x < 1 / 3) cycleBackground(waveBackground);
-      else if (x > 2 / 3) cycleBackground(scene);
+    const side = x < 1 / 3 ? 'left' : x > 2 / 3 ? 'right' : null;
+    if (moved || !side || event.type !== 'pointerup') {
+      lastTap = null;
+      return;
+    }
+    const now = performance.now();
+    if (lastTap?.side === side && now - lastTap.time <= 350 &&
+        Math.hypot(event.clientX - lastTap.x, event.clientY - lastTap.y) <= 32) {
+      lastTap = null;
+      cycleBackground(side === 'left' ? waveBackground : scene);
+    } else {
+      lastTap = {side, time: now, x: event.clientX, y: event.clientY};
     }
   }
   plot.addEventListener('pointerup', finishGesture);
@@ -746,6 +755,7 @@
     const receiving = timer !== null || get('sondeurTitle').dataset.live;
     plot.hidden = !(manualPlot || (settings.auto && receiving && !autoSuppressed && Number.isFinite(latest) && latest < settings.caution));
     mapVeil.hidden = plot.hidden || settings.mapWaves === 'none';
+    if (plot.hidden) lastTap = null;
     map.classList.toggle('sondeur-deployed', !plot.hidden);
     toggle.setAttribute('aria-expanded', String(!plot.hidden));
     reading.textContent = Number.isFinite(latest) ? format.format(latest) + (missing ? '*' : '') : '—';
