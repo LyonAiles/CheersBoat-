@@ -4,7 +4,7 @@
 .sondeur-tools {display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
 .sondeur-actions {display:flex;justify-content:end;gap:3px}
 .sondeur-tools strong {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sondeur-tools button {padding:3px 6px;font-size:12px}
+.sondeur-tools button {padding:4px 7px;min-height:34px;min-width:34px;font-size:12px;touch-action:manipulation}
 .sondeur-settings {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:3px 8px;min-height:0;overflow:auto;overscroll-behavior:contain}
 .sondeur-settings label {display:flex;align-items:center;gap:4px;font-size:11px}
 .sondeur-settings input[type="number"] {width:4em;padding:3px 4px;min-width:0}
@@ -13,7 +13,7 @@
 .sondeur-settings .sondeur-wide-setting,.sondeur-settings .sondeur-slider {grid-column:1/-1}
 .sondeur-settings .sondeur-slider {display:grid;grid-template-columns:1fr auto;gap:0 4px}
 .sondeur-slider input[type="range"] {grid-column:1/-1;width:100%;min-width:0;margin:0;height:18px}
-.sondeur-plot {flex:1;min-height:0;position:relative;overflow:hidden}
+.sondeur-plot {pointer-events:auto;touch-action:none;flex:1;min-height:0;position:relative;overflow:hidden}
 .sondeur-picture,.sondeur-bars {position:absolute;inset:0}
 .sondeur-picture {background:linear-gradient(#06172566,#06172599),url('sondeur-eau.jpg') center center/cover}
 .sondeur-bars {left:calc(-1 * var(--sondeur-bar-width));right:max(0px,calc(100% - var(--sondeur-axis) - var(--sondeur-half-bar)));display:flex;align-items:end;justify-content:end;overflow:hidden}
@@ -128,3 +128,6 @@
 
 .sondeur-plot[data-scene="blue-surface"] .sondeur-picture {background:#05264a url('sondeur-surface-bleue.jpg') center top/cover no-repeat}
 .sondeur-plot[data-scene="deep-rays"] .sondeur-picture {background:#061a27 url('sondeur-rayons-profonds.jpg') center/cover no-repeat}
+
+#mapWrap.sondeur-deployed #compass,#mapWrap.sondeur-deployed #mapRecenter,#mapWrap.sondeur-deployed #mapLayers {z-index:851!important}
+#mapWrap:has(#sondeurSettings:not([hidden])) #nauticSondeur {z-index:852}

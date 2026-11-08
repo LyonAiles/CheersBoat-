@@ -702,6 +702,42 @@
     saveSettings();
   });
 
+  let gesture = null;
+  function cycleBackground(select) {
+    select.selectedIndex = (select.selectedIndex + 1) % select.options.length;
+    select.dispatchEvent(new Event('change'));
+  }
+  plot.addEventListener('pointerdown', event => {
+    if (!event.isPrimary || event.button !== 0) return;
+    const rect = plot.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    gesture = {id: event.pointerId, x, startX: event.clientX, startY: event.clientY, alpha: settings.alpha, moved: false};
+    plot.setPointerCapture(event.pointerId);
+  });
+  plot.addEventListener('pointermove', event => {
+    if (gesture?.id !== event.pointerId) return;
+    const dy = event.clientY - gesture.startY;
+    if (Math.abs(dy) > 6 || Math.abs(event.clientX - gesture.startX) > 6) gesture.moved = true;
+    if (!gesture.moved || gesture.x < 1 / 3 || gesture.x > 2 / 3) return;
+    settings.alpha = Math.round(clamp(gesture.alpha + dy * 90 / Math.max(1, plot.clientHeight), 0, 90, gesture.alpha));
+    inputs.alpha.value = settings.alpha;
+    plot.style.opacity = String(1 - settings.alpha / 100);
+    get('sondeurAlphaValue').textContent = settings.alpha + ' %';
+  });
+  function finishGesture(event) {
+    if (gesture?.id !== event.pointerId) return;
+    const {x, moved} = gesture;
+    gesture = null;
+    if (moved) saveSettings();
+    else if (event.type === 'pointerup') {
+      if (x < 1 / 3) cycleBackground(waveBackground);
+      else if (x > 2 / 3) cycleBackground(scene);
+    }
+  }
+  plot.addEventListener('pointerup', finishGesture);
+  plot.addEventListener('pointercancel', finishGesture);
+  plot.addEventListener('lostpointercapture', finishGesture);
+
   function refreshView() {
     inputs.alert.max = settings.caution;
     inputs.caution.min = settings.alert;
@@ -710,6 +746,7 @@
     const receiving = timer !== null || get('sondeurTitle').dataset.live;
     plot.hidden = !(manualPlot || (settings.auto && receiving && !autoSuppressed && Number.isFinite(latest) && latest < settings.caution));
     mapVeil.hidden = plot.hidden || settings.mapWaves === 'none';
+    map.classList.toggle('sondeur-deployed', !plot.hidden);
     toggle.setAttribute('aria-expanded', String(!plot.hidden));
     reading.textContent = Number.isFinite(latest) ? format.format(latest) + (missing ? '*' : '') : '—';
     reading.title = missing ? 'Sans écho · dernière valeur connue' : '';
