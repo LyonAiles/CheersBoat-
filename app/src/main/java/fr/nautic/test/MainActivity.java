@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
  private final java.util.concurrent.atomic.AtomicBoolean trematageBusy=new java.util.concurrent.atomic.AtomicBoolean();
  private boolean dashboardVisible=false,mapManipulating=false;
  void dashboardClick(String id,boolean held){js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
+ void updateMapCameraAlpha(float alpha){js("nauticMapCameraAlpha",Float.toString(alpha));}
  void refreshDashboardVideos(){js("nauticDashboardResume","");}
  void dashboardAlert(String message){js("nauticTrematageAlert",message);}
  private PermissionRequest pendingCamera;

@@ -17,6 +17,13 @@ final class DashboardCameras {
  final Map<String,Source> sources=new LinkedHashMap<>();
  final Map<String,Long> retryAt=new HashMap<>();
  int decoderBudget=4;
+ float mapAlpha=1;
+ boolean adjustingMapAlpha;
+ static boolean isMapView(String id){return id.startsWith("mapCamera");}
+ void setMapAlpha(float value){
+  mapAlpha=value;
+  for(Tile tile:tiles.values())if(isMapView(tile.id))tile.frame.setAlpha(value);
+ }
  boolean stopped=false,mapPaused=false;
  void pauseForMap(boolean paused){
   if(mapPaused==paused)return;mapPaused=paused;
@@ -37,8 +44,55 @@ final class DashboardCameras {
    banner=overlay(11);banner.setSingleLine(true);banner.setEllipsize(android.text.TextUtils.TruncateAt.END);frame.addView(banner,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
    footer=overlay(10);footer.setMaxLines(2);frame.addView(footer,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));footer.setVisibility(View.GONE);
    beacon=overlay(42);beacon.setText("⚠");beacon.setBackgroundColor(0xe6e00000);beacon.setVisibility(View.GONE);frame.addView(beacon,new FrameLayout.LayoutParams(dp(70),dp(66),Gravity.CENTER));
+   if(isMapView(id)){
+    if(!id.equals("mapCameraPreview")){
+     frame.setOutlineProvider(new ViewOutlineProvider(){
+      @Override public void getOutline(View view,Outline outline){outline.setOval(0,0,view.getWidth(),view.getHeight());}
+     });
+    }else installTransparencyGesture();
+    banner.setVisibility(View.GONE);
+    frame.setContentDescription("Fermer la caméra Roof");
+    frame.setOnClickListener(v->activity.dashboardClick(id,false));
+    layer.addView(frame);
+    return;
+   }
    TextView refresh=overlay(20);refresh.setText("↻");refresh.setContentDescription("Rafraîchir cette caméra");frame.addView(refresh,new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.TOP|Gravity.RIGHT));refresh.setOnClickListener(v->{refreshTile(id);activity.refreshDashboardVideos();});
    frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{activity.dashboardClick(id,true);return true;});layer.addView(frame);
+  }
+  void installTransparencyGesture(){
+   frame.setOnTouchListener(new View.OnTouchListener(){
+    float startY,startAlpha;
+    boolean center,dragged;
+    @Override public boolean onTouch(View view,MotionEvent event){
+     switch(event.getActionMasked()){
+      case MotionEvent.ACTION_DOWN:
+       center=Math.abs(event.getX()-view.getWidth()/2f)<=view.getWidth()/6f;
+       startY=event.getRawY();
+       startAlpha=mapAlpha;
+       dragged=false;
+       return true;
+      case MotionEvent.ACTION_MOVE:
+       float delta=event.getRawY()-startY;
+       if(center&&(dragged||Math.abs(delta)>ViewConfiguration.get(activity).getScaledTouchSlop())){
+        dragged=true;
+        adjustingMapAlpha=true;
+        setMapAlpha(Math.max(.15f,Math.min(1f,startAlpha+delta/view.getHeight())));
+       }
+       return true;
+      case MotionEvent.ACTION_UP:
+       if(!dragged)view.performClick();
+       // Keep the native and web previews at the same opacity.
+       if(dragged)activity.updateMapCameraAlpha(mapAlpha);
+       adjustingMapAlpha=false;
+       return true;
+      case MotionEvent.ACTION_CANCEL:
+       if(dragged)activity.updateMapCameraAlpha(mapAlpha);
+       adjustingMapAlpha=false;
+       return true;
+      default:return true;
+     }
+    }
+   });
   }
   void decorate(JSONObject data){
    active=data.optBoolean("active",false);
@@ -88,13 +142,16 @@ final class DashboardCameras {
   if(stopped||mapPaused)return;
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
+   if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();
    for(int i=0;i<list.length();i++){
-    JSONObject item=list.getJSONObject(i);String id=item.getString("id");if(!id.matches("cam[123]Body|trematagePreview"))continue;
+    JSONObject item=list.getJSONObject(i);String id=item.getString("id");if(!id.matches("cam[123]Body|trematagePreview|mapCameraPreview|mapCameraPort|mapCameraStarboard"))continue;
     visible.add(id);Tile tile=tiles.get(id);if(tile==null){tile=new Tile(id);tiles.put(id,tile);}
     FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(Math.max(1,(int)(item.getDouble("w")*scale)),Math.max(1,(int)(item.getDouble("h")*scale)));lp.leftMargin=(int)(item.getDouble("x")*scale);lp.topMargin=(int)(item.getDouble("y")*scale);tile.frame.setLayoutParams(lp);tile.frame.setVisibility(View.VISIBLE);
-    tile.decorate(item);
-    boolean mobile=id.equals("trematagePreview");int index=mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
+    boolean inMap=isMapView(id);
+    if(inMap){tile.frame.setAlpha(mapAlpha);tile.frame.bringToFront();}
+    if(!inMap)tile.decorate(item);
+    boolean mobile=id.equals("trematagePreview");int index=mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,inMap?(id.equals("mapCameraPort")?1:id.equals("mapCameraStarboard")?3:2):id.charAt(3)-'0');
     String url=TrematageAccess.address(activity,index);
     if(!url.startsWith("rtsp://")){tile.message.setText("📷");continue;}
     Uri uri=Uri.parse(url);android.content.SharedPreferences p=activity.getSharedPreferences("nautic_camera_private",0);
@@ -103,14 +160,14 @@ final class DashboardCameras {
     String tapoHost=Uri.parse(TrematageAccess.address(activity,TrematageAccess.index(activity))).getHost();
     String path=CameraStreamPolicy.preview(uri.getPath(),mobile,index==1||java.util.Objects.equals(tapoHost,uri.getHost()));
     String stream="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+uri.getHost()+":"+(uri.getPort()>0?uri.getPort():554)+path;
-    if(!grouped.containsKey(stream))grouped.put(stream,new ArrayList<>());grouped.get(stream).add(tile);
+    if(!grouped.containsKey(stream))grouped.put(stream,new ArrayList<>());if(id.equals("mapCameraPreview"))grouped.get(stream).add(0,tile);else grouped.get(stream).add(tile);
    }
    for(Tile t:tiles.values())if(!visible.contains(t.id))t.frame.setVisibility(View.GONE);
    long now=System.currentTimeMillis();
    List<String> eligible=new ArrayList<>();String priority=null;
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
     if(retryAt.containsKey(e.getKey())&&retryAt.get(e.getKey())>now)continue;
-    eligible.add(e.getKey());for(Tile tile:e.getValue())if(tile.id.equals("trematagePreview")&&tile.active)priority=e.getKey();
+    eligible.add(e.getKey());for(Tile tile:e.getValue())if(tile.id.equals("mapCameraPreview")||(priority==null&&tile.id.equals("trematagePreview")&&tile.active))priority=e.getKey();
    }
    Set<String> selected=new HashSet<>();if(priority!=null){selected.add(priority);eligible.remove(priority);}
    int start=eligible.isEmpty()?0:(int)((now/8000)%eligible.size());
@@ -120,7 +177,7 @@ final class DashboardCameras {
     Source source=entry.getValue();
     boolean stalled=now-(source.lastFrame==0?source.created:source.lastFrame)>(source.lastFrame==0?14000:9000);
     if(stalled)retryAt.put(entry.getKey(),now+2000);
-    if(group==null||!group.contains(source.owner)||!selected.contains(entry.getKey())||source.failed||stalled){source.close();iterator.remove();if(stalled||source.failed)selected.remove(entry.getKey());}
+    if(group==null||group.get(0)!=source.owner||!selected.contains(entry.getKey())||source.failed||stalled){source.close();iterator.remove();if(stalled||source.failed)selected.remove(entry.getKey());}
    }
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
     if(!selected.contains(e.getKey()))continue;

@@ -118,3 +118,23 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
 .nautic-work-marker{background:none!important;border:0!important;filter:drop-shadow(0 1px 3px #001b2aaa)}
 .nautic-work-marker svg{display:block;width:100%;height:100%}
 .nautic-work-marker>span{position:absolute;right:-7px;bottom:-7px;background:white;color:#153f56;border:1px solid #153f56;border-radius:10px;min-width:20px;text-align:center;font:bold 12px Arial;padding:2px}
+
+#mapCameraOverlay {
+ position:absolute;
+ inset:var(--sondeur-toolbar-height, 36px) 0 0;
+ z-index:851;
+ cursor:pointer;
+ touch-action:none;
+}
+#mapCameraOverlay[hidden] {display:none}
+.map-camera-view img {width:100%;height:100%;object-fit:cover}
+
+.map-camera-view {position:absolute;overflow:hidden}
+#mapCameraPreview {inset:0}
+#mapCameraPort,#mapCameraStarboard {
+ top:50%;transform:translateY(-50%);
+ width:28%;aspect-ratio:1;border-radius:50%;
+ z-index:1;
+}
+#mapCameraPort {left:3%}
+#mapCameraStarboard {right:3%}
