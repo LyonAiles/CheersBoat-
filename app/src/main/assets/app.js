@@ -222,7 +222,7 @@ async function loadWeather(){
   const symbol=$('weatherCard').querySelector('.weatherSymbol');if(symbol)symbol.textContent=weatherIcon(weather.weather_code);
   const angle=(weather.wind_direction_10m+180-(heading??0))%360;$('windArrow').style.transform=`rotate(${angle}deg)`;
   updateWindCountdown();
- }catch(e){$('weatherTime').textContent='Météo indisponible · toucher pour réessayer';const box=$('localWeatherForecast');if(box&&!weatherForecast)box.textContent='Météo indisponible. Vérifie la connexion puis touche Actualiser.'}
+ }catch(e){$('weatherTime').textContent='Météo indisponible · toucher pour réessayer';const box=$('localWeatherForecast');if(box&&!weatherForecast)box.textContent='Météo indisponible. Vérifie la connexion, puis rouvre le panneau.'}
  finally{windBusy=false}
 }
 function updateWindCountdown(){
@@ -249,15 +249,27 @@ function showCamUrl(u,i){if(!u)return;
  }
 let img=$('cameraImg');img.hidden=false;img.src=u;img.onerror=()=>{$('camMessage').hidden=false;$('camMessage').textContent='Flux inaccessible ou format non pris en charge';img.hidden=true};img.onload=()=>{$('camMessage').hidden=true};let body=$('cam'+i+'Body');body.innerHTML='';let preview=document.createElement('img');preview.src=u;preview.alt='Aperçu caméra '+i;preview.style.cssText='width:100%;height:100%;object-fit:contain';preview.onerror=()=>{body.textContent='Caméra '+i+' : flux indisponible'};body.append(preview)}
 function weatherDialog(){
- $('dialog').classList.remove('nautic-settings');$('dialog').classList.add('nautic-full');
- modal('Vent — prochaines 10 heures','<div id="localWeatherForecast">Chargement de la météo locale…</div><button id="refreshForecast">Actualiser</button>');
- $('refreshForecast').onclick=()=>loadWeather();
- renderWeatherForecast();if(!weatherForecast&&latest)$('localWeatherForecast').textContent='Chargement de la météo locale…';loadWeather();
+ let popup=$('nauticWeatherPopup');
+ if(!popup){
+  popup=document.createElement('dialog');
+  popup.id='nauticWeatherPopup';
+  popup.setAttribute('aria-labelledby','nauticWeatherTitle');
+  popup.innerHTML='<div class="dialogTop"><strong id="nauticWeatherTitle">Vent — prochaines 10 heures</strong><button type="button" aria-label="Fermer la météo">×</button></div><div id="localWeatherForecast"></div>';
+  popup.querySelector('button').onclick=()=>popup.close();
+  popup.addEventListener('close',()=>$('weatherCard').setAttribute('aria-expanded','false'));
+  document.body.append(popup);
+ }
+ if(popup.open){popup.close();return;}
+ popup.show();
+ $('weatherCard').setAttribute('aria-expanded','true');
+ renderWeatherForecast();
+ if(!weatherForecast&&latest)$('localWeatherForecast').textContent='Chargement de la météo locale…';
+ loadWeather();
 }
 function renderWeatherForecast(){
- const box=$('localWeatherForecast');if(!box||!$('dialog').open)return;
+ const box=$('localWeatherForecast');if(!box||!$('nauticWeatherPopup')?.open)return;
  if(!latest){box.textContent='Position GPS nécessaire pour la météo locale.';return}
- if(!weatherForecast||!weather){box.textContent='Météo indisponible. Vérifie la connexion puis touche Actualiser.';return}
+ if(!weatherForecast||!weather){box.textContent='Météo indisponible. Vérifie la connexion, puis rouvre le panneau.';return}
  const h=weatherForecast,now=Date.now()/1000;
  const rows=h.time.map((t,i)=>({t,v:h.wind_speed_10m[i],g:h.wind_gusts_10m[i],rain:h.precipitation[i]})).filter(p=>p.t>=now).slice(0,10);
  const valid=rows.filter(p=>Number.isFinite(p.v)&&Number.isFinite(p.g));
@@ -308,6 +320,6 @@ window.addEventListener('orientationchange',()=>setTimeout(()=>{if(map){layoutNa
  const card=$('speedCard'),old=card.querySelector('small');if(old)old.remove();
  const scale=document.createElement('div');scale.className='speedScale';scale.innerHTML='<span>0</span><span>30</span>';card.appendChild(scale);
  const unit=document.createElement('small');unit.className='speedUnit';unit.textContent='km/h';card.appendChild(unit);
- const weatherCard=$('weatherCard');weatherCard.title='Toucher pour actualiser le vent';weatherCard.addEventListener('click',()=>{if(!windBusy)loadWeather()});
+ $('weatherCard').title='Ouvrir ou fermer les prévisions météo';
  const wind=$('windWidget');if(wind){wind.style.pointerEvents='auto';wind.title='Toucher pour actualiser le vent';wind.addEventListener('click',()=>{if(!windBusy)loadWeather()})}
 })();

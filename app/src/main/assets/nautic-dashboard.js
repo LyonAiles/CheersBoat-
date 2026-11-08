@@ -72,6 +72,12 @@
  mapCamera.id='mapCameraOverlay';
  $('mapWrap').append(mapCamera);
  let mapCameraAlpha=1;
+ let mapCameraIndex=2;
+ function switchMapCamera(){
+  if(mapCamera.hidden)return;
+  mapCameraIndex=3-mapCameraIndex;
+  previews();
+ }
  window.nauticMapCameraAlpha=value=>{
   mapCameraAlpha=Number(value);
   mapCamera.style.opacity=mapCameraAlpha;
@@ -102,12 +108,12 @@
  }
  speedCard.onclick=toggleMapCamera;
  speedCard.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleMapCamera();}};
- mapCamera.onclick=()=>{if(!dragged)toggleMapCamera();dragged=false;};
+ mapCamera.onclick=()=>{if(!dragged)switchMapCamera();dragged=false;};
  window.addEventListener('DOMContentLoaded',()=>{
   const settings=$('sondeurSettings');
   if(settings)new MutationObserver(previews).observe(settings,{attributes:true,attributeFilter:['hidden']});
  });
- window.nauticDashboardClick=id=>{if(mapViews.includes(id)){if(!mapCamera.hidden)toggleMapCamera();}else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
+ window.nauticDashboardClick=id=>{if(mapViews.includes(id))switchMapCamera();else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
  window.nauticDashboardHold=id=>{if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
  function previews(){
   if(!bridge||window.nauticQuietMode)return;
@@ -120,7 +126,7 @@
    if(inMap)mapCamera.style.visibility='';
    const e=$(id);if(!e||e.closest('[hidden],.nautic-hidden')||getComputedStyle(e).display==='none')continue;
    if(id!=='trematagePreview'){
-    const index=inMap?(id==='mapCameraPort'?'1':'2'):id.charAt(3);let url='';try{url=JSON.parse(call('readSetting','nautic-v04')||'{}')['cam'+index]||'';}catch(_){}
+    const index=inMap?String(id==='mapCameraPort'?3-mapCameraIndex:id==='mapCameraPreview'?mapCameraIndex:2):id.charAt(3);let url='';try{url=JSON.parse(call('readSetting','nautic-v04')||'{}')['cam'+index]||'';}catch(_){}
     if(/^https?:\/\//i.test(url)){if(e.dataset.previewUrl!==url){const img=new Image();img.alt='Caméra '+index;img.src=url;e.replaceChildren(img);e.dataset.previewUrl=url;}continue;}
     if(e.dataset.previewUrl){e.replaceChildren();delete e.dataset.previewUrl;}
    }
@@ -129,7 +135,7 @@
    const heading=card?.querySelector('h3')?.cloneNode(true);heading?.querySelectorAll('.nautic-object-tag').forEach(t=>t.remove());
    tiles.push({id,x:r.left,y:r.top,w:r.width,h:r.height,label:mobile?'Trématage':heading?.textContent.trim()||'📷',number:card?.dataset.objectNumber||'',active:(mobile||id==='cam2Body')&&card.classList.contains('trematage-active'),alarm:mobile&&card.classList.contains('trematage-alert'),status:mobile?$('trematageState').textContent:id==='cam2Body'?camera42?.dataset.watchStatus||'':''});
   }
-  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,tiles}));
+  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapCameraIndex,tiles}));
  }
  // Use real HTTP/MJPEG previews in web builds; Android handles RTSP without a relay.
  if(!bridge)for(let i=1;i<=3;i++){try{const saved=JSON.parse(localStorage.getItem('nautic-v04')||'{}'),url=saved['cam'+i];if(/^https?:\/\//i.test(url||'')){const img=new Image();img.alt='Caméra '+i;img.src=url;$('cam'+i+'Body').replaceChildren(img);}}catch(e){}}

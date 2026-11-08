@@ -51,7 +51,7 @@ final class DashboardCameras {
      });
     }else installTransparencyGesture();
     banner.setVisibility(View.GONE);
-    frame.setContentDescription("Fermer la caméra Roof");
+    frame.setContentDescription("Changer la caméra affichée sur la carte");
     frame.setOnClickListener(v->activity.dashboardClick(id,false));
     layer.addView(frame);
     return;
@@ -143,6 +143,7 @@ final class DashboardCameras {
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
    if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
+   int mapCameraIndex=data.optInt("mapCameraIndex",2)==1?1:2;
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();
    for(int i=0;i<list.length();i++){
     JSONObject item=list.getJSONObject(i);String id=item.getString("id");if(!id.matches("cam[123]Body|trematagePreview|mapCameraPreview|mapCameraPort|mapCameraStarboard"))continue;
@@ -151,7 +152,7 @@ final class DashboardCameras {
     boolean inMap=isMapView(id);
     if(inMap){tile.frame.setAlpha(mapAlpha);tile.frame.bringToFront();}
     if(!inMap)tile.decorate(item);
-    boolean mobile=id.equals("trematagePreview");int index=mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,inMap?(id.equals("mapCameraPort")?1:2):id.charAt(3)-'0');
+    boolean mobile=id.equals("trematagePreview");int index=mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,inMap?(id.equals("mapCameraPort")?3-mapCameraIndex:id.equals("mapCameraPreview")?mapCameraIndex:2):id.charAt(3)-'0');
     String url=TrematageAccess.address(activity,index);
     if(!url.startsWith("rtsp://")){tile.message.setText("📷");continue;}
     Uri uri=Uri.parse(url);android.content.SharedPreferences p=activity.getSharedPreferences("nautic_camera_private",0);

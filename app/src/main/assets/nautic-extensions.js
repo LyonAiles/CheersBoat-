@@ -51,7 +51,16 @@ const css=document.createElement('style');css.textContent=`
 const openModal=(title,body,full=false)=>{dialog.classList.remove('nautic-settings');dialog.querySelector('.dialogTop #settingsSave')?.remove();dialog.classList.toggle('nautic-full',full);modal(title,body)};
 dialog.addEventListener('close',()=>dialog.classList.remove('nautic-full'));
 function nativeCall(fn,...args){if(native&&typeof native[fn]==='function'){native[fn](...args);return true}return false}
-function callNumber(n){if(!nativeCall('call',n))location.href='tel:'+n.replace(/[^+0-9]/g,'')}
+function callNumber(n,urgent=false){
+ const number=n.replace(/[^+0-9]/g,'');
+ const emergency=!state.testMode&&(urgent||/^(15|17|18|112|114|115|119|191|196|197|116000|116117)$/.test(number));
+ if(state.callMode==='sip'&&(!emergency||state.sipEmergency===true)){
+  if(!state.sipDomain||!nativeCall('dialSip',number,state.sipDomain))alert('Configure le compte SIP et son domaine dans Paramètres → Appels.');
+  return;
+ }
+ if(emergency&&state.callMode==='sip')alert('Appel d’urgence via le téléphone. Si la tablette ne dispose pas de service vocal, utilise un autre téléphone.');
+ if(!nativeCall('call',n))location.href='tel:'+number;
+}
 function smsNumber(n,msg){if(!nativeCall('sms',n,msg))location.href='sms:'+n.replace(/[^+0-9]/g,'')+'?body='+encodeURIComponent(msg)}
 const head=document.querySelector('header');const headerControls=document.createElement('div');headerControls.id='nauticHeaderControls';head.appendChild(headerControls);const settingsButton=document.createElement('button');
 settingsButton.id='nauticSettingsButton';settingsButton.textContent='⚙';settingsButton.title='Paramètres';headerControls.append(settingsButton);const exitButton=document.createElement('button');exitButton.id='nauticExitButton';exitButton.textContent='Sortie';exitButton.title='Fermer Nautic';headerControls.append(exitButton);exitButton.onclick=()=>{if(!nativeCall('exitApp'))alert('La fermeture est disponible dans l’application Android.');};
@@ -209,7 +218,7 @@ function emergencyDialog(mode='urgent'){
   const recent=selectedRecent!==null?[...phoneHistory,...(state.recentCalls||[])].filter((c,i,arr)=>arr.findIndex(x=>x.number===c.number)===i)[selectedRecent]:null;
   const c=recent?{label:recent.label,phone:recent.number,mode:recent.mode||'call',type:recent.label}:contacts[selected];
   if(!state.testMode){state.recentCalls=[{label:c.label,number:n,mode:c.mode},...(state.recentCalls||[]).filter(x=>x.number!==n)].slice(0,8);persist()}
-  if(mode==='urgent'&&c.mode==='sms'){const msg=get('emText').value;if(get('emAttachPhoto').checked)shareEmergencyPhoto(n,msg);else smsNumber(n,msg)}else callNumber(n)
+  if(mode==='urgent'&&c.mode==='sms'){const msg=get('emText').value;if(get('emAttachPhoto').checked)shareEmergencyPhoto(n,msg);else smsNumber(n,msg)}else callNumber(n,!!c.urgent)
  };
  get('emContacts').onclick=()=>{if(!nativeCall('pickContact'))alert('Sélecteur de contacts indisponible')};
 }
@@ -417,6 +426,11 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <p class="muted">Sélection autour du bateau, dans toutes les directions. Au-delà de 10 km, les points lointains utilisent des données allégées et des distances à vol d’oiseau. Actualisation après progression ; cache local. Les distances par le réseau ne désignent pas un itinéraire choisi : bifurcations à confirmer. Sans raccordement, distance à vol d’oiseau explicitement indiquée.</p>
  <h3>Bateau</h3>${field('Nom du bateau','settingBoat',state.boatName)}${field('Téléphone de rappel (inclus dans les SMS)','settingContactPhone',state.contactPhone||testNumber,'tel')}
  <p>Carburant estimé consommé : <b>${(typeof fuelUsed==='number'?fuelUsed:0).toFixed(2)} L</b>. La consommation d'un arrêt de moins de ${state.stopMinutes} minutes est ajoutée à la reprise ; après ce délai elle est annulée.</p>
+ <h3>Appels</h3>
+ <label>Mode d’appel<select id="settingCallMode" class="nautic-select"><option value="phone">Téléphone</option><option value="sip" ${state.callMode==='sip'?'selected':''}>Internet · SIP</option></select></label>
+ ${field('Domaine SIP fourni par l’opérateur','settingSipDomain',state.sipDomain||'')}
+ <label class="settingRow"><input type="checkbox" id="settingSipEmergency" ${state.sipEmergency===true?'checked':''}><span>Autoriser le SIP pour les secours si mon opérateur confirme la prise en charge</span></label>
+ <p class="muted">Configure une application SIP Android avec un abonnement permettant les appels vers les fixes et mobiles. Confirme auprès de ton opérateur l’acheminement des secours et la localisation de l’appelant. Le 114 par SMS conserve son propre parcours.</p>
  <h3>Urgences</h3><p class="${state.testMode?'testBadge':'muted'}">${state.testMode?'Mode TEST actif':'Mode RÉEL actif'}</p>
  <button id="toggleEmergency">Basculer TEST / RÉEL (code)</button>
  <p class="muted">Mode TEST : tous les appels et SMS vers ${testNumber}. Mode réel : coordonnées vérifiées uniquement.</p>
@@ -469,6 +483,19 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('settingPlugsButton').onclick=()=>equipmentDialog();
  get('settingDiscoverDevices').onclick=()=>scanEquipment(get('settingDiscoverResults'));
  get('settingNetworkReport').innerHTML=networkAddressReport();
+ const sections=[...content.querySelectorAll('details')];
+ const toggleSections=document.createElement('button');
+ toggleSections.id='settingsToggleSections';
+ toggleSections.type='button';
+ content.prepend(toggleSections);
+ const updateToggle=()=>{toggleSections.textContent=sections.every(section=>section.open)?'Tout replier':'Tout déployer';};
+ toggleSections.onclick=()=>{
+  const open=!sections.every(section=>section.open);
+  sections.forEach(section=>section.open=open);
+  updateToggle();
+ };
+ sections.forEach(section=>section.addEventListener('toggle',updateToggle));
+ updateToggle();
  const top=dialog.querySelector('.dialogTop');
  const saveButton=document.createElement('button');saveButton.id='settingsSave';saveButton.textContent='✓ Enregistré';saveButton.disabled=true;
  top.insertBefore(saveButton,get('dialogClose'));
@@ -508,7 +535,16 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  get('dialogClose').addEventListener('click',()=>dialog.classList.remove('nautic-settings'),{once:true});
  get('toggleEmergency').onclick=()=>{let pass=prompt('Code pour changer de mode :');if(pass==='xxx'){state.testMode=!state.testMode;persist();settingsDialog()}else if(pass!==null)alert('Code incorrect')};
  get('settingsSave').onclick=()=>{
+  const callMode=get('settingCallMode').value;
+  const sipDomain=get('settingSipDomain').value.trim();
+  if(callMode==='sip'&&!/^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::[0-9]{1,5})?$/i.test(sipDomain)){
+   alert('Saisis le domaine SIP de ton opérateur, sans préfixe sip: ni identifiants.');
+   return;
+  }
   const previous=JSON.stringify(state), previousCfg=JSON.stringify(cfg);
+  state.callMode=callMode;
+  state.sipDomain=sipDomain;
+  state.sipEmergency=get('settingSipEmergency').checked;
   dialog.querySelectorAll('[data-button]').forEach(e=>state.buttons[e.dataset.button]=e.checked);
   state.cameraSimulation42=get("settingCameraSimulation42").checked;
   state.mapEngine=get('settingMapEngine').value;

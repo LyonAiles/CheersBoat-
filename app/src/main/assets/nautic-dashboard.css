@@ -138,3 +138,22 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
 }
 #mapCameraPort {left:3%}
 #mapCameraStarboard {right:3%}
+
+#app #nauticSettingsButton {min-width:44px;min-height:44px;margin-inline-end:6px}
+#nauticWeatherPopup {
+ position:fixed;
+ inset:8px 8px auto;
+ margin:0 auto;
+ width:min(calc(100vw - 16px), 610px);
+ max-height:min(62dvh, 420px);
+ overflow:auto;
+}
+#nauticWeatherPopup p {margin:6px 0}
+
+#app .left > :is(#gpsCard,#logCard,#notesCard) .dashboard-symbol-icon,
+#app .left > #nauticCallsSlot #dashboardPhone {
+ font-size:clamp(36px,min(7vw,7dvh),62px)!important;
+}
+#app .left > #fuelCard h3 {
+ font-size:clamp(19px,min(4vw,4dvh),30px)!important;
+}

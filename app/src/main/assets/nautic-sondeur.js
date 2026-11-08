@@ -21,36 +21,40 @@
       </div>
     </div>
     <div class="sondeur-settings" id="sondeurSettings" hidden>
+      <h3>Profondeur et seuils</h3>
       <label>Profondeur max. <input id="sondeurMax" type="number" min="0.5" max="30" step="0.1"> m</label>
       <label>Seuil de prudence <input id="sondeurCaution" type="number" min="0.1" max="30" step="0.01"> m</label>
       <label>Tirant d’eau <input id="sondeurDraft" type="number" min="0.1" max="30" step="0.01"> m</label>
       <label>Seuil d’alerte <input id="sondeurAlert" type="number" min="0.1" max="2" step="0.01"> m</label>
+      <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
+      <h3>Affichage</h3>
       <label class="sondeur-slider">Transparence <output id="sondeurAlphaValue"></output><input id="sondeurAlpha" type="range" min="0" max="90"></label>
       <label class="sondeur-slider">Position du relevé <output id="sondeurAxisValue"></output><input id="sondeurAxis" type="range" min="10" max="95" step="1"></label>
       <label class="sondeur-slider">Largeur <output id="sondeurWidthValue"></output><input id="sondeurWidth" type="range" min="2" max="24"></label>
-      <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
       <label>Couleur des barres
         <select id="sondeurBarColor">
           <option value="auto">Selon les seuils</option>
           <option value="black">Noir</option>
-          <option value="white">Blanc</option>
-          <option value="navy">Bleu foncé</option>
-          <option value="darkgreen">Vert foncé</option>
+          <option value="white">Gris neutre très foncé</option>
+          <option value="navy">Bleu très foncé</option>
+          <option value="darkgreen">Vert très foncé</option>
         </select>
       </label>
       <label><input type="checkbox" id="sondeurHullOutline"> Ligne de coque</label>
-      <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
-      <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
       <label>Vision sous-marine <select id="sondeurScene"><option value="photo">Photo d’origine</option><option value="clear">Eau claire</option><option value="deep">Eau profonde</option><option value="blue-surface">Surface bleue</option><option value="deep-rays">Rayons en profondeur</option><option value="none">Sans image</option></select></label>
       <label>Voile d’ondes sur la carte <select id="sondeurWaveBackground"><option value="none">Désactivé</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option><option value="green">Vert diffus</option><option value="turquoise">Turquoise diffus</option><option value="deep-blue">Bleu profond</option><option value="blue-waves">Vagues bleues</option></select></label>
       <label><input type="checkbox" id="sondeurSunRays"> Rayons du soleil</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
-      <label class="sondeur-wide-setting">Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
-      <button type="button" id="sondeurAlertList">Alertes sur la carte</button>
+      <h3>Cadence et simulation</h3>
+      <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
+      <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label>Cadence <select id="sondeurTempoMode"><option value="auto">Automatique</option><option value="manual">Manuelle</option></select></label>
       <label>Intervalle <input id="sondeurPeriod" type="number" min="0.1" max="60" step="0.01"> s</label>
       <output id="sondeurTempoStatus"></output>
+      <h3>Alertes sur la carte</h3>
+      <label class="sondeur-wide-setting">Courriel de test <input id="sondeurTestEmail" type="email" placeholder="Ton adresse"></label>
+      <button type="button" id="sondeurAlertList">Alertes sur la carte</button>
     </div>
     <div class="sondeur-replay" hidden>
       <button type="button" id="sondeurBack" aria-label="Retour rapide vers les alertes">⏪</button>
@@ -96,7 +100,10 @@
   map.append(mapVeil, panel);
   const toolbar = panel.querySelector('.sondeur-tools');
   if (typeof ResizeObserver === 'function') {
-    new ResizeObserver(() => map.style.setProperty('--sondeur-toolbar-height', toolbar.offsetHeight + 'px')).observe(toolbar);
+    new ResizeObserver(() => {
+      map.style.setProperty('--sondeur-toolbar-height', toolbar.offsetHeight + 'px');
+      positionSettings();
+    }).observe(toolbar);
   }
 
   const get = id => panel.querySelector('#' + id);
@@ -693,10 +700,11 @@
   const barColor = get('sondeurBarColor');
   const savedColor = saved.barColor ?? (saved.blackBars ? 'black' : 'auto');
   barColor.value = Array.from(barColor.options).some(option => option.value === savedColor) ? savedColor : 'auto';
+  const darkBarColors = {black: '#000000', white: '#202020', navy: '#03091b', darkgreen: '#03130b'};
   function applyBarColor() {
     settings.barColor = barColor.value;
     if (barColor.value === 'auto') plot.style.removeProperty('--sondeur-uniform-bar-color');
-    else plot.style.setProperty('--sondeur-uniform-bar-color', barColor.value);
+    else plot.style.setProperty('--sondeur-uniform-bar-color', darkBarColors[barColor.value]);
   }
   applyBarColor();
   barColor.addEventListener('change', () => {
@@ -809,8 +817,13 @@
     else if (!replay && (timer !== null || get('sondeurTitle').dataset.live)) updateSound(history.at(-1)?.depth);
   });
   playButton.onclick = play;
+  function positionSettings() {
+    panel.style.setProperty('--sondeur-settings-top', Math.round(toolbar.getBoundingClientRect().bottom) + 'px');
+  }
+  window.addEventListener('resize', positionSettings);
   get('sondeurOptions').onclick = () => {
     const options = get('sondeurSettings');
+    positionSettings();
     options.hidden = !options.hidden;
     get('sondeurOptions').setAttribute('aria-expanded', String(!options.hidden));
   };

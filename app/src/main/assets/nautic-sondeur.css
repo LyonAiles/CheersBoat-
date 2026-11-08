@@ -18,7 +18,7 @@
 .sondeur-picture {background:linear-gradient(#06172566,#06172599),url('sondeur-eau.jpg') center center/cover}
 .sondeur-bars {left:calc(-1 * var(--sondeur-bar-width));right:max(0px,calc(100% - var(--sondeur-axis) - var(--sondeur-half-bar)));display:flex;align-items:end;justify-content:end;overflow:hidden}
 .sondeur-bars span,.sondeur-extension {flex:none;background:var(--sondeur-uniform-bar-color,#000)}
-.sondeur-reading {color:white;font:bold 16px system-ui;white-space:nowrap;font-variant-numeric:tabular-nums}
+.sondeur-reading {color:white;font:bold clamp(21px,5.8vw,30px) system-ui;white-space:nowrap;font-variant-numeric:tabular-nums}
 
 .sondeur-scale {position:absolute;inset:0;overflow:hidden}
 .sondeur-bars span.shallow,.sondeur-extension.shallow {background:var(--sondeur-uniform-bar-color,#43091b)}
@@ -130,3 +130,33 @@
 
 #mapWrap.sondeur-deployed #compass,#mapWrap.sondeur-deployed #mapRecenter,#mapWrap.sondeur-deployed #mapLayers {z-index:851!important}
 #mapWrap:has(#sondeurSettings:not([hidden])) #nauticSondeur {z-index:852}
+
+.sondeur-tools {gap:6px}
+.sondeur-title,.sondeur-actions {gap:8px}
+.sondeur-tools button {min-width:44px;min-height:44px}
+.sondeur-settings:not([hidden]) {
+ position:fixed;
+ inset:auto 4px 4px;
+ top:var(--sondeur-settings-top, 20dvh);
+ z-index:853;
+ align-content:start;
+ padding:10px;
+ gap:8px 10px;
+ border:1px solid #4184a4;
+ border-radius:10px;
+ background:#123b4d;
+}
+.sondeur-settings h3 {
+ grid-column:1/-1;
+ font-size:14px;
+ margin:4px 0 0;
+ padding-bottom:4px;
+ border-bottom:1px solid #4184a4;
+}
+.sondeur-settings label {flex-wrap:wrap}
+.sondeur-settings select {max-width:100%}
+.sondeur-settings #sondeurTempoStatus {grid-column:1/-1}
+@media(max-width:360px) {
+ .sondeur-title {gap:4px}
+ .sondeur-actions {gap:5px}
+}

@@ -201,6 +201,15 @@ public class MainActivity extends Activity {
    try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number))));}
    catch(Exception e){toast("Téléphone indisponible");}
   });}
+  @JavascriptInterface public void dialSip(String number,String domain){runOnUiThread(()->{
+   if(number==null||!number.matches("[+]?[0-9]+")||domain==null||
+      !domain.matches("(?i)[a-z0-9-]+(?:[.][a-z0-9-]+)+(?::[0-9]{1,5})?")){
+    toast("Numéro ou domaine SIP invalide");
+    return;
+   }
+   try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.fromParts("sip",number+"@"+domain,null)));}
+   catch(android.content.ActivityNotFoundException e){toast("Aucune application ne prend en charge les appels SIP");}
+  });}
   @JavascriptInterface public void sms(String number,String message){runOnUiThread(()->{
    try{Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(number)));
     i.putExtra("sms_body",message);startActivity(i);
