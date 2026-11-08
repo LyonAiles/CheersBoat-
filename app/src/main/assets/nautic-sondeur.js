@@ -29,7 +29,15 @@
       <label class="sondeur-slider">Position du relevé <output id="sondeurAxisValue"></output><input id="sondeurAxis" type="range" min="10" max="95" step="1"></label>
       <label class="sondeur-slider">Largeur <output id="sondeurWidthValue"></output><input id="sondeurWidth" type="range" min="2" max="24"></label>
       <label><input id="sondeurAuto" type="checkbox"> Fond automatique au seuil de prudence</label>
-      <label><input type="checkbox" id="sondeurBlackBars"> Barres uniformes noires</label>
+      <label>Couleur des barres
+        <select id="sondeurBarColor">
+          <option value="auto">Selon les seuils</option>
+          <option value="black">Noir</option>
+          <option value="white">Blanc</option>
+          <option value="navy">Bleu foncé</option>
+          <option value="darkgreen">Vert foncé</option>
+        </select>
+      </label>
       <label><input type="checkbox" id="sondeurHullOutline"> Ligne de coque</label>
       <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
       <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
@@ -667,7 +675,6 @@
   }
 
   for (const [key, id] of Object.entries({
-    blackBars: 'sondeurBlackBars',
     hullOutline: 'sondeurHullOutline',
     shimmer: 'sondeurShimmer',
     sunRays: 'sondeurSunRays',
@@ -682,6 +689,20 @@
       saveSettings();
     });
   }
+
+  const barColor = get('sondeurBarColor');
+  const savedColor = saved.barColor ?? (saved.blackBars ? 'black' : 'auto');
+  barColor.value = Array.from(barColor.options).some(option => option.value === savedColor) ? savedColor : 'auto';
+  function applyBarColor() {
+    settings.barColor = barColor.value;
+    if (barColor.value === 'auto') plot.style.removeProperty('--sondeur-uniform-bar-color');
+    else plot.style.setProperty('--sondeur-uniform-bar-color', barColor.value);
+  }
+  applyBarColor();
+  barColor.addEventListener('change', () => {
+    applyBarColor();
+    saveSettings();
+  });
 
   const scene = get('sondeurScene');
   settings.scene = Array.from(scene.options).some(option => option.value === saved.scene) ? saved.scene : 'photo';
