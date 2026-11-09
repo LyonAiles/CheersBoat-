@@ -137,7 +137,7 @@
    const inMap=mapViews.includes(id);
    const e=$(id);if(!e||e.closest('[hidden],.nautic-hidden')||getComputedStyle(e).display==='none')continue;
    if(id!=='trematagePreview'){
-    const index=inMap?String(id==='mapCameraPort'?3-mapCameraIndex:id==='mapCameraPreview'?mapCameraIndex:2):id.charAt(3);let url='';try{url=JSON.parse(call('readSetting','nautic-v04')||'{}')['cam'+index]||'';}catch(_){}
+    const index=inMap?'2':id.charAt(3);let url='';try{url=JSON.parse(call('readSetting','nautic-v04')||'{}')['cam'+index]||'';}catch(_){}
     if(/^https?:\/\//i.test(url)){if(e.dataset.previewUrl!==url){const img=new Image();img.alt='Caméra '+index;img.src=url;e.replaceChildren(img);e.dataset.previewUrl=url;}continue;}
     if(e.dataset.previewUrl){e.replaceChildren();delete e.dataset.previewUrl;}
    }

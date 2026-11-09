@@ -154,19 +154,20 @@ final class DashboardCameras {
     if(inMap){tile.frame.setAlpha(mapAlpha);tile.frame.bringToFront();}
     if(!inMap)tile.decorate(item);
     boolean mobile=id.equals("trematagePreview");
-    int index;
-    if(inMap){
-     index=id.equals("mapCameraPort")?3-mapCameraIndex:id.equals("mapCameraPreview")?mapCameraIndex:2;
-    }else{
-     index=mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
-    }
+    // The map alternates the two lenses of the same camera, using its saved credentials.
+    int index=inMap?2:mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
     String url=TrematageAccess.address(activity,index);
     if(!url.startsWith("rtsp://")){tile.message.setText("📷");continue;}
     Uri uri=Uri.parse(url);android.content.SharedPreferences p=activity.getSharedPreferences("nautic_camera_private",0);
     String user=p.getString("username"+index,p.getString("username","")),pass=p.getString("password"+index,p.getString("password",""));
     if(user.isEmpty()){tile.message.setText("⚙ Identifiants caméra");continue;}
     String tapoHost=Uri.parse(TrematageAccess.address(activity,TrematageAccess.index(activity))).getHost();
-    String path=CameraStreamPolicy.preview(uri.getPath(),mobile,index==1||java.util.Objects.equals(tapoHost,uri.getHost()));
+    String path=uri.getPath();
+    if(inMap){
+     int lens=id.equals("mapCameraPort")?3-mapCameraIndex:id.equals("mapCameraPreview")?mapCameraIndex:2;
+     path=lens==2?"/stream1":"/stream6";
+    }
+    path=CameraStreamPolicy.preview(path,mobile,inMap||index==1||java.util.Objects.equals(tapoHost,uri.getHost()));
     String stream="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+uri.getHost()+":"+(uri.getPort()>0?uri.getPort():554)+path;
     if(!grouped.containsKey(stream))grouped.put(stream,new ArrayList<>());if(id.equals("mapCameraPreview"))grouped.get(stream).add(0,tile);else grouped.get(stream).add(tile);
    }
