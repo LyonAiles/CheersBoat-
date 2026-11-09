@@ -157,3 +157,19 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
 #app .left > #fuelCard h3 {
  font-size:clamp(19px,min(4vw,4dvh),30px)!important;
 }
+
+#mapCameraSwitch {
+ position:absolute;
+ left:50%;
+ bottom:10px;
+ transform:translateX(-50%);
+ z-index:852;
+ width:42px;
+ height:42px;
+ padding:0;
+ border-radius:50%;
+ background:#123b4d;
+ color:white;
+ font-size:20px;
+}
+#mapCameraSwitch[hidden] {display:none}

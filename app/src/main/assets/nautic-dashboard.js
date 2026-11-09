@@ -38,7 +38,7 @@
   const fixed={clock:10,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
   const reservedNumbers=new Set(Object.values(fixed));
   const zoomIn=document.querySelector('.leaflet-control-zoom-in'),zoomOut=document.querySelector('.leaflet-control-zoom-out');if(zoomIn)zoomIn.id='mapZoomIn';if(zoomOut)zoomOut.id='mapZoomOut';
-  const elements=new Set(Object.keys(fixed).map($).filter(Boolean));for(const e of document.querySelectorAll('#app button,#app [role=button],#app .leaflet-bar a,#dialog button'))if(e.id!=='dashboardPhone'&&!e.classList.contains('sondeur-map-alert'))elements.add(e);
+  const elements=new Set(Object.keys(fixed).map($).filter(Boolean));for(const e of document.querySelectorAll('#app button,#app [role=button],#app .leaflet-bar a,#dialog button'))if(e.id!=='dashboardPhone'&&e.id!=='mapCameraSwitch'&&!e.classList.contains('sondeur-map-alert'))elements.add(e);
   for(const e of elements){if(!e.id)e.id='nauticControl'+[...document.querySelectorAll('#app button,#app [role=button],#app .leaflet-bar a,#dialog button')].indexOf(e);let n=fixed[e.id];if(n===undefined){if(!Number.isInteger(extraNumbers[e.id])||extraNumbers[e.id]<60||reservedNumbers.has(extraNumbers[e.id])){extraNumbers[e.id]=Math.max(59,...reservedNumbers,...Object.values(extraNumbers).filter(x=>Number.isInteger(x)&&x>=60))+1;const saved=JSON.stringify(extraNumbers);if(bridge)call('writeSetting','nautic-control-numbers',saved);else try{localStorage.setItem('nautic-control-numbers',saved);}catch(_){}}n=extraNumbers[e.id];}e.dataset.objectNumber=enabled?String(n):'';let tag=[...e.children].find(x=>x.classList.contains('nautic-object-tag'));if(!enabled){tag?.remove();continue;}if(!tag){tag=document.createElement('span');tag.className='nautic-object-tag';e.appendChild(tag);}tag.textContent=String(n);if(getComputedStyle(e).position==='static')e.style.position='relative';tag.style.cssText='position:absolute;top:1px;left:1px;z-index:500;background:#ffe24b;color:#111;font:bold 10px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';}
  }
  window.nauticNumberDashboard=()=>{numberButtons();previews();};
@@ -70,7 +70,15 @@
   mapCamera.append(view);
  }
  mapCamera.id='mapCameraOverlay';
- $('mapWrap').append(mapCamera);
+ const mapSwitch=document.createElement('button');
+ mapSwitch.id='mapCameraSwitch';
+ mapSwitch.type='button';
+ mapSwitch.textContent='⇄';
+ mapSwitch.title='Changer de caméra';
+ mapSwitch.setAttribute('aria-label',mapSwitch.title);
+ mapSwitch.hidden=true;
+ mapSwitch.onclick=switchMapCamera;
+ $('mapWrap').append(mapCamera,mapSwitch);
  let mapCameraAlpha=1;
  let mapCameraIndex=2;
  function switchMapCamera(){
@@ -103,6 +111,7 @@
  speedCard.setAttribute('aria-pressed','false');
  function toggleMapCamera(){
   mapCamera.hidden=!mapCamera.hidden;
+  mapSwitch.hidden=mapCamera.hidden;
   speedCard.setAttribute('aria-pressed',String(!mapCamera.hidden));
   previews();
  }
@@ -113,7 +122,7 @@
   const settings=$('sondeurSettings');
   if(settings)new MutationObserver(previews).observe(settings,{attributes:true,attributeFilter:['hidden']});
  });
- window.nauticDashboardClick=id=>{if(mapViews.includes(id))switchMapCamera();else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
+ window.nauticDashboardClick=id=>{if(id===mapSwitch.id||mapViews.includes(id))switchMapCamera();else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
  window.nauticDashboardHold=id=>{if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
  function previews(){
   if(!bridge)return;
@@ -121,6 +130,7 @@
   const settingsOpen=sonarSettings&&!sonarSettings.hidden;
   mapCamera.style.visibility=settingsOpen?'hidden':'';
   const hidden=settingsOpen||document.hidden||document.querySelector('dialog[open]')||$('app')?.classList.contains('nautic-edit');
+  mapSwitch.style.visibility=hidden?'hidden':'';
   if(!hidden&&window.nauticQuietMode)return;
   const tiles=[];
   if(!hidden)for(const id of ['trematagePreview','cam1Body','cam2Body','cam3Body','mapCameraPreview','mapCameraPort','mapCameraStarboard']){
@@ -136,7 +146,10 @@
    const heading=card?.querySelector('h3')?.cloneNode(true);heading?.querySelectorAll('.nautic-object-tag').forEach(t=>t.remove());
    tiles.push({id,x:r.left,y:r.top,w:r.width,h:r.height,label:mobile?'Trématage':heading?.textContent.trim()||'📷',number:card?.dataset.objectNumber||'',active:(mobile||id==='cam2Body')&&card.classList.contains('trematage-active'),alarm:mobile&&card.classList.contains('trematage-alert'),status:mobile?$('trematageState').textContent:id==='cam2Body'?camera42?.dataset.watchStatus||'':''});
   }
-  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapCameraIndex,tiles}));
+  const rect=mapSwitch.getBoundingClientRect();
+  const switchButton=!hidden&&!mapSwitch.hidden&&rect.width>0
+   ?{x:rect.left,y:rect.top,w:rect.width,h:rect.height}:null;
+  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapCameraIndex,tiles,switchButton}));
  }
  // Use real HTTP/MJPEG previews in web builds; Android handles RTSP without a relay.
  if(!bridge)for(let i=1;i<=3;i++){try{const saved=JSON.parse(localStorage.getItem('nautic-v04')||'{}'),url=saved['cam'+i];if(/^https?:\/\//i.test(url||'')){const img=new Image();img.alt='Caméra '+i;img.src=url;$('cam'+i+'Body').replaceChildren(img);}}catch(e){}}
