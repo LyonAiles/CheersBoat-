@@ -100,6 +100,7 @@ public class MainActivity extends Activity {
   if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)
    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},GPS);
   web.loadUrl("file:///android_asset/index.html");
+  NauticUpdates.check(this);
  }
  private void toast(String s){runOnUiThread(()->Toast.makeText(this,s,Toast.LENGTH_LONG).show());}
  private void js(String name,String value){
