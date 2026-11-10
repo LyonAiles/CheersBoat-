@@ -48,6 +48,8 @@
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <h3>Cadence et simulation</h3>
       <label>Démo <select id="sondeurDemo"><option value="bars">Barres</option><option value="relief">Relief</option></select></label>
+      <label>Couleur des ondes <select id="sondeurWaveColor"><option value="graphite">Graphite</option><option value="pearl">Blanc perle</option><option value="blue">Bleu</option><option value="turquoise">Turquoise</option><option value="green">Vert</option><option value="purple">Violet</option></select></label>
+      <label class="sondeur-slider">Épaisseur des ondes <output id="sondeurWaveThicknessValue"></output><input id="sondeurWaveThickness" type="range" min="50" max="250" step="5"></label>
       <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
       <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label>Cadence <select id="sondeurTempoMode"><option value="auto">Automatique</option><option value="manual">Manuelle</option></select></label>
@@ -483,6 +485,11 @@
     setSound(alertSound, audible && depth < settings.alert);
   }
 
+  const waveColors = {
+    graphite: [156, 156, 156], pearl: [231, 228, 217], blue: [91, 153, 232],
+    turquoise: [76, 195, 192], green: [113, 185, 111], purple: [169, 125, 214]
+  };
+
   function drawRelief() {
     const width = relief.clientWidth;
     const height = relief.clientHeight;
@@ -507,17 +514,19 @@
     visible.forEach(({depth, missing, time}, index) => {
       if (missing || !Number.isFinite(depth)) return;
       const age = (visible.length - 1 - index) / (rows - 1);
-      const half = width * (.40 + .13 * age);
+      const half = width * .53;
       const y = project(age, depth);
       const bend = height * (.013 + .018 * age);
-      const thickness = height * (.009 + .012 * age);
-      const tone = Math.round(120 + 104 * age);
-      const color = alpha => 'rgba(' + tone + ',' + tone + ',' + alpha + ')';
-      const gradient = ctx.createLinearGradient(center - half, 0, center + half, 0);
-      gradient.addColorStop(0, color(0));
-      gradient.addColorStop(.30, color(.24 + .68 * age));
-      gradient.addColorStop(.70, color(.24 + .68 * age));
-      gradient.addColorStop(1, color(0));
+      const thickness = height * (.009 + .012 * age) * settings.waveThickness / 100;
+      const shade = .52 + .48 * age;
+      const base = waveColors[settings.waveColor];
+      const fade = color => {
+        const gradient = ctx.createLinearGradient(0, 0, width, 0);
+        for (const [stop, opacity] of [[0, .16], [.24, 1], [.76, 1], [1, .16]]) {
+          gradient.addColorStop(stop, 'rgba(' + color.join(',') + ',' + opacity * shade + ')');
+        }
+        return gradient;
+      };
 
       // The depth is measured at the center. Crosswise variations are fictitious.
       const phase = (time % 20000) / 20000 * Math.PI * 2;
@@ -528,6 +537,7 @@
         const offset = (.24 * rise + .12 * dip) * (1 - lateral ** 4);
         const crossDepth = Math.max(0, depth + offset);
         return {
+          depth: crossDepth,
           x: center + half * lateral,
           y: y + project(age, crossDepth) - project(age, depth) + bend * lateral ** 2
         };
@@ -539,8 +549,40 @@
         ctx.lineTo(profile[i].x, profile[i].y + thickness);
       }
       ctx.closePath();
-      ctx.fillStyle = gradient;
+      ctx.fillStyle = fade(base);
       ctx.fill();
+
+      const crestColors = [
+        base.map(channel => Math.round(channel + (255 - channel) * .58)),
+        [255, 176, 62],
+        [255, 82, 103]
+      ].map(fade);
+      const level = depth => depth < settings.alert ? 2 : depth < settings.caution ? 1 : 0;
+      ctx.lineWidth = Math.max(1, thickness * .22);
+      ctx.lineCap = 'round';
+      const crests = crestColors.map(() => new Path2D());
+      for (let i = 1; i < profile.length; i++) {
+        const from = profile[i - 1];
+        const to = profile[i];
+        const stops = [0, 1];
+        for (const threshold of [settings.alert, settings.caution]) {
+          const crossing = (threshold - from.depth) / (to.depth - from.depth);
+          if (crossing > 0 && crossing < 1) stops.push(crossing);
+        }
+        stops.sort((a, b) => a - b);
+        for (let j = 1; j < stops.length; j++) {
+          const start = stops[j - 1];
+          const end = stops[j];
+          const depth = from.depth + (to.depth - from.depth) * (start + end) / 2;
+          const crest = crests[level(depth)];
+          crest.moveTo(from.x + (to.x - from.x) * start, from.y + (to.y - from.y) * start);
+          crest.lineTo(from.x + (to.x - from.x) * end, from.y + (to.y - from.y) * end);
+        }
+      }
+      crests.forEach((crest, index) => {
+        ctx.strokeStyle = crestColors[index];
+        ctx.stroke(crest);
+      });
     });
 
     ctx.fillStyle = '#70d7dc';
@@ -715,6 +757,24 @@
   ].filter((_, index) => index % 4 === 0);
   settings.demo = saved.demo === 'relief' ? 'relief' : 'bars';
   demo.value = settings.demo;
+  const waveColor = get('sondeurWaveColor');
+  const waveThickness = get('sondeurWaveThickness');
+  const waveThicknessValue = get('sondeurWaveThicknessValue');
+  waveColor.value = Object.hasOwn(waveColors, saved.waveColor) ? saved.waveColor : 'graphite';
+  waveThickness.value = clamp(saved.waveThickness, 50, 250, 100);
+  function updateWaveSettings() {
+    settings.waveColor = waveColor.value;
+    settings.waveThickness = Number(waveThickness.value);
+    waveThicknessValue.textContent = settings.waveThickness + ' %';
+  }
+  updateWaveSettings();
+  for (const control of [waveColor, waveThickness]) {
+    control.addEventListener('input', () => {
+      updateWaveSettings();
+      saveSettings();
+      refreshView();
+    });
+  }
   demo.addEventListener('change', () => {
     if (!get('sondeurTitle').dataset.live && !replay) {
       stop();
