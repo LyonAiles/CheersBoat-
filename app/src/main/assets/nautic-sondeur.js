@@ -43,10 +43,11 @@
       <label><input type="checkbox" id="sondeurHullOutline"> Ligne de coque</label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
       <label>Vision sous-marine <select id="sondeurScene"><option value="photo">Photo d’origine</option><option value="clear">Eau claire</option><option value="deep">Eau profonde</option><option value="blue-surface">Surface bleue</option><option value="deep-rays">Rayons en profondeur</option><option value="none">Sans image</option></select></label>
-      <label>Voile d’ondes sur la carte <select id="sondeurWaveBackground"><option value="none">Désactivé</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option><option value="green">Vert diffus</option><option value="turquoise">Turquoise diffus</option><option value="deep-blue">Bleu profond</option><option value="blue-waves">Vagues bleues</option></select></label>
+      <label>Voile d’ondes sur la carte <select id="sondeurWaveBackground"><option value="none">Désactivé</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option><option value="green">Vert diffus</option><option value="turquoise">Turquoise diffus</option><option value="deep-blue">Bleu profond</option><option value="blue-waves">Vagues bleues</option><option value="graphite">Relief graphite</option></select></label>
       <label><input type="checkbox" id="sondeurSunRays"> Rayons du soleil</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <h3>Cadence et simulation</h3>
+      <label>Démo <select id="sondeurDemo"><option value="bars">Barres</option><option value="relief">Relief</option></select></label>
       <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
       <label>Défilement <select id="sondeurScrollSteps"><option value="1">Direct</option><option value="4">Lissé</option></select></label>
       <label>Cadence <select id="sondeurTempoMode"><option value="auto">Automatique</option><option value="manual">Manuelle</option></select></label>
@@ -78,6 +79,7 @@
       </div>
       <div class="sondeur-scale">
         <div class="sondeur-depth-marks" aria-hidden="true"></div>
+        <canvas class="sondeur-relief" aria-hidden="true"></canvas>
         <div class="sondeur-bars" aria-hidden="true"></div>
         <div class="sondeur-extension" aria-hidden="true"></div>
         <svg class="sondeur-hull-outline" viewBox="0 0 120 60" preserveAspectRatio="none" aria-hidden="true">
@@ -109,6 +111,9 @@
   const get = id => panel.querySelector('#' + id);
   const extension = panel.querySelector('.sondeur-extension');
   const bars = panel.querySelector('.sondeur-bars');
+  const relief = panel.querySelector('.sondeur-relief');
+  const reliefContext = relief.getContext('2d');
+  const demo = get('sondeurDemo');
   const playButton = get('sondeurPlay');
   const reading = panel.querySelector('.sondeur-reading');
   const wave = (mean, amplitude) => Array.from({length: 100}, (_, i) =>
@@ -478,8 +483,64 @@
     setSound(alertSound, audible && depth < settings.alert);
   }
 
+  function drawRelief() {
+    const width = relief.clientWidth;
+    const height = relief.clientHeight;
+    if (!width || !height || !reliefContext) return;
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const pixelsWide = Math.round(width * ratio);
+    const pixelsHigh = Math.round(height * ratio);
+    if (relief.width !== pixelsWide) relief.width = pixelsWide;
+    if (relief.height !== pixelsHigh) relief.height = pixelsHigh;
+    const ctx = reliefContext;
+    ctx.setTransform(pixelsWide / width, 0, 0, pixelsHigh / height, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    // Project the longitudinal position and the measured vertical depth separately.
+    const rows = 22;
+    const center = width / 2;
+    const project = (age, depth) => {
+      const scale = .48 + .52 * age;
+      return height * (.12 + .48 * age + .38 * scale * Math.min(depth / settings.max, 1));
+    };
+    const visible = history.slice(-rows);
+    visible.forEach(({depth, missing}, index) => {
+      if (missing || !Number.isFinite(depth)) return;
+      const age = (visible.length - 1 - index) / (rows - 1);
+      const half = width * (.40 + .13 * age);
+      const y = project(age, depth);
+      // The center stays at its measured ordinate as the edges recede.
+      const bend = height * (.013 + .018 * age);
+      const thickness = height * (.009 + .012 * age);
+      const tone = Math.round(120 + 104 * age);
+      const color = alpha => 'rgba(' + tone + ',' + tone + ',' + tone + ',' + alpha + ')';
+      const gradient = ctx.createLinearGradient(center - half, 0, center + half, 0);
+      gradient.addColorStop(0, color(0));
+      gradient.addColorStop(.30, color(.24 + .68 * age));
+      gradient.addColorStop(.70, color(.24 + .68 * age));
+      gradient.addColorStop(1, color(0));
+      ctx.beginPath();
+      ctx.moveTo(center - half, y + bend);
+      ctx.quadraticCurveTo(center, y - bend, center + half, y + bend);
+      ctx.lineTo(center + half, y + bend + thickness);
+      ctx.quadraticCurveTo(center, y - bend + thickness, center - half, y + bend + thickness);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+    });
+
+    ctx.fillStyle = '#70d7dc';
+    ctx.fillRect(center - 10, project(0, settings.draft), 20, 2);
+  }
+
   function draw() {
     plot.style.opacity = String(1 - settings.alpha / 100);
+    const reliefDemo = settings.demo === 'relief' && !replay && !get('sondeurTitle').dataset.live;
+    plot.classList.toggle('sondeur-relief-demo', reliefDemo);
+    if (reliefDemo) {
+      drawRelief();
+      return;
+    }
     const step = settings.max <= 4 ? 0.5 : Math.ceil(settings.max / 8);
     const depths = [0];
     for (let depth = step; depth < settings.max; depth += step) depths.push(depth);
@@ -527,7 +588,7 @@
 
   function animateScroll(interval) {
     scrollAnimation?.cancel();
-    if (settings.scrollSteps === 1 || !bars.animate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (plot.classList.contains('sondeur-relief-demo') || settings.scrollSteps === 1 || !bars.animate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     scrollAnimation = bars.animate([
       {transform: 'translateX(' + settings.width + 'px)'},
       {transform: 'translateX(0)'}
@@ -635,10 +696,31 @@
     const base = settings.tempoMode === 'manual' ? settings.period * 1000 : 500;
     timer = setInterval(simulationTick, base / settings.simulationRate);
   }
+  const reliefSamples = [
+    ...wave(2.15, .88), ...wave(2.15, .55)
+  ].filter((_, index) => index % 4 === 0);
+  settings.demo = saved.demo === 'relief' ? 'relief' : 'bars';
+  demo.value = settings.demo;
+  demo.addEventListener('change', () => {
+    if (!get('sondeurTitle').dataset.live && !replay) {
+      stop();
+      history.length = 0;
+      next = 0;
+    }
+    settings.demo = demo.value;
+    saveSettings();
+    refreshView();
+  });
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => {
+      if (!plot.hidden && plot.classList.contains('sondeur-relief-demo')) drawRelief();
+    }).observe(plot);
+  }
   function simulationTick() {
       if (window.nauticMapInteracting || window.nauticQuietMode || document.hidden) return;
-      const depth = samples[next];
-      next = (next + 1) % samples.length;
+      const sequence = settings.demo === 'relief' ? reliefSamples : samples;
+      const depth = sequence[next];
+      next = (next + 1) % sequence.length;
       append(depth);
   }
 
