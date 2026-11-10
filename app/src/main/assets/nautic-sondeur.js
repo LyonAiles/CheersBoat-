@@ -151,7 +151,8 @@
     axis: clamp(saved.axis, 10, 95, 50),
     period: clamp(saved.period, 0.1, 60, 0.5),
     tempoMode: saved.tempoMode === 'manual' ? 'manual' : 'auto',
-    draft: clamp(saved.draft, 0.1, 30, 1.35),
+    draft: clamp(saved.draft === 1.35 && !saved.draftUpdated ? 1.50 : saved.draft, 0.1, 30, 1.50),
+    draftUpdated: true,
     width: clamp(saved.width, 2, 24, 5),
     auto: saved.auto === true
   };
@@ -341,13 +342,14 @@
     lastSave = Date.now();
   }
 
-  function record(depth) {
+  function record(depth, asperity) {
     const time = Date.now();
     while (recordings.length && recordings[0].time < time - oneHour) recordings.shift();
     const simulated = !get('sondeurTitle').dataset.live;
     const missing = depth === null;
     const previous = missing ? recordings.findLast(entry => entry.simulated === simulated) : null;
     const entry = {time, depth: missing ? previous?.depth ?? null : depth, simulated, missing};
+    if (asperity) entry.asperity = asperity;
     if (!missing) {
       if (depth >= settings.alert) alertRecorded = false;
       else if (!alertRecorded) {
@@ -506,12 +508,13 @@
     // Project the longitudinal position and the measured vertical depth separately.
     const rows = 22;
     const center = width / 2;
+    const maxDepth = Math.max(5, settings.max, settings.caution, settings.draft);
     const project = (age, depth) => {
       const scale = .48 + .52 * age;
-      return height * (.12 + .48 * age + .38 * scale * Math.min(depth / settings.max, 1));
+      return height * (.12 + .48 * age + .38 * scale * Math.min(depth / maxDepth, 1));
     };
     const visible = history.slice(-rows);
-    visible.forEach(({depth, missing, time}, index) => {
+    visible.forEach(({depth, missing, time, asperity}, index) => {
       if (missing || !Number.isFinite(depth)) return;
       const age = (visible.length - 1 - index) / (rows - 1);
       const half = width * .53;
@@ -535,7 +538,8 @@
         const rise = Math.sin(lateral * 4.7 + phase) - Math.sin(phase);
         const dip = Math.sin(lateral * 8.3 - phase) + Math.sin(phase);
         const offset = (.24 * rise + .12 * dip) * (1 - lateral ** 4);
-        const crossDepth = Math.max(0, depth + offset);
+        const spike = asperity ? .9 * Math.max(0, 1 - Math.abs(lateral - asperity) / .19) : 0;
+        const crossDepth = Math.max(0, depth + offset - spike);
         return {
           depth: crossDepth,
           x: center + half * lateral,
@@ -585,8 +589,16 @@
       });
     });
 
-    ctx.fillStyle = '#70d7dc';
-    ctx.fillRect(center - 10, project(0, settings.draft), 20, 2);
+    // Use separate horizontal positions so coincident depths remain visible.
+    for (const [position, depth, color] of [
+      [.26, settings.caution, '#ffb03e'],
+      [.50, settings.draft, '#70d7dc'],
+      [.74, settings.alert, '#ff5267']
+    ]) {
+      const halfLength = width * .075;
+      ctx.fillStyle = color;
+      ctx.fillRect(width * position - halfLength, project(0, depth), halfLength * 2, 2);
+    }
   }
 
   function draw() {
@@ -652,9 +664,9 @@
   }
 
   let distanceRemainder = 0;
-  function append(depth) {
+  function append(depth, asperity) {
     if (depth !== null && (!Number.isFinite(depth) || depth < 0)) return false;
-    const entry = record(depth);
+    const entry = record(depth, asperity);
     if (replay) return true;
     const previous = history.at(-1);
     const wasVisible = !plot.hidden;
@@ -752,9 +764,12 @@
     const base = settings.tempoMode === 'manual' ? settings.period * 1000 : 500;
     timer = setInterval(simulationTick, base / settings.simulationRate);
   }
-  const reliefSamples = [
-    ...wave(2.15, .88), ...wave(2.15, .55)
-  ].filter((_, index) => index % 4 === 0);
+  const reliefSamples = Array.from({length: 480}, (_, index) => {
+    const progress = index / 479;
+    const variation = .16 * Math.sin(progress * Math.PI * 14) * Math.sin(progress * Math.PI);
+    const depth = 5 - 3.4 * progress + variation;
+    return Math.round(depth * 100) / 100;
+  });
   settings.demo = saved.demo === 'relief' ? 'relief' : 'bars';
   demo.value = settings.demo;
   const waveColor = get('sondeurWaveColor');
@@ -794,8 +809,12 @@
       if (window.nauticMapInteracting || window.nauticQuietMode || document.hidden) return;
       const sequence = settings.demo === 'relief' ? reliefSamples : samples;
       const depth = sequence[next];
+      const bump = next % 61;
+      const asperity = settings.demo === 'relief' && bump >= 45 && bump <= 47
+        ? (Math.floor(next / 61) % 2 ? -.50 : .44)
+        : 0;
       next = (next + 1) % sequence.length;
-      append(depth);
+      append(depth, asperity);
   }
 
   function play() {
@@ -812,7 +831,7 @@
     alertRecorded = false;
     distanceRemainder = 0;
     delete get('sondeurTitle').dataset.live;
-    manualPlot = !settings.auto;
+    manualPlot = settings.demo === 'relief' || !settings.auto;
     autoSuppressed = false;
     setPlayButton(true);
     restartSimulationTimer();
