@@ -43,7 +43,7 @@
       <label><input type="checkbox" id="sondeurHullOutline"> Ligne de coque</label>
       <label><input type="checkbox" id="sondeurBottomDetail"> Pierres et végétation sur l’historique</label>
       <label>Vision sous-marine <select id="sondeurScene"><option value="photo">Photo d’origine</option><option value="clear">Eau claire</option><option value="deep">Eau profonde</option><option value="blue-surface">Surface bleue</option><option value="deep-rays">Rayons en profondeur</option><option value="none">Sans image</option></select></label>
-      <label>Voile d’ondes sur la carte <select id="sondeurWaveBackground"><option value="none">Désactivé</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option><option value="green">Vert diffus</option><option value="turquoise">Turquoise diffus</option><option value="deep-blue">Bleu profond</option><option value="blue-waves">Vagues bleues</option><option value="graphite">Relief graphite</option></select></label>
+      <label>Voile d’ondes sur la carte <select id="sondeurWaveBackground"><option value="none">Désactivé</option><option value="fine">Ondes fines</option><option value="wide">Ondes larges</option><option value="green">Vert diffus</option><option value="turquoise">Turquoise diffus</option><option value="deep-blue">Bleu profond</option><option value="blue-waves">Vagues bleues</option><option value="graphite">Relief graphite</option><option value="relief-1">Ruban gris</option><option value="relief-2">Entonnoir gris</option><option value="relief-3">Tunnel vers une gorge</option><option value="relief-4">Tunnel plein cadre</option><option value="relief-5">Tunnel accentué</option><option value="relief-6">Tunnel gris progressif</option><option value="relief-7">Tranche au loin</option><option value="relief-8">Historique des reliefs</option></select></label>
       <label><input type="checkbox" id="sondeurSunRays"> Rayons du soleil</label>
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <h3>Cadence et simulation</h3>
@@ -504,26 +504,40 @@
       return height * (.12 + .48 * age + .38 * scale * Math.min(depth / settings.max, 1));
     };
     const visible = history.slice(-rows);
-    visible.forEach(({depth, missing}, index) => {
+    visible.forEach(({depth, missing, time}, index) => {
       if (missing || !Number.isFinite(depth)) return;
       const age = (visible.length - 1 - index) / (rows - 1);
       const half = width * (.40 + .13 * age);
       const y = project(age, depth);
-      // The center stays at its measured ordinate as the edges recede.
       const bend = height * (.013 + .018 * age);
       const thickness = height * (.009 + .012 * age);
       const tone = Math.round(120 + 104 * age);
-      const color = alpha => 'rgba(' + tone + ',' + tone + ',' + tone + ',' + alpha + ')';
+      const color = alpha => 'rgba(' + tone + ',' + tone + ',' + alpha + ')';
       const gradient = ctx.createLinearGradient(center - half, 0, center + half, 0);
       gradient.addColorStop(0, color(0));
       gradient.addColorStop(.30, color(.24 + .68 * age));
       gradient.addColorStop(.70, color(.24 + .68 * age));
       gradient.addColorStop(1, color(0));
+
+      // The depth is measured at the center. Crosswise variations are fictitious.
+      const phase = (time % 20000) / 20000 * Math.PI * 2;
+      const profile = Array.from({length: 33}, (_, point) => {
+        const lateral = point / 16 - 1;
+        const rise = Math.sin(lateral * 4.7 + phase) - Math.sin(phase);
+        const dip = Math.sin(lateral * 8.3 - phase) + Math.sin(phase);
+        const offset = (.24 * rise + .12 * dip) * (1 - lateral ** 4);
+        const crossDepth = Math.max(0, depth + offset);
+        return {
+          x: center + half * lateral,
+          y: y + project(age, crossDepth) - project(age, depth) + bend * lateral ** 2
+        };
+      });
       ctx.beginPath();
-      ctx.moveTo(center - half, y + bend);
-      ctx.quadraticCurveTo(center, y - bend, center + half, y + bend);
-      ctx.lineTo(center + half, y + bend + thickness);
-      ctx.quadraticCurveTo(center, y - bend + thickness, center - half, y + bend + thickness);
+      ctx.moveTo(profile[0].x, profile[0].y);
+      for (const point of profile.slice(1)) ctx.lineTo(point.x, point.y);
+      for (let i = profile.length - 1; i >= 0; i--) {
+        ctx.lineTo(profile[i].x, profile[i].y + thickness);
+      }
       ctx.closePath();
       ctx.fillStyle = gradient;
       ctx.fill();
