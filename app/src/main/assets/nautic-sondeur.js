@@ -48,6 +48,8 @@
       <label><input type="checkbox" id="sondeurShimmer"> Scintillement du fond</label>
       <h3>Cadence et simulation</h3>
       <label>Démo <select id="sondeurDemo"><option value="bars">Barres</option><option value="relief">Relief</option></select></label>
+      <label><input type="checkbox" id="sondeurWideMarks"> Repères sur toute la largeur</label>
+      <label class="sondeur-slider">Espace d’eau <output id="sondeurWaterSpaceValue"></output><input id="sondeurWaterSpace" type="range" min="100" max="200" step="5"></label>
       <label>Couleur des ondes <select id="sondeurWaveColor"><option value="graphite">Graphite</option><option value="pearl">Blanc perle</option><option value="blue">Bleu</option><option value="turquoise">Turquoise</option><option value="green">Vert</option><option value="purple">Violet</option></select></label>
       <label class="sondeur-slider">Épaisseur des ondes <output id="sondeurWaveThicknessValue"></output><input id="sondeurWaveThickness" type="range" min="50" max="250" step="5"></label>
       <label class="sondeur-slider">Vitesse de simulation <output id="sondeurSimulationRateValue"></output><input id="sondeurSimulationRate" type="range" min="0.25" max="4" step="0.25"></label>
@@ -509,10 +511,21 @@
     const rows = 22;
     const center = width / 2;
     const maxDepth = Math.max(5, settings.max, settings.caution, settings.draft);
+    const waterSpace = .12 * settings.waterSpace / 100;
+    const verticalScale = (1 - waterSpace) / .88;
     const project = (age, depth) => {
       const scale = .48 + .52 * age;
-      return height * (.12 + .48 * age + .38 * scale * Math.min(depth / maxDepth, 1));
+      return height * (waterSpace + verticalScale * (.48 * age + .38 * scale * Math.min(depth / maxDepth, 1)));
     };
+    const base = waveColors[settings.waveColor];
+    const withBrightness = (color, target) => {
+      const brightness = color[0] * .2126 + color[1] * .7152 + color[2] * .0722;
+      const limit = brightness < target ? 255 : 0;
+      const amount = (target - brightness) / (limit - brightness);
+      return color.map(channel => Math.round(channel + (limit - channel) * amount));
+    };
+    const waveColor = withBrightness(base, 145);
+    const normalCrest = withBrightness(base, 218);
     const visible = history.slice(-rows);
     visible.forEach(({depth, missing, time, asperity}, index) => {
       if (missing || !Number.isFinite(depth)) return;
@@ -522,7 +535,6 @@
       const bend = height * (.013 + .018 * age);
       const thickness = height * (.009 + .012 * age) * settings.waveThickness / 100;
       const shade = .52 + .48 * age;
-      const base = waveColors[settings.waveColor];
       const fade = color => {
         const gradient = ctx.createLinearGradient(0, 0, width, 0);
         for (const [stop, opacity] of [[0, .16], [.24, 1], [.76, 1], [1, .16]]) {
@@ -553,11 +565,11 @@
         ctx.lineTo(profile[i].x, profile[i].y + thickness);
       }
       ctx.closePath();
-      ctx.fillStyle = fade(base);
+      ctx.fillStyle = fade(waveColor);
       ctx.fill();
 
       const crestColors = [
-        base.map(channel => Math.round(channel + (255 - channel) * .58)),
+        normalCrest,
         [255, 176, 62],
         [255, 82, 103]
       ].map(fade);
@@ -589,15 +601,24 @@
       });
     });
 
-    // Use separate horizontal positions so coincident depths remain visible.
-    for (const [position, depth, color] of [
-      [.26, settings.caution, '#ffb03e'],
-      [.50, settings.draft, '#70d7dc'],
-      [.74, settings.alert, '#ff5267']
+    const marksByRow = new Map();
+    for (const [depth, color] of [
+      [settings.caution, '#ffb03e'],
+      [settings.alert, '#ff5267'],
+      [settings.draft, '#70d7dc']
     ]) {
-      const halfLength = width * .075;
-      ctx.fillStyle = color;
-      ctx.fillRect(width * position - halfLength, project(0, depth), halfLength * 2, 2);
+      const row = Math.round(project(0, depth));
+      if (!marksByRow.has(row)) marksByRow.set(row, []);
+      marksByRow.get(row).push(color);
+    }
+    const length = settings.wideMarks ? width : width * .15;
+    const left = (width - length) / 2;
+    for (const [row, colors] of marksByRow) {
+      const segment = colors.length === 1 ? length : Math.min(6, length / colors.length);
+      for (let offset = 0, index = 0; offset < length; offset += segment, index++) {
+        ctx.fillStyle = colors[index % colors.length];
+        ctx.fillRect(left + offset, row, Math.min(segment, length - offset), 2);
+      }
     }
   }
 
@@ -774,16 +795,23 @@
   demo.value = settings.demo;
   const waveColor = get('sondeurWaveColor');
   const waveThickness = get('sondeurWaveThickness');
+  const wideMarks = get('sondeurWideMarks');
+  const waterSpace = get('sondeurWaterSpace');
+  wideMarks.checked = saved.wideMarks === true;
+  waterSpace.value = clamp(saved.waterSpace, 100, 200, 150);
   const waveThicknessValue = get('sondeurWaveThicknessValue');
   waveColor.value = Object.hasOwn(waveColors, saved.waveColor) ? saved.waveColor : 'graphite';
   waveThickness.value = clamp(saved.waveThickness, 50, 250, 100);
   function updateWaveSettings() {
     settings.waveColor = waveColor.value;
     settings.waveThickness = Number(waveThickness.value);
+    settings.wideMarks = wideMarks.checked;
+    settings.waterSpace = Number(waterSpace.value);
+    get('sondeurWaterSpaceValue').textContent = settings.waterSpace + ' %';
     waveThicknessValue.textContent = settings.waveThickness + ' %';
   }
   updateWaveSettings();
-  for (const control of [waveColor, waveThickness]) {
+  for (const control of [waveColor, waveThickness, wideMarks, waterSpace]) {
     control.addEventListener('input', () => {
       updateWaveSettings();
       saveSettings();
