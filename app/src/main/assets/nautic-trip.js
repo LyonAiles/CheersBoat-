@@ -66,10 +66,10 @@
   return null;
  }
 
- function create(elements, location, destination) {
+ function create(elements, location, destination, destinationLimit = maxBankOffset) {
   const {edges} = W.parse(elements.filter(element => element.type === 'way'));
   const start = snap(edges, location), target = snap(edges, destination);
-  if (!start || start.d > maxBankOffset || !target || target.d > maxBankOffset) return null;
+  if (!start || start.d > maxBankOffset || !target || target.d > destinationLimit) return null;
   const posts = elements.map(post).filter(Boolean).map(p => {
    const projection = snap(edges, p);
    return {...projection, pk: p.pk};
@@ -132,9 +132,9 @@
   };
  }
 
- function fromNetwork(elements, start, end) {
+ function fromNetwork(elements, start, end, destinationLimit) {
   // Access restrictions describe navigation, not the physical waterway graph.
-  const route=create(elements,start,end);
+  const route=create(elements,start,end,destinationLimit);
   if(!route)return null;
   const coordinates=route.legs.length?[route.legs[0].a,...route.legs.map(leg=>leg.b)].map(point):[point(route.end)];
   const closedEdges=route.legs.flatMap((leg,i)=>leg.edge.restricted?[i]:[]);

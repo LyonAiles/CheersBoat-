@@ -90,11 +90,22 @@
  }
 
  function cachedRoute(start,end){
-  try{
-   const local=JSON.parse(localStorage.getItem(networkKey)||'null');
-   const elements=[...(cache?.elements||[]),...(Array.isArray(local)?local:[])];
-   return elements.length?calc.fromNetwork(elements,start,end):null;
-  }catch(_){return null;}
+  let local;
+  try{local=JSON.parse(localStorage.getItem(networkKey)||'null');}catch(_){}
+  const bundled=window.NauticLocalWaterways||[];
+  const downloaded=[...(cache?.elements||[]),...(Array.isArray(local)?local:[])];
+  for(const [elements,note,limit] of [
+   [downloaded,'Réseau en cache',undefined],
+   [bundled,'Voie d’eau embarquée · OpenStreetMap',1000],
+   [[...bundled,...downloaded],'Tracé OpenStreetMap en cache',undefined]
+  ]){
+   if(!elements.length)continue;
+   try{
+    const trip=calc.fromNetwork(elements,start,end,limit);
+    if(trip)return {trip,note};
+   }catch(_){}
+  }
+  return null;
  }
  function sectionColor(closed){
   return closed?'#ff715e':routeState.trip.approximate?'#bdc5d2':'#f6dc76';
@@ -265,8 +276,8 @@
   tripRequest=controller;
   const start={lat:departure.lat,lon:departure.lon},end=chosen;
   const cached=cachedRoute(start,end);
-  routeState={start,end,via:[],trip:cached||calc.approximate(start,end),closures:[],covered:0,
-   note:cached?'Réseau en cache':'Réseau fluvial indisponible'};
+  routeState={start,end,via:[],trip:cached?.trip||calc.approximate(start,end),closures:[],covered:0,
+   note:cached?.note||'Réseau fluvial indisponible'};
   saveTrip();renderTrip();
   const timeout=setTimeout(()=>controller.abort(),50000);
   try{
@@ -288,7 +299,7 @@
    if(planned){
     routeState.trip=planned;routeState.note='';
     try{const json=JSON.stringify(result.elements);if(json.length<1800000)localStorage.setItem(networkKey,json);}catch(_){}
-   }else routeState.note=cached?'Réseau en cache':'Réseau fluvial non raccordé';
+   }else routeState.note=cached?.note||'Réseau fluvial non raccordé';
    saveTrip();renderTrip();
   }catch(_){
    // Keep the immediately available estimate or cached route, including manual closures.
@@ -384,9 +395,9 @@
  function showItem(id){const p=lastList.find(x=>x.id===id);if(!p)return;modal('Ouvrage fluvial',info(p)+'<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');}
  function showList(list=lastList){modal(selectedWorkPoint?'Ouvrages autour du point choisi':'Ouvrages autour du bateau', (options.waterwayTypes?.sondeurAlert === false ? '' : '<button type="button" id="waterwaySondeurAlerts">Points d’alerte du sondeur</button>')+`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));const alertsButton=$('waterwaySondeurAlerts');if(alertsButton)alertsButton.onclick=()=>{$('dialog').close();$('sondeurAlertList')?.click();};$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();
  try{cache=JSON.parse(localStorage.getItem('nautic-waterways-cache')||'null');if(cache&&Array.isArray(cache.elements))data=W.parse(cache.elements);else cache=null;}catch(_){cache=null;}
- if(routeState&&!routeState.trip.approximate&&!routeState.trip.closedEdges){
+ if(routeState&&((routeState.trip.approximate&&!routeState.via.length)||(!routeState.trip.approximate&&!routeState.trip.closedEdges))){
   const updated=cachedRoute(routeState.start,routeState.end);
-  if(updated){routeState.trip=updated;saveTrip();renderTrip();}
+  if(updated){Object.assign(routeState,updated);saveTrip();renderTrip();}
  }
  window.nauticFocusSondeurAlert = ({lat, lon}) => {
   window.nauticMapFreePan = true;
