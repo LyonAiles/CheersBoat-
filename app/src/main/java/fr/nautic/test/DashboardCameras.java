@@ -33,33 +33,10 @@ final class DashboardCameras {
   mapAlpha=value;
   for(Tile tile:tiles.values())if(isMapView(tile.id))tile.frame.setAlpha(value);
  }
- boolean stopped=false,mapPaused=false,suspended=false;
- void suspend(){
-  if(stopped||suspended)return;
-  suspended=true;
-  freezeSources();
-  for(Tile tile:tiles.values()){
-   tile.garland.setPaused(true);
-   tile.beacon.clearAnimation();
-  }
- }
- void resume(){
-  suspended=false;
-  mapPaused=false;
-  retryAt.clear();
-  for(Tile tile:tiles.values()){
-   tile.garland.setPaused(false);
-   tile.alarm=false;
-   tile.beacon.setVisibility(View.GONE);
-  }
- }
- void freezeSources(){
-  for(Source source:sources.values())source.close();
-  sources.clear();
- }
+ boolean stopped=false,mapPaused=false;
  void pauseForMap(boolean paused){
   if(mapPaused==paused)return;mapPaused=paused;
-  if(paused){freezeSources();for(Tile tile:tiles.values())if(tile.snapshot==null)tile.message.setText("Image figée · carte");}
+  if(paused){for(Source source:sources.values())source.close();sources.clear();for(Tile tile:tiles.values())tile.message.setText("Image figée · carte");}
   for(Tile tile:tiles.values()){tile.garland.setPaused(paused);if(paused)tile.beacon.clearAnimation();else if(tile.alarm)tile.alarm=false;}
  }
 
@@ -231,7 +208,7 @@ final class DashboardCameras {
    this.owner=owner;texture=new TextureView(activity);
    player=new ExoPlayer.Builder(activity,new DefaultRenderersFactory(activity).setEnableDecoderFallback(true)).build();
    owner.frame.addView(texture,0,new FrameLayout.LayoutParams(-1,-1));
-   owner.source=this;
+   owner.source=this;owner.setSnapshot(null);
    try{
    owner.applyCrop();player.setVolume(0);player.setVideoTextureView(texture);
    player.setVideoFrameMetadataListener((presentationTimeUs,releaseTimeNs,format,mediaFormat)->lastFrame=System.currentTimeMillis());
@@ -240,7 +217,6 @@ final class DashboardCameras {
      if(owner.source!=Source.this)return;
      if(firstFrame==0){firstFrame=System.currentTimeMillis();lastFrame=Math.max(lastFrame,firstFrame);}
      failures.remove(uri);
-     owner.setSnapshot(null);
      owner.message.setText("");
     }
     @Override public void onPlayerError(PlaybackException e){
@@ -280,8 +256,7 @@ final class DashboardCameras {
    if(snapshot!=null){
     owner.setSnapshot(snapshot);
     for(Tile tile:mirrors)tile.setSnapshot(snapshot);
-    owner.message.setText("");
-    for(Tile tile:mirrors)tile.message.setText("");
+    owner.message.setText("Dernière image · actualisation…");
    }
    player.release();owner.frame.removeView(texture);owner.source=null;
   }
@@ -302,7 +277,7 @@ final class DashboardCameras {
   for(Tile tile:tiles.values())if(tile.cropCamera==camera)tile.applyCrop();
  }
  void update(String json){
-  if(stopped||mapPaused||suspended)return;
+  if(stopped||mapPaused)return;
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
    for(int camera=1;camera<=3;camera++)if(camera!=draggingCamera){
