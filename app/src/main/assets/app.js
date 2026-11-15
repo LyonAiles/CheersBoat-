@@ -222,15 +222,8 @@ async function loadWeather(){
   $('weatherLabel').textContent=weatherIcon(weather.weather_code)+' '+Math.round(weather.temperature_2m)+'°C';
   renderWeatherGustLine();
   const angle=(weather.wind_direction_10m+180-(heading??0))%360;$('windArrow').style.transform=`rotate(${angle}deg)`;
-  updateWindCountdown();
  }catch(e){$('weatherTime').textContent='Météo indisponible · toucher pour réessayer';const box=$('localWeatherForecast');if(box&&!weatherForecast)box.textContent='Météo indisponible. Vérifie la connexion, puis rouvre le panneau.'}
  finally{windBusy=false}
-}
-function updateWindCountdown(){
- const el=$('weatherTime');if(!el||!weatherAt)return;
- const remain=Math.max(0,WIND_PERIOD-(Date.now()-weatherAt)),mins=Math.floor(remain/60000),secs=Math.floor(remain%60000/1000);
- const v=Math.round(weather?.wind_speed_10m??0),g=weather?.wind_gusts_10m;
- el.textContent='Vent '+v+' · Raf. '+(Number.isFinite(g)?Math.round(g):'—')+' km/h · '+String(mins).padStart(2,'0')+':'+String(secs).padStart(2,'0');
 }
 function weatherRows(forecast,now=Date.now()/1000){
  return forecast.time.map((t,i)=>({t,v:forecast.wind_speed_10m[i],g:forecast.wind_gusts_10m[i],rain:forecast.precipitation[i]}))
@@ -243,14 +236,40 @@ function forecastLine(rows,key,x,y){
 function renderWeatherGustLine(){
  const chart=$('weatherGustLine');
  const rows=weatherRows(weatherForecast);
+ const winds=rows.map(row=>row.v).filter(Number.isFinite);
  const gusts=rows.map(row=>row.g).filter(Number.isFinite);
  const maximum=Math.max(10,...gusts);
- chart.querySelector('path').setAttribute('d',forecastLine(rows,'g',i=>2+i*96/Math.max(1,rows.length-1),v=>26-v*24/maximum));
+ const x=i=>4+i*92/Math.max(1,rows.length-1),y=v=>27-v*16/maximum;
+ $('weatherTime').textContent=winds.length
+  ?'Vent '+Math.round(Math.min(...winds))+'–'+Math.round(Math.max(...winds))+' km/h'
+  :'Vent prévu indisponible';
+ chart.querySelector('path').setAttribute('d',forecastLine(rows,'g',x,y));
  chart.setAttribute('aria-hidden',String(gusts.length<2));
+ const labels=$('weatherGustPeaks');
+ labels.replaceChildren();
+ if(gusts.length<2||maximum-Math.min(...gusts)<2)return;
+
+ const candidates=rows.map((row,i)=>({value:row.g,i})).filter(({value,i})=>{
+  if(!Number.isFinite(value))return false;
+  const previous=rows[i-1]?.g,next=rows[i+1]?.g;
+  return (!Number.isFinite(previous)||value>=previous)&&(!Number.isFinite(next)||value>=next)&&
+   ((Number.isFinite(previous)&&value-previous>=2)||(Number.isFinite(next)&&value-next>=2));
+ }).sort((a,b)=>b.value-a.value||a.i-b.i);
+ const selected=[];
+ for(const {value,i} of candidates){
+  const labelX=Math.max(10,Math.min(90,x(i)));
+  if(selected.some(position=>Math.abs(position-labelX)<23))continue;
+  const number=document.createElement('span');
+  number.textContent=String(Math.round(value));
+  number.style.left=labelX+'%';
+  number.style.top=(y(value)-1)/28*100+'%';
+  labels.append(number);
+  selected.push(labelX);
+  if(selected.length===2)break;
+ }
 }
 
 window.nauticEvery(()=>{if(latest)loadWeather()},WIND_PERIOD);
-window.nauticEvery(updateWindCountdown,1000);
 function updateLog(){$('distance').textContent=(travel/1000).toFixed(2)+' km';$('routeDistance').textContent=(travel/1000).toFixed(2)+' km';$('recordState').textContent=recording?'Enregistrement actif':'En pause';$('recordDot').classList.toggle('live',recording);if(recording){let s=Math.floor((Date.now()-started)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;$('elapsed').textContent=[h,m,ss].map(x=>String(x).padStart(2,'0')).join(':')}}window.nauticEvery(updateLog,1000);updateLog();
 function exportCsv(){let csv=['date,latitude,longitude,precision_m,vitesse_m_s,cap_deg',...points.map(p=>[new Date(p.t).toISOString(),p.lat,p.lon,p.acc,p.speed??'',p.head??''].join(','))].join('\n');let u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=u;a.download='nautic-journal.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 function logDialog(){modal('Journal de bord',`<p>Points enregistrés : ${points.length}<br>Distance GPS estimée : ${(travel/1000).toFixed(2)} km</p><p class="muted">Le navigateur doit rester ouvert pour enregistrer le trajet. Le suivi en arrière-plan n’est pas garanti.</p><div class="dialogActions"><button id="recordBtn">${recording?'Arrêter':'Démarrer'} l’enregistrement</button><button id="csvBtn">Exporter CSV</button><button id="eraseBtn">Effacer</button></div>`);$('recordBtn').onclick=()=>{recording=!recording;if(recording){started=Date.now();startGps()}updateLog();logDialog()};$('csvBtn').onclick=exportCsv;$('eraseBtn').onclick=()=>{if(confirm('Effacer le trajet et la distance enregistrée ?')){points=[];travel=0;localStorage.removeItem('nautic-v04-points');localStorage.removeItem('nautic-v04-travel');if(routeLine)routeLine.setLatLngs([]);updateLog();logDialog()}}}

@@ -29,10 +29,33 @@ final class DashboardCameras {
   mapAlpha=value;
   for(Tile tile:tiles.values())if(isMapView(tile.id))tile.frame.setAlpha(value);
  }
- boolean stopped=false,mapPaused=false;
+ boolean stopped=false,mapPaused=false,suspended=false;
+ void suspend(){
+  if(stopped||suspended)return;
+  suspended=true;
+  freezeSources();
+  for(Tile tile:tiles.values()){
+   tile.garland.setPaused(true);
+   tile.beacon.clearAnimation();
+  }
+ }
+ void resume(){
+  suspended=false;
+  mapPaused=false;
+  retryAt.clear();
+  for(Tile tile:tiles.values()){
+   tile.garland.setPaused(false);
+   tile.alarm=false;
+   tile.beacon.setVisibility(View.GONE);
+  }
+ }
+ void freezeSources(){
+  for(Source source:sources.values())source.close();
+  sources.clear();
+ }
  void pauseForMap(boolean paused){
   if(mapPaused==paused)return;mapPaused=paused;
-  if(paused){for(Source source:sources.values())source.close();sources.clear();for(Tile tile:tiles.values())tile.message.setText("Image figée · carte");}
+  if(paused){freezeSources();for(Tile tile:tiles.values())if(tile.snapshot==null)tile.message.setText("Image figée · carte");}
   for(Tile tile:tiles.values()){tile.garland.setPaused(paused);if(paused)tile.beacon.clearAnimation();else if(tile.alarm)tile.alarm=false;}
  }
 
@@ -200,15 +223,20 @@ final class DashboardCameras {
   final long created=System.currentTimeMillis();
   boolean failed=false;
   Source(String uri,Tile owner){this.owner=owner;texture=new TextureView(activity);owner.frame.addView(texture,0,new FrameLayout.LayoutParams(-1,-1));
-   owner.source=this;owner.setSnapshot(null);
+   owner.source=this;owner.applyCrop();
    player=new ExoPlayer.Builder(activity,new DefaultRenderersFactory(activity).setEnableDecoderFallback(true)).build();player.setVolume(0);player.setVideoTextureView(texture);
    player.setVideoFrameMetadataListener((presentationTimeUs,releaseTimeNs,format,mediaFormat)->lastFrame=System.currentTimeMillis());
    player.addListener(new Player.Listener(){
-    @Override public void onRenderedFirstFrame(){owner.message.setText("");}
+    @Override public void onRenderedFirstFrame(){
+     if(owner.source!=Source.this)return;
+     owner.setSnapshot(null);
+     owner.message.setText("");
+    }
     @Override public void onPlayerError(PlaybackException e){
      failed=true;retryAt.put(uri,System.currentTimeMillis()+4000);
      if(e.getErrorCodeName().contains("DECOD"))decoderBudget=Math.max(1,Math.min(decoderBudget,sources.size()-1));
-     owner.message.setText("Relance · "+e.getErrorCodeName());for(Tile t:mirrors)t.message.setText(owner.message.getText());
+     if(owner.snapshot==null)owner.message.setText("Relance · "+e.getErrorCodeName());
+     for(Tile tile:mirrors)if(tile.snapshot==null)tile.message.setText(owner.message.getText());
     }
     @Override public void onVideoSizeChanged(VideoSize size){
      if(size.width<=0||size.height<=0||size.pixelWidthHeightRatio<=0)return;
@@ -223,16 +251,19 @@ final class DashboardCameras {
    // View transformations only affect display. Each tile crops its own copy of the full frame.
    int width=Math.max(1,Math.round(320*Math.min(1,videoRatio)));
    int height=Math.max(1,Math.round(320*Math.min(1,1/videoRatio)));
-   Bitmap bitmap=texture.getBitmap(width,height);
-   if(bitmap!=null)bitmap.setDensity(Bitmap.DENSITY_NONE);
-   return bitmap;
+   try{
+    Bitmap bitmap=texture.getBitmap(width,height);
+    if(bitmap!=null)bitmap.setDensity(Bitmap.DENSITY_NONE);
+    return bitmap;
+   }catch(RuntimeException ignored){return null;}
   }
   void close(){
    Bitmap snapshot=stopped?null:capture();
    if(snapshot!=null){
     owner.setSnapshot(snapshot);
     for(Tile tile:mirrors)tile.setSnapshot(snapshot);
-    owner.message.setText("Dernière image · actualisation…");
+    owner.message.setText("");
+    for(Tile tile:mirrors)tile.message.setText("");
    }
    player.release();owner.frame.removeView(texture);owner.source=null;
   }
@@ -253,7 +284,7 @@ final class DashboardCameras {
   for(Tile tile:tiles.values())if(tile.cropCamera==camera)tile.applyCrop();
  }
  void update(String json){
-  if(stopped||mapPaused)return;
+  if(stopped||mapPaused||suspended)return;
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
    for(int camera=1;camera<=3;camera++)if(camera!=draggingCamera){
@@ -318,7 +349,7 @@ final class DashboardCameras {
    for(Tile tile:changedFeeds){tile.setSnapshot(null);}
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
     if(!selected.contains(e.getKey()))continue;
-    Source source=sources.get(e.getKey());if(source==null){Tile owner=e.getValue().get(0);owner.message.setText("◌");source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);}
+    Source source=sources.get(e.getKey());if(source==null){Tile owner=e.getValue().get(0);owner.message.setText(owner.snapshot==null?"◌":"");source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);}
     source.mirrors.clear();for(Tile t:e.getValue())if(t!=source.owner)source.mirrors.add(t);source.copy();
    }
   }catch(Exception ignored){}

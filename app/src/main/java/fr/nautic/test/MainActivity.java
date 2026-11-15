@@ -51,9 +51,9 @@ public class MainActivity extends Activity {
  private PermissionRequest pendingCamera;
  private NotesPad notesPad;
  private android.content.BroadcastReceiver trematageReceiver;
- @Override protected void onStart(){super.onStart();dashboardVisible=true;trematageReceiver=TrematageAlerts.attach(this);}
- @Override protected void onPause(){mapManipulating=false;dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}super.onPause();}
- @Override protected void onStop(){dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
+ @Override protected void onStart(){super.onStart();trematageReceiver=TrematageAlerts.attach(this);}
+ @Override protected void onPause(){mapManipulating=false;dashboardVisible=false;if(dashboardCameras!=null)dashboardCameras.suspend();super.onPause();}
+ @Override protected void onStop(){dashboardVisible=false;if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
   if(RemoteTwinService.prefs(this).getBoolean("enabled",false))RemoteTwinService.apply(this);
@@ -309,7 +309,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onResume(){
   super.onResume();dashboardVisible=true;
-  if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}
+  if(dashboardCameras!=null)dashboardCameras.resume();
   js("nauticDashboardResume","");
   String saved=getSharedPreferences("nautic_settings",MODE_PRIVATE).getString("nautic-v04","");
   if(!saved.isEmpty())js("nauticCameraAddressSync",saved);
