@@ -197,3 +197,6 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
 .map-camera-label {display:var(--camera-label-display,block)}
 dialog .settingRow {position:relative}
 dialog .settingRow > .nautic-field-number {position:absolute;top:2px;left:2px}
+
+#cam1Body,#cam2Body {touch-action:none}
+.map-camera-view img,#app .camCard .camBody img {object-position:var(--camera-position,50% 50%)}

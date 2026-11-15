@@ -199,6 +199,64 @@
  });
  window.nauticDashboardClick=id=>{if(id===mapSwitch.id)switchMapCamera();else if(mapViews.includes(id))activateMapView(id);else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
  window.nauticDashboardHold=id=>{if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
+ const clampCrop=value=>Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
+ const cropKey=camera=>'nautic-camera-crop-'+camera;
+ const liveCrops=new Map();
+ function readCrop(camera){
+  let value='';
+  try{value=call('readSetting',cropKey(camera))||localStorage.getItem(cropKey(camera))||'';}catch(_){}
+  const [x,y]=value.split(',').map(Number);
+  return liveCrops.get(Number(camera))||{x:clampCrop(x),y:clampCrop(y)};
+ }
+ function showCrop(view,camera){
+  if(camera!=1&&camera!=2){view.style.removeProperty('--camera-position');return;}
+  const {x,y}=readCrop(camera);
+  view.style.setProperty('--camera-position',`${50-50*x}% ${50-50*y}%`);
+ }
+ for(const camera of [1,2]){
+  const view=$('cam'+camera+'Body'),card=$('cam'+camera+'Card');
+  let gesture=null,suppressClick=false;
+  view.addEventListener('pointerdown',event=>{
+   if(event.button!==0||!event.isPrimary||!view.querySelector('img'))return;
+   suppressClick=false;
+   gesture={id:event.pointerId,x:event.clientX,y:event.clientY,initial:readCrop(camera),dragged:false};
+  });
+  view.addEventListener('pointermove',event=>{
+   if(gesture?.id!==event.pointerId)return;
+   const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
+   if(!gesture.dragged){
+    if(Math.hypot(dx,dy)<=8)return;
+    gesture.dragged=true;
+    view.setPointerCapture(event.pointerId);
+   }
+   const bounds=view.getBoundingClientRect();
+   liveCrops.set(camera,{x:clampCrop(gesture.initial.x+2*dx/Math.max(1,bounds.width)),
+    y:clampCrop(gesture.initial.y+2*dy/Math.max(1,bounds.height))});
+   showCrop(view,camera);
+   for(const id of mapViews)if(feeds[id].camera===camera)showCrop($(id),camera);
+  });
+  function finishCrop(event){
+   if(gesture?.id!==event.pointerId)return;
+   suppressClick=gesture.dragged;
+   if(gesture.dragged&&event.type==='pointerup'){
+    const {x,y}=liveCrops.get(camera);
+    const value=x+','+y;
+    try{
+     if(bridge)call('writeSetting',cropKey(camera),value);
+     else localStorage.setItem(cropKey(camera),value);
+    }catch(_){}
+   }
+   liveCrops.delete(camera);gesture=null;previews();
+  }
+  view.addEventListener('pointerup',finishCrop);
+  view.addEventListener('pointercancel',finishCrop);
+  card.addEventListener('click',event=>{
+   if(!suppressClick||!event.detail)return;
+   suppressClick=false;
+   event.stopImmediatePropagation();
+  },true);
+ }
+
  function previews(){
   const sonarSettings=$('sondeurSettings');
   const settingsOpen=sonarSettings&&!sonarSettings.hidden;
@@ -217,8 +275,9 @@
     const index=feed?.camera||id.charAt(3);
     const url=config['cam'+index]||'';
     if(/^https?:\/\//i.test(url)){
+     showCrop(e,index);
      if(e.dataset.previewUrl!==url){
-      const img=new Image();img.alt='Caméra '+(40+Number(index));img.src=url;
+      const img=new Image();img.alt='Caméra '+(40+Number(index));img.draggable=false;img.src=url;
       if(inMap){e.querySelector('img')?.remove();e.prepend(img);}else e.replaceChildren(img);
       e.dataset.previewUrl=url;
      }

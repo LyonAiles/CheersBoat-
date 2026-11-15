@@ -1,5 +1,6 @@
 package fr.nautic.test;
 
+import android.content.SharedPreferences;
 import android.graphics.*;
 import android.net.Uri;
 import android.view.*;
@@ -13,6 +14,9 @@ import java.util.*;
 /** Muted local RTSP previews, bounded to visible dashboard tiles. Duplicate URLs share a decoder. */
 final class DashboardCameras {
  final MainActivity activity;final FrameLayout layer;
+ final SharedPreferences settings;
+ final CameraCrop[] crops={CameraCrop.CENTER,CameraCrop.CENTER,CameraCrop.CENTER};
+ int draggingCamera;
  final Map<String,Tile> tiles=new LinkedHashMap<>();
  final Map<String,Source> sources=new LinkedHashMap<>();
  final Map<String,Long> retryAt=new HashMap<>();
@@ -35,14 +39,20 @@ final class DashboardCameras {
  class Tile{
   final String id;final FrameLayout frame;final ImageView mirror;final TextView message,banner,footer,beacon;
   boolean alarm=false,active=false;
-  int displayedCamera=0,displayedLens=0;
+  int displayedCamera=0,displayedLens=0,cropCamera=0;
+  boolean longClicked;
+  Bitmap snapshot;
+  Source source;
   TextView refresh;
   final CameraGarland garland=new CameraGarland(activity.getResources().getDisplayMetrics().density);
   int dp(float n){return (int)(n*activity.getResources().getDisplayMetrics().density+.5f);}
   TextView overlay(int size){TextView t=new TextView(activity);t.setTextColor(Color.WHITE);t.setTextSize(size);t.setGravity(Gravity.CENTER);t.setPadding(dp(4),dp(3),dp(4),dp(3));t.setBackgroundColor(0xb3075e9f);return t;}
   Tile(String id){this.id=id;frame=new FrameLayout(activity);frame.setBackgroundColor(Color.BLACK);
    android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(Color.BLACK);shape.setCornerRadius(dp(8));frame.setBackground(shape);frame.setClipToOutline(true);
-   mirror=new ImageView(activity);mirror.setScaleType(ImageView.ScaleType.CENTER_CROP);frame.addView(mirror,new FrameLayout.LayoutParams(-1,-1));
+   mirror=new ImageView(activity);mirror.setScaleType(ImageView.ScaleType.MATRIX);frame.addView(mirror,new FrameLayout.LayoutParams(-1,-1));
+   frame.addOnLayoutChangeListener((view,l,t,r,b,oldL,oldT,oldR,oldB)->{
+    if(r-l!=oldR-oldL||b-t!=oldB-oldT)applyCrop();
+   });
    message=new TextView(activity);message.setTextColor(Color.WHITE);message.setTextSize(10);message.setGravity(Gravity.CENTER);frame.addView(message,new FrameLayout.LayoutParams(-1,-1));
    banner=overlay(11);banner.setSingleLine(true);banner.setEllipsize(android.text.TextUtils.TruncateAt.END);frame.addView(banner,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
    footer=overlay(10);footer.setMaxLines(2);frame.addView(footer,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));footer.setVisibility(View.GONE);
@@ -63,7 +73,71 @@ final class DashboardCameras {
     return;
    }
    refresh=overlay(20);refresh.setText("↻");refresh.setContentDescription("Rafraîchir cette caméra");frame.addView(refresh,new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.TOP|Gravity.RIGHT));refresh.setOnClickListener(v->{refreshTile(id);activity.refreshDashboardVideos();});
-   frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{activity.dashboardClick(id,true);return true;});layer.addView(frame);
+   frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{longClicked=true;activity.dashboardClick(id,true);return true;});layer.addView(frame);
+   if(id.equals("cam1Body")||id.equals("cam2Body"))installCropGesture(id.charAt(3)-'0');
+  }
+  void setSnapshot(Bitmap bitmap){
+   snapshot=bitmap;
+   mirror.setImageBitmap(bitmap);
+   applyCrop();
+  }
+  void applyCrop(){
+   int width=frame.getWidth(),height=frame.getHeight();
+   if(width<=0||height<=0)return;
+   CameraCrop crop=CameraCrop.supported(cropCamera)?crops[cropCamera]:CameraCrop.CENTER;
+   if(source!=null){
+    float ratio=source.videoRatio/((float)width/height);
+    float sx=Math.max(1,ratio),sy=Math.max(1,1/ratio);
+    source.texture.setScaleX(sx);source.texture.setScaleY(sy);
+    source.texture.setTranslationX(crop.translateX(width*(sx-1)));
+    source.texture.setTranslationY(crop.translateY(height*(sy-1)));
+   }
+   if(snapshot!=null){
+    float scale=Math.max((float)width/snapshot.getWidth(),(float)height/snapshot.getHeight());
+    float extraX=snapshot.getWidth()*scale-width,extraY=snapshot.getHeight()*scale-height;
+    Matrix matrix=new Matrix();
+    matrix.setScale(scale,scale);
+    matrix.postTranslate(-extraX/2+crop.translateX(extraX),-extraY/2+crop.translateY(extraY));
+    mirror.setImageMatrix(matrix);
+   }
+  }
+  void installCropGesture(int camera){
+   frame.setOnTouchListener(new View.OnTouchListener(){
+    float startX,startY;
+    CameraCrop initial;
+    boolean dragging;
+    @Override public boolean onTouch(View view,MotionEvent event){
+     switch(event.getActionMasked()){
+      case MotionEvent.ACTION_DOWN:
+       initial=crops[camera];startX=event.getRawX();startY=event.getRawY();
+       dragging=false;longClicked=false;
+       return false;
+      case MotionEvent.ACTION_MOVE:
+       if(initial==null||longClicked)return false;
+       float dx=event.getRawX()-startX,dy=event.getRawY()-startY;
+       if(!dragging){
+        if(Math.hypot(dx,dy)<=ViewConfiguration.get(activity).getScaledTouchSlop())return false;
+        dragging=true;draggingCamera=camera;
+        MotionEvent cancel=MotionEvent.obtain(event);
+        cancel.setAction(MotionEvent.ACTION_CANCEL);
+        view.onTouchEvent(cancel);cancel.recycle();
+       }
+       applyCameraCrop(camera,initial.drag(dx,dy,view.getWidth(),view.getHeight()));
+       return true;
+      case MotionEvent.ACTION_UP:
+      case MotionEvent.ACTION_CANCEL:
+       if(!dragging)return false;
+       if(event.getActionMasked()==MotionEvent.ACTION_UP){
+        settings.edit().putString(CameraCrop.key(camera),crops[camera].encode()).apply();
+        activity.refreshDashboardVideos();
+       }else applyCameraCrop(camera,initial);
+       dragging=false;draggingCamera=0;initial=null;
+       return true;
+      default:
+       return dragging;
+     }
+    }
+   });
   }
   void installTransparencyGesture(){
    frame.setOnTouchListener(new View.OnTouchListener(){
@@ -119,12 +193,12 @@ final class DashboardCameras {
  }
  class Source{
   final ExoPlayer player;final TextureView texture;final Tile owner;final List<Tile> mirrors=new ArrayList<>();
-  Bitmap last;
+  float videoRatio=16f/9f;
   volatile long lastFrame=0;
   final long created=System.currentTimeMillis();
   boolean failed=false;
   Source(String uri,Tile owner){this.owner=owner;texture=new TextureView(activity);owner.frame.addView(texture,0,new FrameLayout.LayoutParams(-1,-1));
-   owner.mirror.setImageDrawable(null);
+   owner.source=this;owner.setSnapshot(null);
    player=new ExoPlayer.Builder(activity,new DefaultRenderersFactory(activity).setEnableDecoderFallback(true)).build();player.setVolume(0);player.setVideoTextureView(texture);
    player.setVideoFrameMetadataListener((presentationTimeUs,releaseTimeNs,format,mediaFormat)->lastFrame=System.currentTimeMillis());
    player.addListener(new Player.Listener(){
@@ -134,25 +208,55 @@ final class DashboardCameras {
      if(e.getErrorCodeName().contains("DECOD"))decoderBudget=Math.max(1,Math.min(decoderBudget,sources.size()-1));
      owner.message.setText("Relance · "+e.getErrorCodeName());for(Tile t:mirrors)t.message.setText(owner.message.getText());
     }
-    @Override public void onVideoSizeChanged(VideoSize size){texture.post(()->{
-     if(size.width==0||size.height==0||texture.getWidth()==0||texture.getHeight()==0)return;
-     float sourceRatio=(float)size.width*size.pixelWidthHeightRatio/size.height,viewRatio=(float)texture.getWidth()/texture.getHeight();
-     Matrix m=new Matrix();m.setScale(sourceRatio>viewRatio?sourceRatio/viewRatio:1,sourceRatio<viewRatio?viewRatio/sourceRatio:1,texture.getWidth()/2f,texture.getHeight()/2f);texture.setTransform(m);
-    });}
+    @Override public void onVideoSizeChanged(VideoSize size){
+     if(size.width<=0||size.height<=0||size.pixelWidthHeightRatio<=0)return;
+     videoRatio=size.width*size.pixelWidthHeightRatio/size.height;
+     owner.applyCrop();
+    }
    });
    player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));player.prepare();player.play();
   }
-  void close(){
-   if(!stopped&&texture.isAvailable()&&lastFrame>0){Bitmap snapshot=texture.getBitmap(320,200);if(snapshot!=null){owner.mirror.setImageBitmap(snapshot);for(Tile t:mirrors)t.mirror.setImageBitmap(snapshot);owner.message.setText("Dernière image · actualisation…");}}
-   player.release();owner.frame.removeView(texture);last=null;
+  Bitmap capture(){
+   if(!texture.isAvailable()||lastFrame==0)return null;
+   // View transformations only affect display. Each tile crops its own copy of the full frame.
+   int width=Math.max(1,Math.round(320*Math.min(1,videoRatio)));
+   int height=Math.max(1,Math.round(320*Math.min(1,1/videoRatio)));
+   Bitmap bitmap=texture.getBitmap(width,height);
+   if(bitmap!=null)bitmap.setDensity(Bitmap.DENSITY_NONE);
+   return bitmap;
   }
-  void copy(){if(mirrors.isEmpty()||!texture.isAvailable())return;Bitmap next=texture.getBitmap(320,200);if(next==null)return;for(Tile t:mirrors){t.mirror.setImageBitmap(next);t.message.setText(owner.message.getText());}last=next;}
+  void close(){
+   Bitmap snapshot=stopped?null:capture();
+   if(snapshot!=null){
+    owner.setSnapshot(snapshot);
+    for(Tile tile:mirrors)tile.setSnapshot(snapshot);
+    owner.message.setText("Dernière image · actualisation…");
+   }
+   player.release();owner.frame.removeView(texture);owner.source=null;
+  }
+  void copy(){
+   if(mirrors.isEmpty())return;
+   Bitmap snapshot=capture();
+   if(snapshot==null)return;
+   for(Tile tile:mirrors){tile.setSnapshot(snapshot);tile.message.setText(owner.message.getText());}
+  }
  }
- DashboardCameras(MainActivity activity,FrameLayout layer){this.activity=activity;this.layer=layer;}
+ DashboardCameras(MainActivity activity,FrameLayout layer){
+  this.activity=activity;this.layer=layer;
+  settings=activity.getSharedPreferences("nautic_settings",MainActivity.MODE_PRIVATE);
+  for(int camera=1;camera<=2;camera++)crops[camera]=CameraCrop.read(settings.getString(CameraCrop.key(camera),""));
+ }
+ void applyCameraCrop(int camera,CameraCrop crop){
+  crops[camera]=crop;
+  for(Tile tile:tiles.values())if(tile.cropCamera==camera)tile.applyCrop();
+ }
  void update(String json){
   if(stopped||mapPaused)return;
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
+   for(int camera=1;camera<=2;camera++)if(camera!=draggingCamera){
+    applyCameraCrop(camera,CameraCrop.read(settings.getString(CameraCrop.key(camera),"")));
+   }
    if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();
    Set<Tile> changedFeeds=new HashSet<>();
@@ -165,6 +269,8 @@ final class DashboardCameras {
     if(!inMap)tile.decorate(item);
     boolean mobile=id.equals("trematagePreview");
     int index=inMap?item.optInt("camera",2):mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
+    tile.cropCamera=inMap?index:mobile?0:id.charAt(3)-'0';
+    tile.applyCrop();
     int lens=inMap&&index==2?item.optInt("lens",2):0;
     if(inMap){
      if(index<1||index>3)continue;
@@ -207,7 +313,7 @@ final class DashboardCameras {
     if(stalled)retryAt.put(entry.getKey(),now+2000);
     if(group==null||group.get(0)!=source.owner||!selected.contains(entry.getKey())||source.failed||stalled){source.close();iterator.remove();if(stalled||source.failed)selected.remove(entry.getKey());}
    }
-   for(Tile tile:changedFeeds){tile.mirror.setImageDrawable(null);}
+   for(Tile tile:changedFeeds){tile.setSnapshot(null);}
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
     if(!selected.contains(e.getKey()))continue;
     Source source=sources.get(e.getKey());if(source==null){Tile owner=e.getValue().get(0);owner.message.setText("◌");source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);}
