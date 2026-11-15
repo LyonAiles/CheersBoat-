@@ -21,10 +21,13 @@
    for(const layer of vector.getStyle().layers||[])if(layer.type==='symbol'&&layer.layout?.['text-field']){vector.setLayoutProperty(layer.id,'text-rotation-alignment','viewport');vector.setLayoutProperty(layer.id,'text-pitch-alignment','viewport');vector.setLayoutProperty(layer.id,'symbol-placement','point');vector.setLayoutProperty(layer.id,'text-rotate',0);}
    vector.addSource('nautic-route',{type:'geojson',data:routeData()});vector.addLayer({id:'nautic-route',type:'line',source:'nautic-route',paint:{'line-color':'#20bce9','line-width':4}});
    vector.addSource('nautic-trip', {type:'geojson', data:tripData()});
-   vector.addLayer({id:'nautic-trip-line',type:'line',source:'nautic-trip',filter:['==','$type','LineString'],paint:{'line-color':'#f6dc76','line-width':4}});
-   vector.addLayer({id:'nautic-trip-end',type:'circle',source:'nautic-trip',filter:['==','$type','Point'],paint:{'circle-radius':6,'circle-color':'#f6dc76','circle-stroke-width':2,'circle-stroke-color':'#092f43'}});
+   const tripLines={type:'line',source:'nautic-trip',paint:{'line-color':['get','color'],'line-width':4}};
+   vector.addLayer({...tripLines,id:'nautic-trip-line',filter:['all',['==','$type','LineString'],['==','dash',false]]});
+   vector.addLayer({...tripLines,id:'nautic-trip-estimate',filter:['all',['==','$type','LineString'],['==','dash',true]],
+    paint:{...tripLines.paint,'line-dasharray':[2,2]}});
+   vector.addLayer({id:'nautic-trip-end',type:'circle',source:'nautic-trip',filter:['==','$type','Point'],paint:{'circle-radius':6,'circle-color':['get','color'],'circle-stroke-width':2,'circle-stroke-color':'#092f43'}});
    vector.on('click', e => {
-    if (!choosingDestination || e.originalEvent?.target?.closest('.maplibregl-ctrl')) return;
+    if (!selection || e.originalEvent?.target?.closest('.maplibregl-ctrl')) return;
     selectDestination(e.lngLat);
     e.preventDefault();
    });
@@ -59,149 +62,212 @@
  destinationStatus.id = 'nauticDestinationStatus';
  destinationStatus.setAttribute('role', 'status');
  wrap.append(destinationButton, destinationStatus);
- let choosingDestination = false, destination = null, trip = null, coveredMetres = 0;
- let tripRequest = null;
- const kmFormat = new Intl.NumberFormat('fr-FR', {minimumFractionDigits: 1, maximumFractionDigits: 1});
- const pkFormat = new Intl.NumberFormat('fr-FR', {maximumFractionDigits: 3});
- const km = value => kmFormat.format(value) + ' km';
+ const tripKey='nautic-last-trip-v1', networkKey='nautic-trip-network-v1';
+ const calc=window.NauticTrip;
+ const validPoint=p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&Math.abs(p.lat)<=90&&Math.abs(p.lon)<=180;
+ let routeState=restoreTrip(), selection=null, tripRequest=null, lastSave=0;
+ const formatKm=new Intl.NumberFormat('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1});
+ const formatPk=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:3});
+ const formatDate=new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium'});
+ const km=value=>formatKm.format(value)+' km';
 
- function tripData() {
-  const features = [];
-  if (trip?.legs.length) {
-   const positions = [trip.legs[0].a, ...trip.legs.map(leg => leg.b)];
-   features.push({type:'Feature', properties:{}, geometry:{type:'LineString',
-    coordinates:positions.map(p => [p.lon, p.lat])}});
-  }
-  const end = trip?.end || destination;
-  if (end) features.push({type:'Feature', properties:{}, geometry:{type:'Point', coordinates:[end.lon, end.lat]}});
-  return {type:'FeatureCollection', features};
+ function restoreTrip(){
+  try{
+   const saved=JSON.parse(native?.readSetting(tripKey)||localStorage.getItem(tripKey)||'null');
+   if(!saved||!validPoint(saved.start)||!validPoint(saved.end)||!Array.isArray(saved.via)||!saved.via.every(validPoint)||
+    !Array.isArray(saved.trip?.coordinates)||!saved.trip.coordinates.length||!saved.trip.coordinates.every(validPoint)||
+    !Number.isFinite(saved.trip.total)||saved.trip.total<0||!Number.isFinite(saved.covered)||saved.covered<0)return null;
+   return saved;
+  }catch(_){return null;}
+ }
+ function saveTrip(){
+  const json=JSON.stringify(routeState);
+  try{localStorage.setItem(tripKey,json);}catch(_){}
+  try{native?.writeSetting(tripKey,json);}catch(_){}
+  lastSave=Date.now();
  }
 
- const legacyTrip = map ? L.geoJSON(null, {
-  style: {color:'#f6dc76', weight:4, interactive:false},
-  pointToLayer: (_, position) => L.circleMarker(position, {
-   radius:6, color:'#092f43', fillColor:'#f6dc76', fillOpacity:1, interactive:false
+ function cachedRoute(start,end){
+  try{
+   const local=JSON.parse(localStorage.getItem(networkKey)||'null');
+   const elements=[...(cache?.elements||[]),...(Array.isArray(local)?local:[])];
+   return elements.length?calc.fromNetwork(elements,start,end):null;
+  }catch(_){return null;}
+ }
+ function routeColor(){
+  return routeState?.closure||routeState?.trip.restricted?'#ff715e':routeState?.trip.approximate?'#bdc5d2':'#f6dc76';
+ }
+ function tripData(){
+  if(!routeState)return {type:'FeatureCollection',features:[]};
+  const {trip}=routeState;
+  const coordinates=trip.coordinates.map(p=>[p.lon,p.lat]);
+  const properties={color:routeColor(),dash:!!trip.approximate};
+  const features=[{type:'Feature',properties,geometry:{type:'Point',coordinates:coordinates.at(-1)}}];
+  if(coordinates.length>1)features.unshift({type:'Feature',properties,geometry:{type:'LineString',coordinates}});
+  return {type:'FeatureCollection',features};
+ }
+ const legacyTrip=map?L.geoJSON(null,{
+  style:feature=>({color:feature.properties.color,weight:4,dashArray:feature.properties.dash?'8 8':null,interactive:false}),
+  pointToLayer:(feature,position)=>L.circleMarker(position,{
+   radius:6,color:'#092f43',fillColor:feature.properties.color,fillOpacity:1,interactive:false
   })
- }).addTo(map) : null;
-
- function renderTrip() {
-  const data = tripData();
+ }).addTo(map):null;
+ function renderTrip(){
+  const data=tripData();
   legacyTrip?.clearLayers();
   legacyTrip?.addData(data);
   vector?.getSource('nautic-trip')?.setData(data);
- }
-
- function renderTripCounters(available = !!trip) {
-  for (const [id, label, value] of [
-   ['tripCovered', 'Distance parcourue', coveredMetres / 1000],
-   ['tripRemaining', 'Distance restante', trip ? window.NauticTrip.remaining(trip.total, coveredMetres) : 0]
-  ]) {
-   const element = $(id);
-   const text = available ? km(value) : '—';
-   if (element.textContent === text) continue;
-   element.textContent = text;
-   element.setAttribute('aria-label', label + ' : ' + (available ? text : 'indisponible'));
-  }
- }
-
- function showDestination(message = '') {
-  destinationButton.textContent = choosingDestination ? 'Annuler le choix' : 'Destination';
-  destinationButton.setAttribute('aria-pressed', String(choosingDestination));
-  wrap.classList.toggle('nautic-select-destination', choosingDestination);
-  destinationStatus.textContent = message;
-  destinationStatus.hidden = !message;
- }
-
- function tripSummary() {
-  const arrival = trip.pk === null ? 'PK indisponible' : 'Arrivée PK ' + pkFormat.format(trip.pk);
-  return arrival + ' · ' + (trip.estimated ? '≈ ' : '') + km(trip.total);
- }
-
- destinationButton.onclick = () => {
-  if (choosingDestination) {
-   choosingDestination = false;
-   showDestination(trip ? tripSummary() : '');
-   return;
-  }
-  if (destination) {
-   modal('Destination', '<button type="button" id="tripChange">Choisir sur la carte</button> ' +
-    '<button type="button" id="tripClear">Effacer le trajet</button>');
-   $('tripChange').onclick = () => { $('dialog').close(); chooseDestination(); };
-   $('tripClear').onclick = () => {
-    $('dialog').close();
-    tripRequest?.abort();
-    tripRequest = null;
-    trip = destination = null;
-    renderTrip();
-    renderTripCounters();
-    showDestination();
-   };
-   return;
-  }
-  chooseDestination();
- };
-
- function chooseDestination() {
-  choosingDestination = true;
-  showDestination('Touche la carte près de la voie d’eau');
- }
-
- async function selectDestination(position) {
-  choosingDestination = false;
-  const departure = stableFix;
-  if (!departure) {
-   showDestination('Position GPS en attente');
-   return;
-  }
-  tripRequest?.abort();
-  const controller = new AbortController();
-  tripRequest = controller;
-  const end = {lat:position.lat, lon:position.lng};
-  destination = end;
-  trip = null;
-  coveredMetres = 0;
-  renderTrip();
   renderTripCounters();
-  showDestination('Calcul du trajet fluvial…');
-  const timeout = setTimeout(() => controller.abort(), 50000);
-  try {
-   const distance = W.distance(departure, end);
-   const margin = Math.max(.025, distance / 111000 * .35);
-   const lonMargin = margin / Math.max(.15, Math.cos((departure.lat + end.lat) * Math.PI / 360));
-   const bounds = [Math.min(departure.lat, end.lat) - margin, Math.min(departure.lon, end.lon) - lonMargin,
-    Math.max(departure.lat, end.lat) + margin, Math.max(departure.lon, end.lon) + lonMargin];
-   const area = bounds.map(n => n.toFixed(5)).join(',');
-   const query = '[out:json][timeout:40];(way[waterway~"^(canal|river|fairway)$"]' +
-    '[boat!=no][motorboat!=no](' + area + ');node["seamark:distance_mark:distance"](' + area + '););out geom;';
-   const response = await fetch('https://overpass-api.de/api/interpreter', {
-    method:'POST', body:new URLSearchParams({data:query}), signal:controller.signal
+  showDestination(tripSummary());
+ }
+ function renderTripCounters(){
+  for(const [id,label,value] of [
+   ['tripCovered','Distance parcourue',(routeState?.covered||0)/1000],
+   ['tripRemaining','Distance restante',routeState?calc.remaining(routeState.trip.total,routeState.covered):0]
+  ]){
+   const element=$(id),text=routeState?km(value):'—';
+   if(element.textContent===text)continue;
+   element.textContent=text;
+   element.setAttribute('aria-label',label+' : '+(routeState?text:'indisponible'));
+  }
+ }
+ function showDestination(message=''){
+  destinationButton.textContent=selection?'Annuler le choix':'Destination';
+  destinationButton.setAttribute('aria-pressed',String(!!selection));
+  wrap.classList.toggle('nautic-select-destination',!!selection);
+  destinationStatus.textContent=message;
+  destinationStatus.hidden=!message;
+  destinationStatus.style.borderLeft=routeState?'3px solid '+routeColor():'';
+ }
+ function tripSummary(){
+  if(!routeState)return '';
+  const {trip,closure,note}=routeState;
+  const distance=(trip.estimated?'≈ ':'')+km(trip.total);
+  const parts=[];
+  if(closure){
+   const date=closure.date?new Date(closure.date+'T12:00:00'):null;
+   parts.push('Parcours fermé',date&&Number.isFinite(+date)?'Réouverture prévue '+formatDate.format(date):'Réouverture inconnue');
+  }else if(trip.restricted)parts.push('Restriction OpenStreetMap · réouverture inconnue');
+  if(trip.approximate)parts.push('Tracé indicatif');
+  if(note)parts.push(note);
+  if(trip.pk!=null)parts.push('Arrivée PK '+formatPk.format(trip.pk));
+  parts.push(distance);
+  return parts.join(' · ');
+ }
+ function choose(type,start=null){
+  selection={type,start};
+  showDestination(type==='start'?'Touche le point de départ':type==='via'?'Touche un point avant l’arrivée':'Touche la destination');
+ }
+
+ destinationButton.onclick=()=>{
+  if(selection){selection=null;showDestination(tripSummary());return;}
+  if(!routeState){choose(stableFix?'end':'start');return;}
+  modal('Destination',
+   '<button type="button" id="tripFit">Voir le parcours</button> '+
+   '<button type="button" id="tripChange">Nouvelle destination</button> '+
+   '<button type="button" id="tripChooseStart">Choisir le départ sur la carte</button> '+
+   (routeState.trip.approximate?'<button type="button" id="tripVia">Ajouter un point au tracé indicatif</button> ':'')+
+   '<button type="button" id="tripClosure">'+(routeState.closure?'Modifier la fermeture':'Signaler une fermeture')+'</button> '+
+   '<button type="button" id="tripClear">Effacer le trajet</button>');
+  $('tripFit').onclick=()=>{$('dialog').close();fitTrip();};
+  $('tripChange').onclick=()=>{$('dialog').close();choose(stableFix?'end':'start');};
+  $('tripChooseStart').onclick=()=>{$('dialog').close();choose('start');};
+  if($('tripVia'))$('tripVia').onclick=()=>{$('dialog').close();choose('via');};
+  $('tripClosure').onclick=editClosure;
+  $('tripClear').onclick=()=>{
+   $('dialog').close();
+   tripRequest?.abort();tripRequest=null;
+   routeState=null;saveTrip();renderTrip();
+  };
+ };
+ function fitTrip(){
+  const points=routeState.trip.coordinates;
+  window.nauticMapFreePan=true;
+  if(active&&vector){
+   const bounds=new maplibregl.LngLatBounds();
+   for(const point of points)bounds.extend([point.lon,point.lat]);
+   vector.fitBounds(bounds,{padding:32,maxZoom:16,duration:0});
+  }else if(map){
+   map.fitBounds(points.map(p=>[p.lat,p.lon]),{padding:[24,24],maxZoom:16,animate:false});
+  }
+ }
+ function editClosure(){
+  modal('Fermeture du parcours','<p>Reporte la date annoncée dans l’avis de navigation si elle est connue.</p>'+
+   '<p><a href="https://avisbat.vnf.fr/" target="_blank" rel="noopener">Consulter Avisbat (VNF)</a></p>'+
+   '<label>Réouverture prévue <input id="tripReopenDate" type="date"></label> '+
+   '<button type="button" id="tripSaveClosure">Marquer le parcours fermé</button> '+
+   (routeState.closure?'<button type="button" id="tripClearClosure">Retirer la fermeture signalée</button>':''));
+  $('tripReopenDate').value=routeState.closure?.date||'';
+  $('tripSaveClosure').onclick=()=>{
+   routeState.closure={date:$('tripReopenDate').value};
+   $('dialog').close();saveTrip();renderTrip();
+  };
+  if($('tripClearClosure'))$('tripClearClosure').onclick=()=>{
+   routeState.closure=null;$('dialog').close();saveTrip();renderTrip();
+  };
+ }
+
+ async function selectDestination(position){
+  const next=selection;
+  if(!next)return;
+  selection=null;
+  const chosen={lat:position.lat,lon:position.lng};
+  if(next.type==='start'){choose('end',chosen);return;}
+  if(next.type==='via'&&routeState){
+   tripRequest?.abort();tripRequest=null;
+   routeState.via.push(chosen);
+   routeState.trip=calc.approximate(routeState.start,routeState.end,routeState.via);
+   saveTrip();renderTrip();return;
+  }
+  const departure=next.start||stableFix;
+  if(!departure){choose('start');return;}
+  tripRequest?.abort();
+  const controller=new AbortController();
+  tripRequest=controller;
+  const start={lat:departure.lat,lon:departure.lon},end=chosen;
+  const cached=cachedRoute(start,end);
+  routeState={start,end,via:[],trip:cached||calc.approximate(start,end),closure:null,covered:0,
+   note:cached?'Réseau en cache':'Réseau fluvial indisponible'};
+  saveTrip();renderTrip();
+  const timeout=setTimeout(()=>controller.abort(),50000);
+  try{
+   const distance=W.distance(start,end);
+   const margin=Math.max(.025,distance/111000*.35);
+   const lonMargin=margin/Math.max(.15,Math.cos((start.lat+end.lat)*Math.PI/360));
+   const area=[Math.min(start.lat,end.lat)-margin,Math.min(start.lon,end.lon)-lonMargin,
+    Math.max(start.lat,end.lat)+margin,Math.max(start.lon,end.lon)+lonMargin].map(n=>n.toFixed(5)).join(',');
+   const query='[out:json][timeout:40];(way[waterway~"^(canal|river|fairway)$"]('+area+
+    ');node["seamark:distance_mark:distance"]('+area+'););out geom;';
+   const response=await fetch('https://overpass-api.de/api/interpreter',{
+    method:'POST',body:new URLSearchParams({data:query}),signal:controller.signal
    });
-   if (!response.ok) throw Error('Overpass ' + response.status);
-   const result = await response.json();
-   if (tripRequest !== controller) return;
-   if (result.remark || !Array.isArray(result.elements)) throw Error('Réseau incomplet');
-   trip = window.NauticTrip.create(result.elements, departure, end);
-   renderTrip();
-   if (trip) {
-    showDestination(tripSummary());
-    renderTripCounters();
-   } else showDestination('Aucun trajet fluvial raccordé dans la zone chargée');
-  } catch (_) {
-   if (tripRequest === controller) showDestination('Réseau fluvial indisponible · réessaie');
-  } finally {
+   if(!response.ok)throw Error('Overpass '+response.status);
+   const result=await response.json();
+   if(tripRequest!==controller)return;
+   if(result.remark||!Array.isArray(result.elements))throw Error('Réseau incomplet');
+   const planned=calc.fromNetwork(result.elements,start,end);
+   if(planned){
+    routeState.trip=planned;routeState.note='';
+    try{const json=JSON.stringify(result.elements);if(json.length<1800000)localStorage.setItem(networkKey,json);}catch(_){}
+   }else routeState.note=cached?'Réseau en cache':'Réseau fluvial non raccordé';
+   saveTrip();renderTrip();
+  }catch(_){
+   // Keep the immediately available estimate or cached route, including manual closures.
+  }finally{
    clearTimeout(timeout);
-   if (tripRequest === controller) tripRequest = null;
+   if(tripRequest===controller)tripRequest=null;
   }
  }
 
- // The GPS filter in onPos confirms each leg before it gets counted.
- window.nauticTripGpsLeg = metres => {
-  if (!trip && !tripRequest) return;
-  coveredMetres += metres;
-  if (trip) renderTripCounters();
+ window.nauticTripGpsLeg=metres=>{
+  if(!routeState)return;
+  routeState.covered+=metres;
+  renderTripCounters();
+  if(Date.now()-lastSave>15000)saveTrip();
  };
-
- showDestination();
+ window.addEventListener('pagehide',()=>{if(routeState)saveTrip()});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden&&routeState)saveTrip()});
+ renderTrip();
  function routeData(){return {type:'FeatureCollection',features:points.length>1?[{type:'Feature',geometry:{type:'LineString',coordinates:points.map(p=>[p.lon,p.lat])},properties:{}}]:[]};}
  function worksData(){return {type:'FeatureCollection',features:(options.waterwayWorks===false?[]:lastList).map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{id:p.id,category:p.category||W.categoryOf(p.type)}}))};}
  function positionBoat(){const boat=$('mapBoat'),p=stableFix||latest;if(!boat||!p)return;if(!window.nauticMapFreePan){boat.style.setProperty('left','50%','important');boat.style.setProperty('top','66.666667%','important');return;}let q;if(active&&vector)q=vector.project([p.lon,p.lat]);else if(map){q=map.latLngToContainerPoint([p.lat,p.lon]);const r=$('map').getBoundingClientRect(),w=wrap.getBoundingClientRect();q={x:q.x+r.left-w.left,y:q.y+r.top-w.top};}if(q){const angle=active&&vector?(heading??0)-vector.getBearing():(heading??0);boat.style.transform=`translate(-50%,-50%) rotate(${angle}deg)`;boat.style.setProperty('left',q.x+'px','important');boat.style.setProperty('top',q.y+'px','important');}}
@@ -220,8 +286,8 @@
  };
  window.addEventListener('nauticvisibility', () => {
   if (!destinationButton.classList.contains('nautic-hidden')) return;
-  choosingDestination = false;
-  showDestination(trip ? tripSummary() : '');
+  selection=null;
+  showDestination(tripSummary());
  });
  window.addEventListener('nauticmapidle',()=>{sync();setTimeout(updateWorks,1200);});
  window.nauticEvery(sync,350,true);let routeCount=-1;window.nauticEvery(()=>{if(active&&vector&&points.length!==routeCount){routeCount=points.length;vector.getSource('nautic-route')?.setData(routeData());}updateWorks();},3000,true);
@@ -235,7 +301,7 @@
  }
  map?.on('click', e => {
   if (active) return;
-  if (choosingDestination) selectDestination(e.latlng);
+  if (selection) selectDestination(e.latlng);
   else selectWorkPoint(e.latlng);
  });
  function workArea(){

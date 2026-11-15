@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const {create, remaining} = require('../../app/src/main/assets/nautic-trip.js');
+const {create, remaining, fromNetwork, approximate} = require('../../app/src/main/assets/nautic-trip.js');
 
 const p = (lat, lon = 0) => ({lat, lon});
 const way = (id, nodes, geometry, name = 'Canal') => ({
@@ -30,10 +30,10 @@ assert(Math.abs(reverse.total - 2.4) < 1e-8);
 const partial = create(elements, p(.0045), p(.018, .004));
 assert(Math.abs(partial.total - 1.9) < 1e-8);
 
-const approximate = create(water, p(0), p(.018, .004));
-assert.equal(approximate.pk, null);
-assert.equal(approximate.estimated, true);
-assert(approximate.total > 2.4);
+const uncalibrated = create(water, p(0), p(.018, .004));
+assert.equal(uncalibrated.pk, null);
+assert.equal(uncalibrated.estimated, true);
+assert(uncalibrated.total > 2.4);
 assert.equal(create(water, p(0), p(.022, .004)), null);
 assert.equal(create([...water, way(3, [5, 6], [p(.02, .004), p(.024, .004)])], p(0), p(.024, .004)), null);
 
@@ -45,3 +45,15 @@ assert.equal(reset.pk, 1);
 assert.equal(reset.estimated, true);
 assert(reset.total > 2 && reset.total < 3);
 console.log('PASS: PK calibration, partial segment, reverse direction, GPS distance subtraction, missing PK, network gaps and numbering changes');
+
+const denied = {...water[1],tags:{...water[1].tags,motorboat:'no'}};
+const restricted = fromNetwork([water[0],denied],p(0),p(.018,.004));
+assert.equal(restricted.restricted,true);
+assert(restricted.coordinates.length>2);
+assert.equal(fromNetwork(water,p(0),p(.018,.004)).restricted,false);
+const direct = approximate(p(0),p(.018,.004));
+const indicative = approximate(p(0),p(.018,.004),[p(.009)]);
+assert.equal(direct.approximate,true);
+assert(indicative.total>direct.total);
+assert.equal(indicative.coordinates.length,3);
+console.log('PASS: restricted paths remain traceable and offline waypoints refine the distance');

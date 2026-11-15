@@ -205,3 +205,5 @@ dialog .settingRow > .nautic-field-number {position:absolute;top:2px;left:2px}
 #weatherGustLine {width:86%;height:clamp(12px,3dvh,30px);min-height:10px;flex:0 1 auto}
 #weatherGustLine path {fill:none;stroke:#ffd479;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #app .camera-still {position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:var(--camera-position,50% 50%);pointer-events:none}
+
+#mapFallback {inset:auto auto 8px 8px;max-width:68%;padding:4px 7px;border-radius:5px;font-size:11px;pointer-events:none;background:#092f43e8}
