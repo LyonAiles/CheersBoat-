@@ -77,6 +77,8 @@
    if(!saved||!validPoint(saved.start)||!validPoint(saved.end)||!Array.isArray(saved.via)||!saved.via.every(validPoint)||
     !Array.isArray(saved.trip?.coordinates)||!saved.trip.coordinates.length||!saved.trip.coordinates.every(validPoint)||
     !Number.isFinite(saved.trip.total)||saved.trip.total<0||!Number.isFinite(saved.covered)||saved.covered<0)return null;
+   saved.closures=Array.isArray(saved.closures)?saved.closures.filter(c=>c&&((!c.from&&!c.to)||(validPoint(c.from)&&validPoint(c.to)))):saved.closure?[saved.closure]:[];
+   delete saved.closure;
    return saved;
   }catch(_){return null;}
  }
@@ -94,16 +96,19 @@
    return elements.length?calc.fromNetwork(elements,start,end):null;
   }catch(_){return null;}
  }
- function routeColor(){
-  return routeState?.closure||routeState?.trip.restricted?'#ff715e':routeState?.trip.approximate?'#bdc5d2':'#f6dc76';
+ function sectionColor(closed){
+  return closed?'#ff715e':routeState.trip.approximate?'#bdc5d2':'#f6dc76';
  }
  function tripData(){
   if(!routeState)return {type:'FeatureCollection',features:[]};
-  const {trip}=routeState;
-  const coordinates=trip.coordinates.map(p=>[p.lon,p.lat]);
-  const properties={color:routeColor(),dash:!!trip.approximate};
-  const features=[{type:'Feature',properties,geometry:{type:'Point',coordinates:coordinates.at(-1)}}];
-  if(coordinates.length>1)features.unshift({type:'Feature',properties,geometry:{type:'LineString',coordinates}});
+  const {trip,closures}=routeState;
+  const xy=p=>[p.lon,p.lat];
+  const segments=calc.sections(trip,closures);
+  const properties=closed=>({color:sectionColor(closed),dash:!!trip.approximate});
+  const features=segments.map(segment=>({type:'Feature',properties:properties(segment.closed),
+   geometry:{type:'LineString',coordinates:segment.coordinates.map(xy)}}));
+  features.push({type:'Feature',properties:properties(!!segments.at(-1)?.closed),
+   geometry:{type:'Point',coordinates:xy(trip.coordinates.at(-1))}});
   return {type:'FeatureCollection',features};
  }
  const legacyTrip=map?L.geoJSON(null,{
@@ -118,7 +123,7 @@
   legacyTrip?.addData(data);
   vector?.getSource('nautic-trip')?.setData(data);
   renderTripCounters();
-  showDestination(tripSummary());
+  showDestination(selection?selectionPrompt(selection.type):tripSummary());
  }
  function renderTripCounters(){
   for(const [id,label,value] of [
@@ -137,26 +142,39 @@
   wrap.classList.toggle('nautic-select-destination',!!selection);
   destinationStatus.textContent=message;
   destinationStatus.hidden=!message;
-  destinationStatus.style.borderLeft=routeState?'3px solid '+routeColor():'';
+  destinationStatus.style.borderLeft=routeState?'3px solid '+sectionColor(routeState.closures.length>0||routeState.trip.restricted):'';
  }
  function tripSummary(){
   if(!routeState)return '';
-  const {trip,closure,note}=routeState;
+  const {trip,closures,note}=routeState;
   const distance=(trip.estimated?'≈ ':'')+km(trip.total);
   const parts=[];
-  if(closure){
-   const date=closure.date?new Date(closure.date+'T12:00:00'):null;
-   parts.push('Parcours fermé',date&&Number.isFinite(+date)?'Réouverture prévue '+formatDate.format(date):'Réouverture inconnue');
-  }else if(trip.restricted)parts.push('Restriction OpenStreetMap · réouverture inconnue');
+  if(closures.length){
+   parts.push(closures.length===1?'Un tronçon fermé':closures.length+' tronçons fermés');
+   const dates=[...new Set(closures.map(closureDate))];
+   parts.push(dates.length===1?dates[0]:'Dates dans Destination');
+  }
+  if(trip.restricted)parts.push(trip.closedEdges?'Restriction OpenStreetMap':'Restriction à localiser');
   if(trip.approximate)parts.push('Tracé indicatif');
   if(note)parts.push(note);
   if(trip.pk!=null)parts.push('Arrivée PK '+formatPk.format(trip.pk));
   parts.push(distance);
   return parts.join(' · ');
  }
+ function closureDate(closure){
+  const date=closure.date?new Date(closure.date+'T12:00:00'):null;
+  return date&&Number.isFinite(+date)?'Réouverture prévue '+formatDate.format(date):'Réouverture inconnue';
+ }
+ function selectionPrompt(type){
+  if(type==='start')return 'Touche le point de départ';
+  if(type==='via')return 'Touche un point avant l’arrivée';
+  if(type==='closureStart')return 'Touche le début du tronçon fermé sur le tracé';
+  if(type==='closureEnd')return 'Touche la fin du tronçon fermé sur le tracé';
+  return 'Touche la destination';
+ }
  function choose(type,start=null){
   selection={type,start};
-  showDestination(type==='start'?'Touche le point de départ':type==='via'?'Touche un point avant l’arrivée':'Touche la destination');
+  showDestination(selectionPrompt(type));
  }
 
  destinationButton.onclick=()=>{
@@ -167,13 +185,18 @@
    '<button type="button" id="tripChange">Nouvelle destination</button> '+
    '<button type="button" id="tripChooseStart">Choisir le départ sur la carte</button> '+
    (routeState.trip.approximate?'<button type="button" id="tripVia">Ajouter un point au tracé indicatif</button> ':'')+
-   '<button type="button" id="tripClosure">'+(routeState.closure?'Modifier la fermeture':'Signaler une fermeture')+'</button> '+
+   '<button type="button" id="tripClosure">Signaler un tronçon fermé</button> '+
+   routeState.closures.map((closure,i)=>'<button type="button" data-trip-closure="'+i+'">'+
+    (closure.from?'Tronçon '+(i+1):'Parcours entier')+' · '+closureDate(closure)+'</button> ').join('')+
    '<button type="button" id="tripClear">Effacer le trajet</button>');
   $('tripFit').onclick=()=>{$('dialog').close();fitTrip();};
   $('tripChange').onclick=()=>{$('dialog').close();choose(stableFix?'end':'start');};
   $('tripChooseStart').onclick=()=>{$('dialog').close();choose('start');};
   if($('tripVia'))$('tripVia').onclick=()=>{$('dialog').close();choose('via');};
-  $('tripClosure').onclick=editClosure;
+  $('tripClosure').onclick=()=>{$('dialog').close();choose('closureStart');};
+  $('dialog').querySelectorAll('[data-trip-closure]').forEach(button=>{
+   button.onclick=()=>editClosure(routeState.closures[Number(button.dataset.tripClosure)],Number(button.dataset.tripClosure));
+  });
   $('tripClear').onclick=()=>{
    $('dialog').close();
    tripRequest?.abort();tripRequest=null;
@@ -191,19 +214,21 @@
    map.fitBounds(points.map(p=>[p.lat,p.lon]),{padding:[24,24],maxZoom:16,animate:false});
   }
  }
- function editClosure(){
-  modal('Fermeture du parcours','<p>Reporte la date annoncée dans l’avis de navigation si elle est connue.</p>'+
+ function editClosure(closure,index=null){
+  modal('Fermeture du tronçon','<p>Reporte la date annoncée dans l’avis de navigation si elle est connue.</p>'+
    '<p><a href="https://avisbat.vnf.fr/" target="_blank" rel="noopener">Consulter Avisbat (VNF)</a></p>'+
    '<label>Réouverture prévue <input id="tripReopenDate" type="date"></label> '+
-   '<button type="button" id="tripSaveClosure">Marquer le parcours fermé</button> '+
-   (routeState.closure?'<button type="button" id="tripClearClosure">Retirer la fermeture signalée</button>':''));
-  $('tripReopenDate').value=routeState.closure?.date||'';
+   '<button type="button" id="tripSaveClosure">Enregistrer la fermeture</button> '+
+   (index===null?'':'<button type="button" id="tripClearClosure">Retirer cette fermeture</button>'));
+  $('tripReopenDate').value=closure.date||'';
   $('tripSaveClosure').onclick=()=>{
-   routeState.closure={date:$('tripReopenDate').value};
+   const saved={...closure,date:$('tripReopenDate').value};
+   if(index===null)routeState.closures.push(saved);
+   else routeState.closures[index]=saved;
    $('dialog').close();saveTrip();renderTrip();
   };
   if($('tripClearClosure'))$('tripClearClosure').onclick=()=>{
-   routeState.closure=null;$('dialog').close();saveTrip();renderTrip();
+   routeState.closures.splice(index,1);$('dialog').close();saveTrip();renderTrip();
   };
  }
 
@@ -213,6 +238,20 @@
   selection=null;
   const chosen={lat:position.lat,lon:position.lng};
   if(next.type==='start'){choose('end',chosen);return;}
+  if(next.type==='closureStart'||next.type==='closureEnd'){
+   const coordinates=routeState.trip.coordinates;
+   const hit=calc.locate(coordinates,chosen);
+   if(!hit||hit.distance>300){
+    selection=next;showDestination('Point trop éloigné du tracé · '+selectionPrompt(next.type));return;
+   }
+   if(next.type==='closureStart'){choose('closureEnd',hit.point);return;}
+   const start=calc.locate(coordinates,next.start);
+   if(!start||Math.abs(hit.offset-start.offset)<1){
+    selection=next;showDestination('Choisis une fin distincte sur le tracé');return;
+   }
+   showDestination(tripSummary());
+   editClosure({from:start.point,to:hit.point,date:''});return;
+  }
   if(next.type==='via'&&routeState){
    tripRequest?.abort();tripRequest=null;
    routeState.via.push(chosen);
@@ -226,7 +265,7 @@
   tripRequest=controller;
   const start={lat:departure.lat,lon:departure.lon},end=chosen;
   const cached=cachedRoute(start,end);
-  routeState={start,end,via:[],trip:cached||calc.approximate(start,end),closure:null,covered:0,
+  routeState={start,end,via:[],trip:cached||calc.approximate(start,end),closures:[],covered:0,
    note:cached?'Réseau en cache':'Réseau fluvial indisponible'};
   saveTrip();renderTrip();
   const timeout=setTimeout(()=>controller.abort(),50000);
@@ -345,6 +384,10 @@
  function showItem(id){const p=lastList.find(x=>x.id===id);if(!p)return;modal('Ouvrage fluvial',info(p)+'<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');}
  function showList(list=lastList){modal(selectedWorkPoint?'Ouvrages autour du point choisi':'Ouvrages autour du bateau', (options.waterwayTypes?.sondeurAlert === false ? '' : '<button type="button" id="waterwaySondeurAlerts">Points d’alerte du sondeur</button>')+`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));const alertsButton=$('waterwaySondeurAlerts');if(alertsButton)alertsButton.onclick=()=>{$('dialog').close();$('sondeurAlertList')?.click();};$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();
  try{cache=JSON.parse(localStorage.getItem('nautic-waterways-cache')||'null');if(cache&&Array.isArray(cache.elements))data=W.parse(cache.elements);else cache=null;}catch(_){cache=null;}
+ if(routeState&&!routeState.trip.approximate&&!routeState.trip.closedEdges){
+  const updated=cachedRoute(routeState.start,routeState.end);
+  if(updated){routeState.trip=updated;saveTrip();renderTrip();}
+ }
  window.nauticFocusSondeurAlert = ({lat, lon}) => {
   window.nauticMapFreePan = true;
   if (active && vector) vector.easeTo({center:[lon, lat], padding:{top:0,bottom:0,left:0,right:0}});

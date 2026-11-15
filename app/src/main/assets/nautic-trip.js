@@ -133,16 +133,67 @@
  }
 
  function fromNetwork(elements, start, end) {
-  const permitted = elements.filter(element => {
-   if(element.type !== 'way')return true;
-   const tags = element.tags || {};
-   return tags.boat !== 'no' && tags.motorboat !== 'no';
-  });
-  const available = create(permitted, start, end);
-  const route = available || (permitted.length < elements.length ? create(elements, start, end) : null);
+  // Access restrictions describe navigation, not the physical waterway graph.
+  const route=create(elements,start,end);
   if(!route)return null;
-  const coordinates = route.legs.length ? [route.legs[0].a, ...route.legs.map(leg=>leg.b)].map(point) : [point(route.end)];
-  return {coordinates, total:route.total, pk:route.pk, estimated:route.estimated, restricted:!available};
+  const coordinates=route.legs.length?[route.legs[0].a,...route.legs.map(leg=>leg.b)].map(point):[point(route.end)];
+  const closedEdges=route.legs.flatMap((leg,i)=>leg.edge.restricted?[i]:[]);
+  return {coordinates,total:route.total,pk:route.pk,estimated:route.estimated,restricted:closedEdges.length>0,closedEdges};
+ }
+
+ function geometry(coordinates) {
+  let total=0;
+  const offsets=coordinates.map((p,i)=>i?(total+=W.distance(coordinates[i-1],p)):0);
+  return {offsets,total};
+ }
+
+ function locate(coordinates, position) {
+  const {offsets}=geometry(coordinates);
+  let best=null;
+  for(let i=1;i<coordinates.length;i++){
+   const hit=W.project(position,coordinates[i-1],coordinates[i]);
+   if(!best||hit.d<best.distance)best={point:point(hit),distance:hit.d,offset:offsets[i-1]+hit.t*(offsets[i]-offsets[i-1])};
+  }
+  return best;
+ }
+
+ function sections(trip, closures=[]) {
+  const {coordinates}=trip;
+  const {offsets,total}=geometry(coordinates);
+  const spans=[];
+  for(const closure of closures){
+   if(!closure.from||!closure.to){spans.push([0,total]);continue;}
+   const a=locate(coordinates,closure.from),b=locate(coordinates,closure.to);
+   if(a&&b&&a.distance<=300&&b.distance<=300)spans.push([Math.min(a.offset,b.offset),Math.max(a.offset,b.offset)]);
+  }
+  const known=new Set(trip.closedEdges||[]);
+  const cuts=spans.flat().sort((a,b)=>a-b);
+  let cursor=0;
+  const result=[];
+  for(let i=1;i<coordinates.length;i++){
+   const start=offsets[i-1],end=offsets[i];
+   if(start===end)continue;
+   while(cursor<cuts.length&&cuts[cursor]<=start)cursor++;
+   const stops=[start];
+   while(cursor<cuts.length&&cuts[cursor]<end)stops.push(cuts[cursor++]);
+   stops.push(end);
+   const a=coordinates[i-1],b=coordinates[i];
+   const at=d=>{
+    if(d===start)return a;
+    if(d===end)return b;
+    const t=(d-start)/(end-start);
+    return {lat:a.lat+(b.lat-a.lat)*t,lon:a.lon+(b.lon-a.lon)*t};
+   };
+   for(let j=1;j<stops.length;j++){
+    const lo=stops[j-1],hi=stops[j],mid=(lo+hi)/2;
+    if(lo===hi)continue;
+    const closed=known.has(i-1)||spans.some(([from,to])=>from<=mid&&mid<=to);
+    const previous=result.at(-1);
+    if(previous?.closed===closed)previous.coordinates.push(at(hi));
+    else result.push({closed,coordinates:[at(lo),at(hi)]});
+   }
+  }
+  return result;
  }
 
  function approximate(start, end, via = []) {
@@ -152,7 +203,7 @@
  }
 
  const remaining = (totalKm, coveredMetres) => Math.max(0, totalKm - coveredMetres / 1000);
- const api = {create, fromNetwork, approximate, remaining};
+ const api = {create, fromNetwork, locate, sections, approximate, remaining};
  if (typeof module !== 'undefined') module.exports = api;
  else root.NauticTrip = api;
 })(typeof window !== 'undefined' ? window : globalThis);

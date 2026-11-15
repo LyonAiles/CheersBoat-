@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const {create, remaining, fromNetwork, approximate} = require('../../app/src/main/assets/nautic-trip.js');
+const {create, remaining, fromNetwork, approximate, locate, sections} = require('../../app/src/main/assets/nautic-trip.js');
 
 const p = (lat, lon = 0) => ({lat, lon});
 const way = (id, nodes, geometry, name = 'Canal') => ({
@@ -57,3 +57,20 @@ assert.equal(direct.approximate,true);
 assert(indicative.total>direct.total);
 assert.equal(indicative.coordinates.length,3);
 console.log('PASS: restricted paths remain traceable and offline waypoints refine the distance');
+
+assert.deepEqual(restricted.closedEdges,[1,2]);
+const drawn = sections(restricted);
+assert.deepEqual(drawn.map(part=>part.closed),[false,true]);
+assert.deepEqual(drawn[0].coordinates.at(-1),p(.009));
+assert.deepEqual(drawn[1].coordinates,[p(.009),p(.009,.004),p(.018,.004)]);
+
+const route = fromNetwork(water,p(0),p(.018,.004));
+const mark = {from:p(.0135,.004),to:p(.0045)};
+const marked = sections(route,[mark]);
+assert.deepEqual(marked.map(part=>part.closed),[false,true,false]);
+assert(Math.abs(marked[1].coordinates[0].lat-.0045)<1e-9);
+assert.deepEqual(marked[1].coordinates.slice(1,3),[p(.009),p(.009,.004)]);
+assert(Math.abs(marked[1].coordinates.at(-1).lat-.0135)<1e-9);
+assert(locate(route.coordinates,p(.006,.00005)).distance<6);
+assert(sections(route,[{date:'2027-03-01'}]).every(part=>part.closed));
+console.log('PASS: restrictions and manual closures color only their portions, following the waterway');
