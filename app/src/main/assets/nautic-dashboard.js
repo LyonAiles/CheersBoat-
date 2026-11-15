@@ -274,6 +274,46 @@
   },true);
  }
 
+ const previewViews=['cam1Body','cam2Body','cam3Body',...mapViews];
+ const retryHttp=new Set();
+ function clearHttpStill(view){view.querySelector('.camera-still')?.remove();}
+ function freezeHttpPreviews(){
+  for(const id of previewViews){
+   const view=$(id),img=view.querySelector('img');
+   if(!view.dataset.previewUrl)continue;
+   retryHttp.add(id);
+   if(!img?.naturalWidth||!img.naturalHeight||view.querySelector('.camera-still'))continue;
+   const still=document.createElement('canvas');
+   const scale=Math.min(1,320/Math.max(img.naturalWidth,img.naturalHeight));
+   still.width=Math.max(1,Math.round(img.naturalWidth*scale));
+   still.height=Math.max(1,Math.round(img.naturalHeight*scale));
+   still.className='camera-still';
+   still.setAttribute('aria-hidden','true');
+   try{
+    still.getContext('2d').drawImage(img,0,0,still.width,still.height);
+    img.after(still);
+   }catch(_){}
+  }
+ }
+ function updateHttpPreview(view,url,index){
+  const changed=view.dataset.previewUrl!==url;
+  const retry=retryHttp.delete(view.id);
+  if(!changed&&!retry){
+   if(view.querySelector('img')?.naturalWidth)clearHttpStill(view);
+   return;
+  }
+  if(changed)clearHttpStill(view);
+  const img=new Image();
+  img.alt='Caméra '+(40+Number(index));img.draggable=false;
+  img.onload=()=>{if(!document.hidden&&img.parentElement===view)clearHttpStill(view);};
+  img.src=url;
+  const previous=view.querySelector('img');
+  if(previous)previous.replaceWith(img);
+  else if(view.classList.contains('map-camera-view'))view.prepend(img);
+  else view.replaceChildren(img);
+  view.dataset.previewUrl=url;
+ }
+
  function previews(){
   const sonarSettings=$('sondeurSettings');
   const settingsOpen=sonarSettings&&!sonarSettings.hidden;
@@ -283,7 +323,7 @@
   if(!hidden&&window.nauticQuietMode)return;
   const tiles=[];
   const config=cameraConfig();
-  if(!hidden)for(const id of ['trematagePreview','cam1Body','cam2Body','cam3Body',...mapViews]){
+  if(!hidden)for(const id of ['trematagePreview',...previewViews]){
    const feed=feeds[id],inMap=!!feed;
    const e=$(id);
    if(!e||e.closest('[hidden],.nautic-hidden')||getComputedStyle(e).display==='none')continue;
@@ -296,14 +336,10 @@
     }
     if(/^https?:\/\//i.test(url)){
      showCrop(e,index);
-     if(e.dataset.previewUrl!==url){
-      const img=new Image();img.alt='Caméra '+(40+Number(index));img.draggable=false;img.src=url;
-      if(inMap){e.querySelector('img')?.remove();e.prepend(img);}else e.replaceChildren(img);
-      e.dataset.previewUrl=url;
-     }
+     updateHttpPreview(e,url,index);
      continue;
     }
-    if(e.dataset.previewUrl){e.querySelector('img')?.remove();delete e.dataset.previewUrl;}
+    if(e.dataset.previewUrl){e.querySelector('img')?.remove();clearHttpStill(e);delete e.dataset.previewUrl;}
    }
    const r=e.getBoundingClientRect();if(r.width<2||r.height<2)continue;
    const card=e.closest('.camCard');
@@ -319,8 +355,8 @@
   call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,tiles,switchButton}));
  }
  window.nauticEvery(()=>{numberButtons();refresh();previews();},800);
- window.nauticDashboardResume=()=>{if(window.nauticQuietMode){previews();return;}refresh();for(let i=1;i<=3;i++){const e=$('cam'+i+'Body');if(e)delete e.dataset.previewUrl;}previews();};
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.nauticDashboardResume();else previews();});window.addEventListener('resize',previews);
+ window.nauticDashboardResume=()=>{if(window.nauticQuietMode){previews();return;}refresh();previews();};
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.nauticDashboardResume();else{freezeHttpPreviews();previews();}});window.addEventListener('resize',previews);
  new MutationObserver(previews).observe($('dialog'),{attributes:true,attributeFilter:['open']});
  numberButtons();refresh();previews();setTimeout(previews,200);setTimeout(previews,600);
 })();
