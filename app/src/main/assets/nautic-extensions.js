@@ -10,7 +10,7 @@ const readSetting=(key)=>{try{
 }catch(e){try{return localStorage.getItem(key)||''}catch(_){return ''}}};
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{}'))}catch(e){return {...d}}};
 const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:true});
-mapPitch=Math.max(0,Math.min(45,Number(state.mapPitch)||0));
+mapPitch=clampMapPitch(state.mapPitch);
 // L'horloge reste affichée, indépendamment des anciens réglages de visibilité.
 state.buttons = state.buttons || {};
 if(!readSetting('nautic-object-numbers-v2')){state.objectNumbers=true;try{localStorage.setItem('nautic-object-numbers-v2','1')}catch(e){}}
@@ -115,13 +115,26 @@ let chosenLayer=null;
 function setLayer(id){if(!map||!window.L)return;layoutNavigationMap();map.invalidateSize();map.eachLayer(l=>{if(l instanceof L.TileLayer)map.removeLayer(l)});let d=layerDefs[id]||layerDefs.osm;chosenLayer=L.tileLayer(d.url,{maxZoom:d.maxZoom,attribution:d.attr}).addTo(map);if(id==='sea')L.tileLayer('https://t1.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap',zIndex:5}).addTo(map);state.map=id;persist();let foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Carte '+d.label+' · suivi GPS';rotateMap()}
 window.nauticRestoreLegacy=()=>setLayer(state.map);
 function mapDialog(){
+ const pitchLimit=()=>state.mapEngine==='legacy'?MAX_CLASSIC_PITCH:MAX_VECTOR_PITCH;
+ const displayedPitch=clampMapPitch(mapPitch,pitchLimit());
  openModal('Choisir la carte',`<button type="button" id="chooseVectorMap">MapLibre · vectorielle · libellés horizontaux</button><div class="choiceGrid">${Object.entries(layerDefs).map(([k,v])=>`<button data-map="${k}" aria-pressed="${state.map===k}">${v.label}</button>`).join('')}</div>
- <label>Inclinaison de la carte <output id="mapPitchValue">${mapPitch}°</output><input type="range" id="mapPitch" min="0" max="45" step="5" value="${mapPitch}"></label>
+ <label>Inclinaison de la carte <output id="mapPitchValue">${displayedPitch}°</output><input type="range" id="mapPitch" min="0" max="${pitchLimit()}" step="5" value="${displayedPitch}"></label>
  <p class="muted">Vue en perspective. OpenSeaMap ajoute le balisage disponible. Connexion Internet nécessaire.</p>`);
  get('chooseVectorMap').onclick=()=>{state.mapEngine='vector';persist();window.nauticApplyNavigation?.(state);dialog.close();};
- dialog.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{state.mapEngine='legacy';window.nauticApplyNavigation?.(state);setLayer(b.dataset.map);dialog.querySelectorAll('[data-map]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
- get('mapPitch').oninput=()=>{mapPitch=Number(get('mapPitch').value);get('mapPitchValue').textContent=mapPitch+'°';rotateMap()};
- get('mapPitch').onchange=()=>{state.mapPitch=mapPitch;persist()};
+ const pitchInput=get('mapPitch'),pitchValue=get('mapPitchValue');
+ dialog.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{
+  state.mapEngine='legacy';window.nauticApplyNavigation?.(state);setLayer(b.dataset.map);
+  pitchInput.max=pitchLimit();pitchInput.value=clampMapPitch(mapPitch,pitchLimit());
+  pitchValue.textContent=pitchInput.value+'°';
+  dialog.querySelectorAll('[data-map]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+ });
+ pitchInput.oninput=()=>{
+  mapPitch=clampMapPitch(pitchInput.value,pitchLimit());
+  pitchValue.textContent=mapPitch+'°';
+  rotateMap();
+  window.nauticApplyMapPitch?.();
+ };
+ pitchInput.onchange=()=>{state.mapPitch=mapPitch;persist()};
 }
 layers.onclick=mapDialog;
 const photoFallback='bateau.jpg';

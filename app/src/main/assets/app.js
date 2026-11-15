@@ -78,13 +78,18 @@ function layoutNavigationMap(){
 }
 function initMap(){if(!window.L){$('mapFallback').style.display='grid';return}layoutNavigationMap();map=L.map('map',{zoomControl:false}).setView([47.5911,2.7521],14);L.control.zoom({position:'bottomright'}).addTo(map);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);routeLine=L.polyline(points.map(p=>[p.lat,p.lon]),{color:'#28bdf1',weight:4}).addTo(map);map.on('tileerror',()=>{$('mapFallback').style.display='grid'});map.on('tileload',()=>{$('mapFallback').style.display='none'});map.on('moveend zoomend',rotateMap);map.dragging.enable();map.on('dragstart',()=>{window.nauticMapFreePan=true;rotateMap()});map.on('move',()=>{if(window.nauticMapFreePan)window.nauticPositionBoat?.()});enableMapRotation()}
 // Heading-up is a visual CSS rotation; geographic marker placement is handled by Leaflet.
-let mapPitch=0;try{mapPitch=Math.max(0,Math.min(45,Number(JSON.parse(localStorage.getItem('nautic-extensions')||'{}').mapPitch)||0))}catch(e){}
+const MAX_VECTOR_PITCH=65,MAX_CLASSIC_PITCH=45;
+function clampMapPitch(value,limit=MAX_VECTOR_PITCH){
+ const pitch=Number(value);
+ return Number.isFinite(pitch)?Math.max(0,Math.min(limit,pitch)):0;
+}
+let mapPitch=0;try{mapPitch=clampMapPitch(JSON.parse(localStorage.getItem('nautic-extensions')||'{}').mapPitch)}catch(e){}
 let userMapRotation=0,manualRotationUntil=0,targetHeading=null,headingCandidate=null,lastMapFrame=0;let rotationGesture=null;
 function enableMapRotation(){const el=document.getElementById('map');if(!el)return;const angle=(a,b)=>Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI;
  el.addEventListener('touchstart',e=>{if(e.touches.length===2)rotationGesture={angle:angle(e.touches[0],e.touches[1]),base:userMapRotation}},{passive:true});
  el.addEventListener('touchmove',e=>{if(e.touches.length!==2||!rotationGesture)return;userMapRotation=rotationGesture.base+angle(e.touches[0],e.touches[1])-rotationGesture.angle;manualRotationUntil=Date.now()+8000;rotateMap()},{passive:true});
  el.addEventListener('touchend',e=>{if(e.touches.length<2)rotationGesture=null},{passive:true});}
-function rotateMap(){if(!map)return;if(window.nauticMapFreePan){const pane=map.getPane('mapPane'),pos=L.DomUtil.getPosition(pane)||L.point(0,0);pane.style.transform=`translate3d(${pos.x}px,${pos.y}px,0)`;return;}let pane=map.getPane('mapPane'),pos=L.DomUtil.getPosition(pane)||L.point(0,0),center=map.getSize().divideBy(2).subtract(pos);pane.style.transform=`translate3d(${pos.x}px,${pos.y}px,0) perspective(1200px) rotateX(${mapPitch}deg) scale(${1/Math.cos(rad(mapPitch))}) rotate(${-(heading??0)+userMapRotation}deg)`;pane.style.transformOrigin=`${center.x}px ${center.y}px`;let tile=map.getPane('tilePane');tile.style.transformOrigin='center center';$('compass').style.transform=`rotate(${(heading??0)-userMapRotation}deg)`;}
+function rotateMap(){if(!map)return;if(window.nauticMapFreePan){const pane=map.getPane('mapPane'),pos=L.DomUtil.getPosition(pane)||L.point(0,0);pane.style.transform=`translate3d(${pos.x}px,${pos.y}px,0)`;return;}let pane=map.getPane('mapPane'),pos=L.DomUtil.getPosition(pane)||L.point(0,0),center=map.getSize().divideBy(2).subtract(pos);const pitch=clampMapPitch(mapPitch,MAX_CLASSIC_PITCH);pane.style.transform=`translate3d(${pos.x}px,${pos.y}px,0) perspective(1200px) rotateX(${pitch}deg) scale(${1/Math.cos(rad(pitch))}) rotate(${-(heading??0)+userMapRotation}deg)`;pane.style.transformOrigin=`${center.x}px ${center.y}px`;let tile=map.getPane('tilePane');tile.style.transformOrigin='center center';$('compass').style.transform=`rotate(${(heading??0)-userMapRotation}deg)`;}
 // GPS filtering: boat stays visually fixed, map follows accepted positions smoothly.
 // Only confirmed displacement counts; brief stops count as engine-on, long stops do not.
 let stableFix=null, movingCandidate=null, movementConfirm=0, gpsFollowTarget=null, smoothCenter=null;
