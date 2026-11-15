@@ -3,8 +3,8 @@
  const $=id=>document.getElementById(id),bridge=window.NauticAndroid;
  const call=(name,...args)=>{if(bridge&&typeof bridge[name]==='function')return bridge[name](...args);};
  const icon=(id,symbol,label)=>{const e=$(id);if(!e)return;e.textContent=symbol;e.title=label;e.setAttribute('aria-label',label);};
- icon('nauticExitButton','⏻','Sortie');icon('nauticPlugsButton','🔌','Prises');icon('nauticContactsButton','☎↶','Derniers appels');
- const exit=$('nauticExitButton');if(exit)exit.innerHTML='<svg viewBox="0 0 24 24" width="25" height="25" aria-hidden="true"><path d="M12 2v9M6.3 5.5a8.5 8.5 0 1 0 11.4 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+ icon('nauticExitButton','−','Réduire Nautic');icon('nauticPlugsButton','🔌','Prises');icon('nauticContactsButton','☎↶','Derniers appels');
+ const exit=$('nauticExitButton');if(exit)exit.innerHTML='<svg viewBox="0 0 24 24" width="25" height="25" aria-hidden="true"><path d="M5 15h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
  const compass=$('compass');if(compass){for(const node of [...compass.childNodes])if(node.nodeType===3)node.remove();compass.title='Orientation de la carte';compass.setAttribute('aria-label','Orientation de la carte');}
  const headerControls=$('nauticHeaderControls'),contacts=$('nauticContactsButton');
  if(contacts)contacts.remove();

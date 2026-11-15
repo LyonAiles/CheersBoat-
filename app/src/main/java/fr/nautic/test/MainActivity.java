@@ -44,6 +44,7 @@ public class MainActivity extends Activity {
  private final java.util.concurrent.ExecutorService dashboardCommands=java.util.concurrent.Executors.newSingleThreadExecutor();
  private final java.util.concurrent.atomic.AtomicBoolean trematageBusy=new java.util.concurrent.atomic.AtomicBoolean();
  private boolean dashboardVisible=false,mapManipulating=false;
+ private boolean reducedWithButton=false;
  void dashboardClick(String id,boolean held){js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
  void updateMapCameraAlpha(float alpha){js("nauticMapCameraAlpha",Float.toString(alpha));}
  void refreshDashboardVideos(){js("nauticDashboardResume","");}
@@ -197,7 +198,7 @@ public class MainActivity extends Activity {
    try{return getPackageManager().getPackageInfo(getPackageName(),0).versionName;}
    catch(Exception e){return "?";}
   }
-  @JavascriptInterface public void exitApp(){runOnUiThread(()->{if(web!=null)web.stopLoading();finish();});}
+  @JavascriptInterface public void minimizeApp(){runOnUiThread(()->reducedWithButton=moveTaskToBack(true));}
   @JavascriptInterface public void call(String number){runOnUiThread(()->{
    try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:"+Uri.encode(number))));}
    catch(Exception e){toast("Téléphone indisponible");}
@@ -311,6 +312,7 @@ public class MainActivity extends Activity {
   super.onResume();dashboardVisible=true;
   if(dashboardCameras!=null)dashboardCameras.resume();
   js("nauticDashboardResume","");
+  if(reducedWithButton){reducedWithButton=false;NauticUpdates.check(this);}
   String saved=getSharedPreferences("nautic_settings",MODE_PRIVATE).getString("nautic-v04","");
   if(!saved.isEmpty())js("nauticCameraAddressSync",saved);
  }
