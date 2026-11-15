@@ -82,7 +82,7 @@
  let mapCameraAlpha=1;
  let mapCameraIndex=2;
  function switchMapCamera(){
-  if(mapCamera.hidden)return;
+  if(mapCamera.hidden||mapCamera.classList.contains('nautic-hidden'))return;
   mapCameraIndex=3-mapCameraIndex;
   previews();
  }
@@ -110,6 +110,7 @@
  const speedCard=$('speedCard');
  speedCard.setAttribute('aria-pressed','false');
  function toggleMapCamera(){
+  if(mapCamera.classList.contains('nautic-hidden'))return;
   mapCamera.hidden=!mapCamera.hidden;
   mapSwitch.hidden=mapCamera.hidden;
   speedCard.setAttribute('aria-pressed',String(!mapCamera.hidden));
@@ -147,7 +148,7 @@
    tiles.push({id,x:r.left,y:r.top,w:r.width,h:r.height,label:mobile?'Trématage':heading?.textContent.trim()||'📷',number:card?.dataset.objectNumber||'',active:(mobile||id==='cam2Body')&&card.classList.contains('trematage-active'),alarm:mobile&&card.classList.contains('trematage-alert'),status:mobile?$('trematageState').textContent:id==='cam2Body'?camera42?.dataset.watchStatus||'':''});
   }
   const rect=mapSwitch.getBoundingClientRect();
-  const switchButton=!hidden&&!mapSwitch.hidden&&rect.width>0
+  const switchButton=!hidden&&!mapCamera.classList.contains('nautic-hidden')&&!mapSwitch.hidden&&rect.width>0
    ?{x:rect.left,y:rect.top,w:rect.width,h:rect.height}:null;
   call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapCameraIndex,tiles,switchButton}));
  }

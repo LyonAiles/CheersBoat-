@@ -12,7 +12,7 @@ const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{
 const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:true});
 mapPitch=Math.max(0,Math.min(45,Number(state.mapPitch)||0));
 // L'horloge reste affichée, indépendamment des anciens réglages de visibilité.
-state.buttons.clock=true;
+state.buttons = state.buttons || {};
 if(!readSetting('nautic-object-numbers-v2')){state.objectNumbers=true;try{localStorage.setItem('nautic-object-numbers-v2','1')}catch(e){}}
 const plugDefaults=[{label:'Prise 1',ip:'192.168.1.102'},{label:'Prise 2',ip:'192.168.1.103'},{label:'Prise 3',ip:'192.168.1.105'}];
 state.smartPlugs=plugDefaults.map((d,i)=>({...d,...(Array.isArray(state.smartPlugs)?state.smartPlugs[i]||{}:{})}));
@@ -42,7 +42,7 @@ const css=document.createElement('style');css.textContent=`
  dialog textarea,dialog select{width:100%;background:#09273b;color:white;border:1px solid #4a7b91;border-radius:7px;padding:8px}
  dialog textarea{min-height:110px}
  dialog .settingRow{display:grid;grid-template-columns:22px minmax(0,1fr);justify-content:start;align-items:center;gap:12px;margin:0;padding:9px 4px;min-height:44px;width:100%;text-align:left;line-height:1.25;font-size:15px} dialog .settingRow input[type=checkbox]{width:20px;height:20px;margin:0;justify-self:start;flex:none;accent-color:#31b9e9} dialog.nautic-full h3{margin:18px 0 8px;font-size:18px} dialog.nautic-full .dialogTop{flex:none;position:sticky;top:0;background:#0b293e;z-index:2;padding:4px 0 10px} dialog.nautic-full #dialogContent{padding-bottom:30px} dialog .choiceGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:9px} dialog .choiceGrid button{width:100%}
- .nautic-hidden{display:none!important} #nauticExitButton{flex:none;background:#77352c;border-color:#bd6c60} #nauticSettingsButton{flex:none} #recentCalls{width:100%;margin:8px 0} #recentCalls button{display:inline-flex;margin:3px 4px 3px 0;padding:8px;max-width:100%;overflow-wrap:anywhere}
+ #app#app#app .nautic-hidden{display:none!important} #nauticExitButton{flex:none;background:#77352c;border-color:#bd6c60} #nauticSettingsButton{flex:none} #recentCalls{width:100%;margin:8px 0} #recentCalls button{display:inline-flex;margin:3px 4px 3px 0;padding:8px;max-width:100%;overflow-wrap:anywhere}
  .emChoices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,175px),1fr));gap:9px;margin:10px 0 20px}.emChoice{min-height:72px;display:flex;align-items:center;gap:9px;text-align:left;background:#103d56;padding:10px;line-height:1.2}.emChoice span{font-size:26px;flex:none}.emChoice strong{font-size:15px}.emChoice small{font-size:12px}.emChoice.active{border:2px solid #74d9f0;background:#245e75}.emPanel{padding:12px 0;border-top:1px solid #42788f}.emAction{display:block;width:100%;min-height:65px;margin:12px 0;font-size:21px;font-weight:800;background:#126b59;border:2px solid #70d6b6}.emUrgentAction{background:#b52d2d;border:2px solid #ff9b9b;color:white;font-size:23px}.emPanel #emContacts{margin-bottom:12px}
 
  dialog.nautic-full .nauticCameraStage{position:relative;flex:1;min-height:0;background:#000;overflow:hidden;border-radius:7px}dialog.nautic-full .nauticCameraStage .viewer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;min-height:0;height:100%;width:100%;background:#000}dialog.nautic-full .nauticCameraStage img,dialog.nautic-full .nauticCameraStage video{width:100%;height:100%;object-fit:contain} .camOverlay{position:absolute;top:12px;right:12px;display:flex;gap:8px;z-index:5}.camOverlay button{background:#06253b99;backdrop-filter:blur(3px);min-width:44px;min-height:44px}.camMove{position:absolute;bottom:15px;left:15px;z-index:5;background:#06253b77;padding:8px;border-radius:12px;text-align:center}.camMove button{background:#092e4b99;min-width:46px;min-height:46px;margin:2px}.camMove[hidden]{display:none!important}dialog.nautic-full:has(.nauticCameraStage) .dialogTop{display:none}dialog.nautic-full:has(.nauticCameraStage) #dialogContent{padding:0;overflow:hidden} 
@@ -256,7 +256,34 @@ tapoCam.onclick=()=>{if(!nativeCall('openTapo'))alert('Application Tapo indispon
 // One journal, one recenter button; no obsolete Nautic footer control.
 get('routeCard').style.display='none';get('miniMap').style.display='none';let branding=document.querySelector('.branding');if(branding)branding.style.display='none';
 const footer=document.querySelector('footer');if(footer)footer.style.display='none';
-function applyVisibility(){const ids=['nauticSettingsButton','nauticExitButton','nauticPlugsButton','nauticContactsButton','nauticCallsSlot','mapWrap','gpsCard','boatCard','fuelCard','logCard','cam1Card','cam2Card','cam3Card','speedCard','headingCard','weatherCard'];for(const id of ids){const e=get(id);if(!e)continue;const hidden=state.buttons[id]===false;e.classList.toggle('nautic-hidden',hidden);e.hidden=hidden;e.setAttribute('aria-hidden',hidden?'true':'false')}if(map)setTimeout(()=>map.invalidateSize(),80)}
+const dashboardButtons = [
+ ['nauticPlugsButton', '22 · Prises'], ['gpsCard', '31 · Position GPS / urgences'],
+ ['boatCard', '32 · Mon bateau'], ['logCard', '33 · Journal'], ['fuelCard', '34 · Carburant'],
+ ['nauticCallsSlot', '35 · Téléphone'], ['speedCard', '36 · Vitesse et distances'],
+ ['weatherCard', '37 · Météo'], ['headingCard', '38 · Cap'], ['notesCard', '39 · Bloc-notes'],
+ ['mapWrap', '40 · Carte'], ['cam1Card', '41 · Caméra Roof'], ['cam2Card', '42 · Caméra Côté'],
+ ['cam3Card', '43 · Caméra Fond'], ['trematageCard', '44 · Trématage'],
+ ['mapGps', '50 · Position sur la carte'], ['windWidget', '51 · Vent'],
+ ['compass', '52 · Boussole'], ['mapLayers', '53 · Fond de carte'], ['mapRecenter', '54 · Recentrer'],
+ ['mapZoomIn', '56 · Zoom avant'], ['mapZoomOut', '57 · Zoom arrière'],
+ ['mapCameraOverlay', 'Caméras sur la carte'], ['mapCameraSwitch', 'Changer de caméra sur la carte'],
+ ['nauticWaterwayStatus', 'Ouvrages fluviaux'], ['nauticDestination', 'Destination'],
+ ['sondeurReplay', '294 · Relecture du sondeur'], ['sondeurToggle', '297 · Sondeur'],
+ ['sondeurPlay', 'Simulation du sondeur'], ['sondeurOptions', '299 · Réglages du sondeur']
+];
+function applyVisibility() {
+ const app = get('app');
+ for (const [id] of dashboardButtons) {
+  const hidden = state.buttons[id] === false;
+  app.classList.toggle('hide-' + id, hidden);
+  get(id)?.classList.toggle('nautic-hidden', hidden);
+ }
+ window.nauticNumberDashboard?.();
+ window.dispatchEvent(new Event('nauticvisibility'));
+ if (map) setTimeout(() => map.invalidateSize(), 80);
+}
+document.addEventListener('DOMContentLoaded', applyVisibility);
+
 
 const cameraDefaults=[
  {name:'Roof',app:'tapo',package:'com.tplink.iot',scheme:'',image:''},
@@ -390,7 +417,7 @@ document.addEventListener('pointerup',e=>{
  dragging=null;
  if(!editingLayout||Math.hypot(x-startX,y-startY)<12)return;
  const parent=el.parentElement;
- const candidates=[...parent.children].filter(node=>node!==el&&movableIds.includes(node.id)&&!node.hidden);
+ const candidates=[...parent.children].filter(node=>node!==el&&movableIds.includes(node.id)&&!node.hidden&&!node.classList.contains('nautic-hidden'));
  const target=candidates.find(node=>{const r=node.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;});
  if(target){
   // Échanger les positions sans perdre le suivi tactile lors d'un déplacement DOM.
@@ -405,8 +432,8 @@ document.addEventListener('pointercancel',()=>{if(dragging){dragging.el.classLis
 
 applyAppearance();
 
-function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètres'],['nauticExitButton','21 · Sortie'],['nauticPlugsButton','22 · Prises'],['nauticCallsSlot','35 · Conteneur Derniers appels'],['gpsCard','31 · Position GPS / urgences'],['boatCard','32 · Mon bateau'],['fuelCard','34 · Carburant'],['logCard','33 · Journal'],['cam1Card','41 · Caméra Roof'],['cam2Card','42 · Caméra Côté'],['cam3Card','43 · Caméra Fond'],['speedCard','36 · Vitesse'],['headingCard','38 · Cap'],['weatherCard','37 · Météo'],['mapWrap','40 · Carte']];
- openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet. Le 35 peut être masqué dans Tableau de bord.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><p class="muted">Nautic accepte le redimensionnement Android. Le mode fenêtre flottante dépend du téléphone.</p><h3>Apparence et disposition</h3>
+function settingsDialog(){
+ openModal('Paramètres',`<h3>Repérage des objets</h3><label class="settingRow"><input type="checkbox" id="settingObjectNumbers" ${state.objectNumbers?'checked':''}><span>Afficher les numéros temporaires des objets</span></label><p class="muted">Les petits numéros restent attachés à leur objet.</p><p id="nauticNumberDirectory" class="muted" style="font-size:11px;line-height:1.6"></p><p class="muted">Nautic accepte le redimensionnement Android. Le mode fenêtre flottante dépend du téléphone.</p><h3>Apparence et disposition</h3>
  <label>Modèle de présentation<select class="nautic-select" id="settingLayout"><option value="navigation">Navigation</option><option value="manoeuvres">Manœuvres — caméras agrandies</option><option value="custom">Personnalisé</option></select></label>
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
  <label>Thème<select class="nautic-select" id="settingTheme"><option value="nautic">Nautic bleu</option><option value="day">Jour clair</option><option value="night">Nuit rouge</option><option value="contrast">Contraste élevé</option><option value="custom">Couleurs personnalisées</option></select></label>
@@ -414,7 +441,7 @@ function settingsDialog(){let buttons=[['nauticSettingsButton','20 · Paramètre
  <label>Fond<select class="nautic-select" id="settingBackground"><option value="gradient">Dégradé</option><option value="flat">Uni</option><option value="clear">Panneaux translucides</option></select></label>
  <label>Forme des boutons<select class="nautic-select" id="settingButtons"><option value="rounded">Arrondis</option><option value="square">Carrés / plats</option><option value="round">Très arrondis</option><option value="outline">Contours seuls</option></select></label>
  <label>Taille générale : <output id="settingScaleValue">${state.appearance.scale}%</output><input type="range" id="settingScale" min="80" max="130" step="5" value="${state.appearance.scale}"></label>
- <h3>Tableau de bord</h3>${buttons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
+ <h3>Tableau de bord</h3>${dashboardButtons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <h3>Navigation</h3>${field('Seuil de déplacement confirmé (m)','settingMove',state.moveThreshold,'number')}${field('Arrêt prolongé (minutes)','settingStop',state.stopMinutes,'number')}
  <h3>Carte et ouvrages fluviaux</h3>
  <label>Moteur de carte<select class="nautic-select" id="settingMapEngine"><option value="vector" ${(state.mapEngine||'vector')==='vector'?'selected':''}>MapLibre · libellés horizontaux</option><option value="legacy" ${state.mapEngine==='legacy'?'selected':''}>Carte classique · retour arrière</option></select></label>
