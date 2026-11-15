@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - nautic-test-destination-pk
   workflow_dispatch:
 
 # Chaque commit conserve sa compilation, même si plusieurs changements sont poussés rapidement.
@@ -20,6 +21,11 @@ jobs:
     steps:
       - name: Récupérer le projet
         uses: actions/checkout@v4
+
+      - name: Tester les distances fluviales
+        run: |
+          node tools/navigation/waterways.test.cjs
+          node tools/navigation/trip.test.cjs
 
       - name: Installer Java 17
         uses: actions/setup-java@v4
