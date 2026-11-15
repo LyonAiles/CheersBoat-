@@ -22,7 +22,6 @@ final class DashboardCameras {
  final Map<String,Long> retryAt=new HashMap<>();
  int decoderBudget=4;
  float mapAlpha=1;
- TextView cameraSwitch;
  boolean adjustingMapAlpha;
  static boolean isMapView(String id){return id.startsWith("mapCamera");}
  void setMapAlpha(float value){
@@ -324,12 +323,16 @@ final class DashboardCameras {
     String tapoHost=Uri.parse(TrematageAccess.address(activity,TrematageAccess.index(activity))).getHost();
     String path=uri.getPath();
     if(lens!=0)path=lens==1?"/stream6":"/stream1";
-    path=CameraStreamPolicy.preview(path,mobile,lens!=0||index==1||java.util.Objects.equals(tapoHost,uri.getHost()));
+    boolean tapo=lens!=0||index==1||java.util.Objects.equals(tapoHost,uri.getHost());
+    if(inMap&&tapo&&(path==null||path.isEmpty()))path="/stream1";
+    path=inMap&&tapo&&CameraStreamPolicy.hasTapoQualityPair(path)
+     ?CameraStreamPolicy.viewingQuality(path,!data.optBoolean("mapHd",false))
+     :CameraStreamPolicy.preview(path,mobile,tapo);
     String stream="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+uri.getHost()+":"+(uri.getPort()>0?uri.getPort():554)+path;
     if(!grouped.containsKey(stream))grouped.put(stream,new ArrayList<>());if(id.equals("mapCameraPreview"))grouped.get(stream).add(0,tile);else grouped.get(stream).add(tile);
    }
    for(Tile t:tiles.values())if(!visible.contains(t.id))t.frame.setVisibility(View.GONE);
-   updateCameraSwitch(data.optJSONObject("switchButton"),scale);
+
    long now=System.currentTimeMillis();
    List<String> eligible=new ArrayList<>();String priority=null;
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
@@ -353,36 +356,6 @@ final class DashboardCameras {
     source.mirrors.clear();for(Tile t:e.getValue())if(t!=source.owner)source.mirrors.add(t);source.copy();
    }
   }catch(Exception ignored){}
- }
- void updateCameraSwitch(JSONObject bounds,double scale){
-  if(bounds==null){
-   if(cameraSwitch!=null)cameraSwitch.setVisibility(View.GONE);
-   return;
-  }
-  if(cameraSwitch==null){
-   cameraSwitch=new TextView(activity);
-   cameraSwitch.setText("⇄");
-   cameraSwitch.setTextSize(20);
-   cameraSwitch.setTextColor(Color.WHITE);
-   cameraSwitch.setGravity(Gravity.CENTER);
-   cameraSwitch.setContentDescription("Changer l’objectif central");
-   android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
-   background.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-   background.setColor(0xc0123b4d);
-   cameraSwitch.setBackground(background);
-   cameraSwitch.setOnClickListener(v->activity.dashboardClick("mapCameraSwitch",false));
-   layer.addView(cameraSwitch);
-  }
-  FrameLayout.LayoutParams layout=new FrameLayout.LayoutParams(
-   Math.max(1,(int)(bounds.optDouble("w")*scale)),Math.max(1,(int)(bounds.optDouble("h")*scale)));
-  layout.leftMargin=(int)(bounds.optDouble("x")*scale);
-  layout.topMargin=(int)(bounds.optDouble("y")*scale);
-  String number=bounds.optString("number","");
-  cameraSwitch.setText(number.isEmpty()?"⇄":"⇄ "+number);
-  cameraSwitch.setTextSize(number.isEmpty()?20:13);
-  cameraSwitch.setLayoutParams(layout);
-  cameraSwitch.setVisibility(View.VISIBLE);
-  cameraSwitch.bringToFront();
  }
  void refreshTile(String id){Iterator<Map.Entry<String,Source>> entries=sources.entrySet().iterator();while(entries.hasNext()){Map.Entry<String,Source> e=entries.next();Source source=e.getValue();boolean matches=source.owner.id.equals(id);for(Tile t:source.mirrors)matches|=t.id.equals(id);if(matches){source.close();entries.remove();retryAt.remove(e.getKey());}}}
  void close(){stopped=true;for(Source s:sources.values())s.close();sources.clear();layer.removeAllViews();tiles.clear();}

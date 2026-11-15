@@ -8,7 +8,7 @@
  function begin(){clearTimeout(releaseTimer);clearTimeout(watchdog);if(!root.nauticMapInteracting){root.nauticMapInteracting=true;try{bridge?.mapInteraction?.(true);}catch(_){}root.dispatchEvent(new Event('nauticmapbusy'));}watchdog=setTimeout(finish,30000);}
  function end(){if(!pointers.size){clearTimeout(releaseTimer);releaseTimer=setTimeout(finish,650);}}
  function bind(){const el=document.getElementById('mapWrap');if(!el)return;
-  el.addEventListener('pointerdown',e=>{pointers.add(e.pointerId);begin();},{capture:true,passive:true});
+  el.addEventListener('pointerdown',e=>{if(e.target.closest?.('#mapCameraTools'))return;pointers.add(e.pointerId);begin();},{capture:true,passive:true});
   root.addEventListener('pointerup',e=>{pointers.delete(e.pointerId);end();},{capture:true,passive:true});root.addEventListener('pointercancel',e=>{pointers.delete(e.pointerId);end();},{capture:true,passive:true});
   el.addEventListener('pointermove',()=>{if(pointers.size)begin();},{passive:true});el.addEventListener('wheel',()=>{begin();end();},{capture:true,passive:true});
   root.addEventListener('blur',finish);document.addEventListener('visibilitychange',()=>{if(document.hidden)finish();});

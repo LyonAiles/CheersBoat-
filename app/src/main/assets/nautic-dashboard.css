@@ -158,23 +158,19 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
  font-size:clamp(19px,min(4vw,4dvh),30px)!important;
 }
 
-#mapCameraSwitch {
- position:absolute;
- left:50%;
- bottom:10px;
- transform:translateX(-50%);
- z-index:852;
- width:42px;
- height:42px;
- padding:0;
- border-radius:50%;
- background:#123b4d;
- color:white;
- font-size:20px;
+#mapCameraTools {
+ position:absolute;z-index:852;left:4px;right:4px;bottom:4px;
+ display:flex;justify-content:center;gap:3px;pointer-events:none;
 }
-#mapCameraSwitch[hidden] {display:none}
+#mapCameraTools[hidden],#mapCameraTools button[hidden],#app.hide-mapCameraOverlay #mapCameraTools {display:none!important}
+#mapCameraTools button {
+ flex:0 1 auto;min-width:0;min-height:40px;padding:5px clamp(4px,1vw,10px);
+ font-size:clamp(10px,1.5vw,14px);background:#092f43ec;pointer-events:auto;
+}
+#mapCameraTools #mapCameraSwitch {min-width:36px;font-size:19px}
+#mapCameraTools #mapCameraQuality[aria-pressed="true"] {background:#1b6257}
+#mapCameraOverlay:not([hidden]) {bottom:49px}
 
-#app.hide-mapCameraOverlay #mapCameraSwitch {display:none!important}
 #app.hide-mapZoomIn :is(.leaflet-control-zoom-in,.maplibregl-ctrl-zoom-in),
 #app.hide-mapZoomOut :is(.leaflet-control-zoom-out,.maplibregl-ctrl-zoom-out) {display:none!important}
 #nauticDestination {position:absolute;z-index:740;left:8px;top:40px;font-size:11px;padding:5px 8px;background:#092f43e8}

@@ -108,7 +108,7 @@
   return null;
  }
  function sectionColor(closed){
-  return closed?'#ff715e':routeState.trip.approximate?'#bdc5d2':'#f6dc76';
+  return closed?'#ff715e':routeState.trip.approximate?'#bdc5d2':'#42d67a';
  }
  function tripData(){
   if(!routeState)return {type:'FeatureCollection',features:[]};

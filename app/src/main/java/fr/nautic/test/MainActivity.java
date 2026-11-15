@@ -270,6 +270,32 @@ public class MainActivity extends Activity {
     startActivity(launch);
    }catch(Exception e){toast("Impossible d’ouvrir l’application caméra");}
   });}
+  @JavascriptInterface public void mapCameraControl(int index,String control){runOnUiThread(()->{
+   if(index<1||index>3||isFinishing()||isDestroyed())return;
+   boolean lighting="lights".equals(control);
+   if(!lighting&&!"night".equals(control))return;
+   String[] labels=lighting?new String[]{"Allumer","Éteindre"}:new String[]{"Automatique","Jour","Nuit"};
+   new android.app.AlertDialog.Builder(MainActivity.this)
+    .setTitle(lighting?"Projecteurs caméra":"Jour / nuit · les deux objectifs")
+    .setItems(labels,(dialog,choice)->{
+     toast("Interrogation de la caméra…");
+     dashboardCommands.execute(()->{
+      try{
+       OnvifCamera camera=MapCameraControls.discover(MainActivity.this,index);
+       String result=lighting?MapCameraControls.lights(camera,choice==0):
+        MapCameraControls.night(camera,new String[]{"AUTO","ON","OFF"}[choice]);
+       if(result!=null){toast(result);return;}
+       runOnUiThread(()->{
+        if(isFinishing()||isDestroyed())return;
+        new android.app.AlertDialog.Builder(MainActivity.this)
+         .setMessage(lighting?"Cette caméra ne fournit pas de commande de projecteur identifiable via ONVIF.":
+          "Le mode demandé n’est pas annoncé via ONVIF.")
+         .setPositiveButton("Ouvrir Tapo",(d,w)->openTapo()).setNegativeButton("Fermer",null).show();
+       });
+      }catch(Exception e){toast(e.getMessage()==null?"Commande caméra indisponible":e.getMessage());}
+     });
+    }).setNegativeButton("Annuler",null).show();
+  });}
   @JavascriptInterface public void openTapo(){runOnUiThread(()->{
    try{
     Intent launch=getPackageManager().getLaunchIntentForPackage("com.tplink.iot");
