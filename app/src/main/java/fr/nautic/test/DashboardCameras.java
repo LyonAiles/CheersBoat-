@@ -20,6 +20,8 @@ final class DashboardCameras {
  final Map<String,Tile> tiles=new LinkedHashMap<>();
  final Map<String,Source> sources=new LinkedHashMap<>();
  final Map<String,Long> retryAt=new HashMap<>();
+ final Map<String,String> failures=new HashMap<>();
+ final Set<String> useConfiguredStream=new HashSet<>();
  int decoderBudget=4;
  float mapAlpha=1;
  TextView cameraSwitch;
@@ -222,21 +224,29 @@ final class DashboardCameras {
   volatile long lastFrame=0;
   final long created=System.currentTimeMillis();
   boolean failed=false;
-  Source(String uri,Tile owner){this.owner=owner;texture=new TextureView(activity);owner.frame.addView(texture,0,new FrameLayout.LayoutParams(-1,-1));
-   owner.source=this;owner.applyCrop();
-   player=new ExoPlayer.Builder(activity,new DefaultRenderersFactory(activity).setEnableDecoderFallback(true)).build();player.setVolume(0);player.setVideoTextureView(texture);
+  Source(String uri,Tile owner){
+   this.owner=owner;texture=new TextureView(activity);
+   player=new ExoPlayer.Builder(activity,new DefaultRenderersFactory(activity).setEnableDecoderFallback(true)).build();
+   owner.frame.addView(texture,0,new FrameLayout.LayoutParams(-1,-1));
+   owner.source=this;
+   try{
+   owner.applyCrop();player.setVolume(0);player.setVideoTextureView(texture);
    player.setVideoFrameMetadataListener((presentationTimeUs,releaseTimeNs,format,mediaFormat)->lastFrame=System.currentTimeMillis());
    player.addListener(new Player.Listener(){
     @Override public void onRenderedFirstFrame(){
      if(owner.source!=Source.this)return;
+     failures.remove(uri);
      owner.setSnapshot(null);
      owner.message.setText("");
     }
     @Override public void onPlayerError(PlaybackException e){
      failed=true;retryAt.put(uri,System.currentTimeMillis()+4000);
      if(e.getErrorCodeName().contains("DECOD"))decoderBudget=Math.max(1,Math.min(decoderBudget,sources.size()-1));
-     if(owner.snapshot==null)owner.message.setText("Relance · "+e.getErrorCodeName());
-     for(Tile tile:mirrors)if(tile.snapshot==null)tile.message.setText(owner.message.getText());
+     else if(lastFrame==0)useConfiguredStream.add(uri);
+     String message=e.getErrorCodeName().replace("ERROR_CODE_","");
+     failures.put(uri,message);
+     owner.message.setText(message);
+     for(Tile tile:mirrors)tile.message.setText(message);
     }
     @Override public void onVideoSizeChanged(VideoSize size){
      if(size.width<=0||size.height<=0||size.pixelWidthHeightRatio<=0)return;
@@ -245,6 +255,10 @@ final class DashboardCameras {
     }
    });
    player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));player.prepare();player.play();
+   }catch(RuntimeException e){
+    player.release();owner.frame.removeView(texture);owner.source=null;
+    throw e;
+   }
   }
   Bitmap capture(){
    if(!texture.isAvailable()||lastFrame==0)return null;
@@ -291,6 +305,7 @@ final class DashboardCameras {
     applyCameraCrop(camera,CameraCrop.read(settings.getString(CameraCrop.key(camera),"")));
    }
    if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
+   if(scale<=0)return;
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();
    Set<Tile> changedFeeds=new HashSet<>();
    for(int i=0;i<list.length();i++){
@@ -316,24 +331,46 @@ final class DashboardCameras {
      String action=id.equals("mapCameraPreview")?"":" · toucher pour échanger, glisser pour recadrer";
      tile.frame.setContentDescription("Caméra "+(40+index)+action);
     }
-    String url=TrematageAccess.address(activity,index);
-    if(!url.startsWith("rtsp://")){tile.message.setText("📷");continue;}
+    try{
+    String url=TrematageAccess.address(activity,index).trim();
+    if(url.isEmpty()){tile.message.setText("Adresse caméra manquante");continue;}
+    if(!url.regionMatches(true,0,"rtsp://",0,7)){tile.message.setText("Adresse RTSP non reconnue");continue;}
     Uri uri=Uri.parse(url);android.content.SharedPreferences p=activity.getSharedPreferences("nautic_camera_private",0);
     String user=p.getString("username"+index,p.getString("username","")),pass=p.getString("password"+index,p.getString("password",""));
-    if(user.isEmpty()){tile.message.setText("⚙ Identifiants caméra");continue;}
+    if(uri.getHost()==null){tile.message.setText("Adresse caméra invalide");continue;}
+    String embedded=uri.getUserInfo();
+    if(user.isEmpty()&&embedded!=null){
+     int separator=embedded.indexOf(':');
+     user=separator<0?embedded:embedded.substring(0,separator);
+     pass=separator<0?"":embedded.substring(separator+1);
+    }
     String tapoHost=Uri.parse(TrematageAccess.address(activity,TrematageAccess.index(activity))).getHost();
-    String path=uri.getPath();
+    String path=uri.getEncodedPath();
     if(lens!=0)path=lens==1?"/stream6":"/stream1";
-    path=CameraStreamPolicy.preview(path,mobile,lens!=0||index==1||java.util.Objects.equals(tapoHost,uri.getHost()));
-    String stream="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+uri.getHost()+":"+(uri.getPort()>0?uri.getPort():554)+path;
-    if(!grouped.containsKey(stream))grouped.put(stream,new ArrayList<>());if(id.equals("mapCameraPreview"))grouped.get(stream).add(0,tile);else grouped.get(stream).add(tile);
+    String preferredPath=CameraStreamPolicy.preview(path,mobile,lens!=0||index==1||java.util.Objects.equals(tapoHost,uri.getHost()));
+    String auth=user.isEmpty()?"":Uri.encode(user)+":"+Uri.encode(pass)+"@";
+    String host=uri.getHost();
+    if(host.contains(":")&&!host.startsWith("["))host="["+host+"]";
+    String base="rtsp://"+auth+host+":"+(uri.getPort()>0?uri.getPort():554);
+    String query=uri.getEncodedQuery();
+    String suffix=query==null?"":"?"+query;
+    String preferred=base+preferredPath+suffix;
+    String stream=!mobile&&path!=null&&!path.isEmpty()&&useConfiguredStream.contains(preferred)
+     ?base+path+suffix:preferred;
+    List<Tile> group=grouped.computeIfAbsent(stream,key->new ArrayList<>());
+    if(id.equals("mapCameraPreview"))group.add(0,tile);else group.add(tile);
+    }catch(Exception e){tile.message.setText("Réglages caméra illisibles");}
    }
    for(Tile t:tiles.values())if(!visible.contains(t.id))t.frame.setVisibility(View.GONE);
    updateCameraSwitch(data.optJSONObject("switchButton"),scale);
    long now=System.currentTimeMillis();
    List<String> eligible=new ArrayList<>();String priority=null;
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
-    if(retryAt.containsKey(e.getKey())&&retryAt.get(e.getKey())>now)continue;
+    if(retryAt.getOrDefault(e.getKey(),0L)>now){
+     String message=failures.get(e.getKey());
+     if(message!=null)for(Tile tile:e.getValue())tile.message.setText(message);
+     continue;
+    }
     eligible.add(e.getKey());for(Tile tile:e.getValue())if(tile.id.equals("mapCameraPreview")||(priority==null&&tile.id.equals("trematagePreview")&&tile.active))priority=e.getKey();
    }
    Set<String> selected=new HashSet<>();if(priority!=null){selected.add(priority);eligible.remove(priority);}
@@ -343,13 +380,29 @@ final class DashboardCameras {
     Map.Entry<String,Source> entry=iterator.next();List<Tile> group=grouped.get(entry.getKey());
     Source source=entry.getValue();
     boolean stalled=now-(source.lastFrame==0?source.created:source.lastFrame)>(source.lastFrame==0?14000:9000);
-    if(stalled)retryAt.put(entry.getKey(),now+2000);
+    if(stalled){
+     retryAt.put(entry.getKey(),now+2000);
+     failures.put(entry.getKey(),"Flux sans image");
+     if(source.lastFrame==0)useConfiguredStream.add(entry.getKey());
+    }
     if(group==null||group.get(0)!=source.owner||!selected.contains(entry.getKey())||source.failed||stalled){source.close();iterator.remove();if(stalled||source.failed)selected.remove(entry.getKey());}
    }
    for(Tile tile:changedFeeds){tile.setSnapshot(null);}
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
     if(!selected.contains(e.getKey()))continue;
-    Source source=sources.get(e.getKey());if(source==null){Tile owner=e.getValue().get(0);owner.message.setText(owner.snapshot==null?"◌":"");source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);}
+    Source source=sources.get(e.getKey());
+    if(source==null){
+     Tile owner=e.getValue().get(0);
+     owner.message.setText(failures.getOrDefault(e.getKey(),owner.snapshot==null?"Connexion…":""));
+     try{
+      source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);
+     }catch(RuntimeException error){
+      retryAt.put(e.getKey(),now+4000);
+      failures.put(e.getKey(),"Lecteur vidéo indisponible");
+      for(Tile tile:e.getValue())tile.message.setText("Lecteur vidéo indisponible");
+      continue;
+     }
+    }
     source.mirrors.clear();for(Tile t:e.getValue())if(t!=source.owner)source.mirrors.add(t);source.copy();
    }
   }catch(Exception ignored){}
