@@ -2,6 +2,7 @@ package fr.nautic.test;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -15,6 +16,7 @@ import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -43,9 +45,63 @@ public class CameraActivity extends Activity {
  private int cameraIndex=1;
  private CameraControls controls;
  private android.content.BroadcastReceiver trematageReceiver;
- private boolean mobileAudio=false;
+ private final boolean[] audioEnabled=new boolean[2];
+ private final String[] videoSizes={"",""};
  private boolean mobileOnly=false,singleCamera=false;
- void toggleMobileAudio(){mobileAudio=!mobileAudio;if(players[1]!=null)players[1].setVolume(mobileAudio?1f:0f);}
+ private boolean lensVisible(int lens){return (!mobileOnly||lens==1)&&(!singleCamera||lens==0);}
+ String lensName(int lens){
+  if(singleCamera){
+   String path=configuredPath(lens);
+   if("/stream6".equals(path)||"/stream7".equals(path))return "Objectif orientable";
+   return "Caméra "+(40+cameraIndex);
+  }
+  return lens==0?"Objectif fixe":"Objectif orientable";
+ }
+ private String configuredPath(int lens){
+  if(!singleCamera)return lens==0?"/stream1":"/stream6";
+  String path=Uri.parse(baseUrl).getEncodedPath();
+  return path==null||path.isEmpty()?"/stream1":path;
+ }
+ private String qualityKey(int lens){return "quality."+cameraIndex+(lens==1||"/stream6".equals(configuredPath(lens))||"/stream7".equals(configuredPath(lens))?".mobile":".fixed");}
+ private boolean lightStream(int lens){
+  String path=configuredPath(lens);
+  return getSharedPreferences(PREF,MODE_PRIVATE).getBoolean(qualityKey(lens),"/stream2".equals(path)||"/stream7".equals(path));
+ }
+ void addPlaybackControls(LinearLayout target){
+  for(int lens=0;lens<2;lens++){
+   if(!lensVisible(lens))continue;
+   final int selected=lens;
+   if(CameraStreamPolicy.hasTapoQualityPair(configuredPath(lens))){
+    Button quality=new Button(this);quality.setText(lensName(lens)+" · Qualité vidéo");target.addView(quality);
+    quality.setOnClickListener(v->new AlertDialog.Builder(this).setTitle(lensName(selected)+" · Qualité vidéo")
+     .setSingleChoiceItems(new String[]{"Haute définition","Flux allégé"},lightStream(selected)?1:0,(dialog,index)->{
+      dialog.dismiss();
+      if(lightStream(selected)==(index==1))return;
+      getSharedPreferences(PREF,MODE_PRIVATE).edit().putBoolean(qualityKey(selected),index==1).apply();
+      restart(selected,true);
+     }).setNegativeButton("Fermer",null).show());
+   }
+   Button audio=new Button(this);
+   Runnable label=()->audio.setText(lensName(selected)+(audioEnabled[selected]?" · Couper le son":" · Activer le son"));
+   label.run();target.addView(audio);
+   audio.setOnClickListener(v->{audioEnabled[selected]=!audioEnabled[selected];if(players[selected]!=null)players[selected].setVolume(audioEnabled[selected]?1f:0f);label.run();});
+  }
+  Button technical=new Button(this);technical.setText("Résolution reçue");target.addView(technical);
+  technical.setOnClickListener(v->{
+   StringBuilder report=new StringBuilder();
+   for(int lens=0;lens<2;lens++)if(lensVisible(lens)){
+    if(report.length()>0)report.append("\n");
+    report.append(lensName(lens)).append(" · ").append(videoSizes[lens].isEmpty()?"en attente du flux":videoSizes[lens]);
+   }
+   new AlertDialog.Builder(this).setTitle("Résolution reçue").setMessage(report.toString()).setPositiveButton("Fermer",null).show();
+  });
+  Button tapo=new Button(this);tapo.setText("Ouvrir l’application Tapo");target.addView(tapo);
+  tapo.setOnClickListener(v->{
+   Intent app=getPackageManager().getLaunchIntentForPackage("com.tplink.iot");
+   if(app!=null)startActivity(app);
+   else android.widget.Toast.makeText(this,"Application Tapo indisponible",android.widget.Toast.LENGTH_SHORT).show();
+  });
+ }
  private final org.json.JSONObject scanStatuses=new org.json.JSONObject();
  private final java.util.ArrayList<ExoPlayer> previewPlayers=new java.util.ArrayList<>();
  private static final String PREF="nautic_camera_private";
@@ -94,7 +150,9 @@ public class CameraActivity extends Activity {
   String username=credential("username");
   String password=credential("password");
   String auth=Uri.encode(username)+":"+Uri.encode(password);
-  return "rtsp://"+auth+"@"+uri.getHost()+(uri.getPort()>0?":"+uri.getPort():"")+(singleCamera?(uri.getPath()==null||uri.getPath().isEmpty()?"/stream1":uri.getPath()):(lens==0?"/stream1":"/stream6"));
+  String path=CameraStreamPolicy.viewingQuality(configuredPath(lens),lightStream(lens));
+  return "rtsp://"+auth+"@"+uri.getHost()+(uri.getPort()>0?":"+uri.getPort():"")+path+
+   (singleCamera&&uri.getEncodedQuery()!=null?"?"+uri.getEncodedQuery():"");
  }
  private PlayerView makeView(int lens){
   PlayerView pv=new PlayerView(this);pv.setUseController(false);pv.setKeepScreenOn(true);
@@ -210,28 +268,31 @@ public class CameraActivity extends Activity {
   status.setPadding(dp(8),dp(4),dp(8),dp(4));status.setBackground(bubble());
   FrameLayout.LayoutParams sp=new FrameLayout.LayoutParams(-2,-2,Gravity.LEFT|Gravity.TOP);
   sp.setMargins(dp(8),dp(10),dp(55),0);root.addView(status,sp);
-  TextView commands=new TextView(this);commands.setText("⚙ Objectif 2 · commandes");commands.setTextColor(Color.WHITE);
+  TextView commands=new TextView(this);commands.setText("⚙ Outils caméra");commands.setTextColor(Color.WHITE);
   commands.setPadding(dp(12),dp(10),dp(12),dp(10));commands.setBackground(bubble());
   FrameLayout.LayoutParams commandsLayout=new FrameLayout.LayoutParams(-2,-2,Gravity.LEFT|Gravity.BOTTOM);
-  commandsLayout.setMargins(dp(8),0,dp(8),dp(8));root.addView(commands,commandsLayout);commands.setVisibility(View.GONE);
+  commandsLayout.setMargins(dp(8),0,dp(8),dp(8));root.addView(commands,commandsLayout);
   commands.setOnClickListener(v->{
    if(controls!=null)controls.close();
    controls=new CameraControls(this,Uri.parse(baseUrl).getHost(),credential("username"),credential("password"),cameraIndex);controls.show();
   });
-  for(int i=0;i<2;i++)if((!mobileOnly||i==1)&&(!singleCamera||i==0)){retries[i]=0;restart(i,true);}
+  for(int i=0;i<2;i++)if(lensVisible(i)){retries[i]=0;restart(i,true);}
   if(getIntent().getBooleanExtra("autoControls",false)){getIntent().removeExtra("autoControls");commands.post(()->commands.performClick());}
  }
  private void restart(int lens,boolean reset){
   if(reset)retries[lens]=0;
-  frames[lens]=false;
+  frames[lens]=false;videoSizes[lens]="";
   if(players[lens]!=null){views[lens].setPlayer(null);players[lens].release();players[lens]=null;}
   try{
    DefaultRenderersFactory renderers=new DefaultRenderersFactory(this).setEnableDecoderFallback(true);
    ExoPlayer p=new ExoPlayer.Builder(this,renderers).build();players[lens]=p;
-   p.setVolume(lens==1&&mobileAudio?1f:0f);
+   p.setVolume(audioEnabled[lens]?1f:0f);
    views[lens].setPlayer(p);
    final int index=lens;
    p.addListener(new Player.Listener(){
+    @Override public void onVideoSizeChanged(androidx.media3.common.VideoSize size){
+     if(players[index]==p&&size.width>0&&size.height>0)videoSizes[index]=size.width+" × "+size.height;
+    }
     @Override public void onRenderedFirstFrame(){frames[index]=true;status.setText("Vidéo locale");}
     @Override public void onPlayerError(PlaybackException e){
      if(!frames[index]&&retries[index]<1){

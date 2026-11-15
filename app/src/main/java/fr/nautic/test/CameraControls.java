@@ -31,8 +31,9 @@ final class CameraControls {
  }
  void show(){
   ScrollView scroll=new ScrollView(activity);scroll.addView(content);
-  dialog=new AlertDialog.Builder(activity).setTitle("Objectif 2 — commandes et alertes").setView(scroll).setNegativeButton("Fermer",null).create();
+  dialog=new AlertDialog.Builder(activity).setTitle("Outils caméra").setView(scroll).setNegativeButton("Fermer",null).create();
   dialog.setOnDismissListener(d->close());dialog.show();
+  if(activity instanceof CameraActivity)((CameraActivity)activity).addPlaybackControls(content);
   task(()->{camera.discover();ui(()->profiles());},"Fonctions détectées");
  }
  private void ui(Runnable r){activity.runOnUiThread(()->{if(!closed&&!activity.isFinishing())r.run();});}
@@ -41,14 +42,19 @@ final class CameraControls {
   commands.execute(()->{try{work.run();ui(()->state.setText(success));}catch(Exception e){ui(()->state.setText(e.getMessage()==null?"Commande indisponible":e.getMessage()));}});
  }
  private TextView text(String message){TextView t=new TextView(activity);t.setText(message);t.setPadding(8,10,8,10);content.addView(t);return t;}
- private Button button(String label,Work work){Button b=new Button(activity);b.setText(label);content.addView(b);b.setOnClickListener(v->task(work,"Commande effectuée"));return b;}
  private void profiles(){
   if(camera.profiles.isEmpty()){text("Aucun profil vidéo ONVIF disponible.");return;}
-  text("Choisir le profil de l’objectif mobile si plusieurs profils sont proposés.");
+  text("Profil ONVIF de la caméra");
   Spinner selector=new Spinner(activity);List<String> names=new ArrayList<>();int choice=0;
   for(int i=0;i<camera.profiles.size();i++){
    Element p=camera.profiles.get(i);boolean ptz=!OnvifCamera.elements(p,"PTZConfiguration").isEmpty();
-   names.add(OnvifCamera.value(p,"Name")+" · "+p.getAttribute("token")+(ptz?" · motorisé":""));if(ptz)choice=i;
+   List<Element> encoders=OnvifCamera.elements(p,"VideoEncoderConfiguration");
+   String resolution="";
+   if(!encoders.isEmpty()){
+    String width=OnvifCamera.value(encoders.get(0),"Width"),height=OnvifCamera.value(encoders.get(0),"Height");
+    if(!width.isEmpty()&&!height.isEmpty())resolution=" · "+width+" × "+height;
+   }
+   names.add(OnvifCamera.value(p,"Name")+" · "+p.getAttribute("token")+resolution+(ptz?" · motorisé":""));if(ptz)choice=i;
   }
   selector.setAdapter(new ArrayAdapter<>(activity,android.R.layout.simple_spinner_dropdown_item,names));content.addView(selector);
   selector.setSelection(choice);
@@ -70,8 +76,6 @@ final class CameraControls {
   inventory.append("\nLes réglages propres à Tapo (IA, suivi automatique, sirène, confidentialité…) ne sont pas garantis par ONVIF.");
   Button report=new Button(activity);report.setText("Inventaire des fonctions et alertes");target.addView(report);
   report.setOnClickListener(v->new AlertDialog.Builder(activity).setTitle("Fonctions de cette caméra").setMessage(inventory.toString()).setPositiveButton("Fermer",null).show());
-  Button mute=new Button(activity);mute.setText("Son de l’objectif mobile : activer / couper");target.addView(mute);
-  mute.setOnClickListener(v->{if(activity instanceof CameraActivity)((CameraActivity)activity).toggleMobileAudio();});
   String imaging="http://www.onvif.org/ver20/imaging/wsdl";
   if(camera.services.containsKey(imaging)&&!OnvifCamera.elements(p,"VideoSourceConfiguration").isEmpty()){
    String source=OnvifCamera.value(OnvifCamera.elements(p,"VideoSourceConfiguration").get(0),"SourceToken");
@@ -194,26 +198,105 @@ final class CameraControls {
    new AlertDialog.Builder(activity).setTitle("Aller à une position").setItems(names,(d,i)->task(()->camera.ptz(p,"GotoPreset","<c:PresetToken>"+OnvifCamera.xml(presets.get(i).getAttribute("token"))+"</c:PresetToken>"),"Position rappelée")).setNegativeButton("Annuler",null).show();
   });
  }
+ private interface ImageField {String change();}
+ private void formLabel(LinearLayout form,String title){
+  TextView label=new TextView(activity);label.setText(title);label.setPadding(0,12,0,2);form.addView(label);
+ }
+ private static Element child(Element parent,String name){
+  if(parent==null)return null;
+  for(Node node=parent.getFirstChild();node!=null;node=node.getNextSibling()){
+   if(node instanceof Element&&name.equals(node.getLocalName()))return (Element)node;
+  }
+  return null;
+ }
+ private static String childValue(Element parent,String name){
+  Element item=child(parent,name);return item==null?"":item.getTextContent().trim();
+ }
+ private void numberField(LinearLayout form,List<ImageField> fields,Element options,Element current,String key,String label){
+  Element bounds=child(options,key);
+  if(bounds==null)return;
+  String initial=childValue(current,key);
+  if(initial.isEmpty())return;
+  final float min,max;
+  try{
+   min=Float.parseFloat(childValue(bounds,"Min"));max=Float.parseFloat(childValue(bounds,"Max"));
+   if(Float.isNaN(min)||Float.isInfinite(min)||Float.isNaN(max)||Float.isInfinite(max)||min>max)return;
+  }catch(NumberFormatException ignored){return;}
+  formLabel(form,label+" ("+min+" à "+max+")");
+  EditText value=new EditText(activity);
+  value.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+  value.setText(initial);form.addView(value);
+  fields.add(()->{
+   String entered=value.getText().toString().trim().replace(',','.');
+   if(entered.equals(initial))return "";
+   try{
+    float number=Float.parseFloat(entered);
+    if(Float.isNaN(number)||Float.isInfinite(number)||number<min||number>max)throw new NumberFormatException();
+    return "<tt:"+key+">"+number+"</tt:"+key+">";
+   }catch(NumberFormatException e){value.setError("Valeur hors plage");return null;}
+  });
+ }
+ private void modeField(LinearLayout form,List<ImageField> fields,Element options,Element current,
+                        String group,String key,String title,String[] values,String[] labels){
+  Element scope=group.isEmpty()?options:child(options,group);
+  if(scope==null)return;
+  Set<String> offered=new LinkedHashSet<>();
+  for(Node node=scope.getFirstChild();node!=null;node=node.getNextSibling()){
+   if(node instanceof Element&&key.equals(node.getLocalName()))offered.add(node.getTextContent().trim());
+  }
+  List<String> codes=new ArrayList<>(),names=new ArrayList<>();
+  codes.add("");names.add("Conserver le réglage actuel");
+  for(int i=0;i<values.length;i++)if(offered.contains(values[i])){codes.add(values[i]);names.add(labels[i]);}
+  if(codes.size()==1)return;
+  String initial=childValue(group.isEmpty()?current:child(current,group),key);
+  formLabel(form,title);
+  Spinner spinner=new Spinner(activity);
+  spinner.setAdapter(new ArrayAdapter<>(activity,android.R.layout.simple_spinner_dropdown_item,names));
+  form.addView(spinner);spinner.setSelection(Math.max(0,codes.indexOf(initial)));
+  fields.add(()->{
+   int i=spinner.getSelectedItemPosition();
+   if(i<=0||initial.equals(codes.get(i)))return "";
+   String setting="<tt:"+key+">"+codes.get(i)+"</tt:"+key+">";
+   return group.isEmpty()?setting:"<tt:"+group+">"+setting+"</tt:"+group+">";
+  });
+ }
  private void imageSettings(String ns,String token,Document current,Document options){
   LinearLayout form=new LinearLayout(activity);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(20,8,20,8);
-  Map<String,EditText> fields=new LinkedHashMap<>();Map<String,float[]> ranges=new LinkedHashMap<>();
-  String[] keys={"Brightness","Contrast","ColorSaturation","Sharpness"};String[] labels={"Luminosité","Contraste","Saturation","Netteté"};
-  for(int i=0;i<keys.length;i++)try{
-   String key=keys[i];List<Element> bounds=OnvifCamera.elements(options,key);if(bounds.isEmpty())continue;
-   float min=Float.parseFloat(OnvifCamera.value(bounds.get(0),"Min")),max=Float.parseFloat(OnvifCamera.value(bounds.get(0),"Max"));
-   ranges.put(key,new float[]{min,max});TextView label=new TextView(activity);label.setText(labels[i]+" ("+min+" à "+max+")");form.addView(label);
-   EditText field=new EditText(activity);field.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);field.setText(OnvifCamera.value(current,key));form.addView(field);fields.put(key,field);
-  }catch(Exception ignored){}
+  List<Element> optionList=OnvifCamera.elements(options,"ImagingOptions");
+  List<Element> currentList=OnvifCamera.elements(current,"ImagingSettings");
+  Element limits=optionList.isEmpty()?null:optionList.get(0), settings=currentList.isEmpty()?null:currentList.get(0);
+  List<ImageField> fields=new ArrayList<>();
+  String[] onOff={"ON","OFF"}, enabled={"Activé","Désactivé"};
+  String[] autoManual={"AUTO","MANUAL"}, automatic={"Automatique","Manuel"};
+  // Emit fields in the ONVIF ImagingSettings20 schema order.
+  modeField(form,fields,limits,settings,"BacklightCompensation","Mode","Compensation du contre-jour",onOff,enabled);
+  numberField(form,fields,limits,settings,"Brightness","Luminosité");
+  numberField(form,fields,limits,settings,"ColorSaturation","Saturation");
+  numberField(form,fields,limits,settings,"Contrast","Contraste");
+  modeField(form,fields,limits,settings,"Exposure","Mode","Exposition",autoManual,automatic);
+  modeField(form,fields,limits,settings,"Focus","AutoFocusMode","Mise au point",autoManual,automatic);
+  modeField(form,fields,limits,settings,"","IrCutFilter","Jour / nuit · filtre infrarouge",
+   new String[]{"AUTO","ON","OFF"},new String[]{"Automatique","Jour","Nuit"});
+  numberField(form,fields,limits,settings,"Sharpness","Netteté");
+  modeField(form,fields,limits,settings,"WideDynamicRange","Mode","Plage dynamique (WDR)",onOff,enabled);
+  modeField(form,fields,limits,settings,"WhiteBalance","Mode","Balance des blancs",autoManual,automatic);
   if(fields.isEmpty()){state.setText("Aucun réglage d’image modifiable annoncé");return;}
-  AlertDialog edit=new AlertDialog.Builder(activity).setTitle("Image — profil sélectionné").setView(form).setPositiveButton("Appliquer",null).setNegativeButton("Annuler",null).create();edit.show();
+  ScrollView scroll=new ScrollView(activity);scroll.addView(form);
+  AlertDialog edit=new AlertDialog.Builder(activity).setTitle("Image — profil sélectionné").setView(scroll).setPositiveButton("Appliquer",null).setNegativeButton("Annuler",null).create();edit.show();
   edit.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-   StringBuilder settings=new StringBuilder();
-   for(String key:fields.keySet())try{
-    float value=Float.parseFloat(fields.get(key).getText().toString().replace(',','.'));float[] range=ranges.get(key);
-    if(Float.isNaN(value)||Float.isInfinite(value)||value<range[0]||value>range[1])throw new IllegalArgumentException();
-    settings.append("<tt:").append(key).append(">").append(value).append("</tt:").append(key).append(">");
-   }catch(Exception e){fields.get(key).setError("Valeur hors de la plage autorisée");return;}
-   edit.dismiss();task(()->camera.call(camera.services.get(ns),ns,"SetImagingSettings",token+"<c:ImagingSettings>"+settings+"</c:ImagingSettings><c:ForcePersistence>true</c:ForcePersistence>"),"Image mise à jour");
+   StringBuilder changes=new StringBuilder();
+   for(ImageField field:fields){String change=field.change();if(change==null)return;changes.append(change);}
+   if(changes.length()==0){edit.dismiss();return;}
+   Button apply=edit.getButton(AlertDialog.BUTTON_POSITIVE);apply.setEnabled(false);
+   task(()->{
+    try{
+     camera.call(camera.services.get(ns),ns,"SetImagingSettings",token+"<c:ImagingSettings>"+changes+"</c:ImagingSettings><c:ForcePersistence>true</c:ForcePersistence>");
+     ui(edit::dismiss);
+    }catch(Exception e){
+     ui(()->{apply.setEnabled(true);new AlertDialog.Builder(activity).setMessage(e.getMessage()==null?"Réglage refusé par la caméra":e.getMessage()).setPositiveButton("Fermer",null).show();});
+     throw e;
+    }
+   },"Image mise à jour");
   });
  }
  void close(){if(closed)return;closed=true;listening=false;commands.shutdownNow();events.shutdownNow();if(dialog!=null&&dialog.isShowing())dialog.dismiss();}
