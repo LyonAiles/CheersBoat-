@@ -173,3 +173,11 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
  font-size:20px;
 }
 #mapCameraSwitch[hidden] {display:none}
+
+#app.hide-mapCameraOverlay #mapCameraSwitch {display:none!important}
+#app.hide-mapZoomIn :is(.leaflet-control-zoom-in,.maplibregl-ctrl-zoom-in),
+#app.hide-mapZoomOut :is(.leaflet-control-zoom-out,.maplibregl-ctrl-zoom-out) {display:none!important}
+#nauticDestination {position:absolute;z-index:740;left:8px;top:40px;font-size:11px;padding:5px 8px;background:#092f43e8}
+#nauticDestination[aria-pressed="true"] {background:#145b63}
+#nauticDestinationStatus {position:absolute;z-index:739;left:8px;top:70px;max-width:65%;padding:4px 7px;border-radius:5px;background:#092f43e8;font-size:11px;pointer-events:none}
+#mapWrap.nautic-select-destination :is(.leaflet-container,.maplibregl-canvas-container) {cursor:crosshair}

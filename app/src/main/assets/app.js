@@ -318,11 +318,12 @@ window.addEventListener('orientationchange',()=>setTimeout(()=>{if(map){layoutNa
  #speedCard .arc::before{border-color:#39d3ff;border-right-color:transparent;border-bottom:0;filter:drop-shadow(0 0 3px #26d6ff)}
  #speedCard .arcInner{font-size:13px;left:calc(50% - 5px);bottom:-6px;color:#f6dc76}
  #speedCard .speedScale{width:min(190px,94%);display:flex;justify-content:space-between;margin:3px auto 0;font-size:12px;font-weight:800;color:#c7eaf8}
+ #speedCard .speedScale span{white-space:nowrap;font-variant-numeric:tabular-nums;font-size:clamp(9px,1.2vw,12px)}
  #speedCard .speedUnit{font-size:10px;opacity:.75;margin-top:2px}
  #weatherCard{cursor:pointer}
  `;document.head.appendChild(style);
  const card=$('speedCard'),old=card.querySelector('small');if(old)old.remove();
- const scale=document.createElement('div');scale.className='speedScale';scale.innerHTML='<span>0</span><span>30</span>';card.appendChild(scale);
+ const scale=document.createElement('div');scale.className='speedScale';scale.innerHTML='<span id="tripCovered" title="Distance parcourue" aria-label="Distance parcourue : indisponible">—</span><span id="tripRemaining" title="Distance restante" aria-label="Distance restante : indisponible">—</span>';card.appendChild(scale);
  const unit=document.createElement('small');unit.className='speedUnit';unit.textContent='km/h';card.appendChild(unit);
  $('weatherCard').title='Ouvrir ou fermer les prévisions météo';
  const wind=$('windWidget');if(wind){wind.style.pointerEvents='auto';wind.title='Toucher pour actualiser le vent';wind.addEventListener('click',()=>{if(!windBusy)loadWeather()})}
