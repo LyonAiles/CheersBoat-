@@ -170,6 +170,12 @@ public class MainActivity extends Activity {
   }
   @JavascriptInterface public void openNotes(){runOnUiThread(()->{dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}notesPad.show();});}
   @JavascriptInterface public void mapInteraction(boolean active){runOnUiThread(()->{mapManipulating=active;if(dashboardCameras!=null)dashboardCameras.pauseForMap(active);});}
+  @JavascriptInterface public void checkNavigationNotices(){
+   new Thread(()->{
+    try{if(!isDestroyed())js("nauticNavigationNotices",NauticNotices.lookup());}
+    catch(Exception e){if(!isDestroyed())js("nauticNavigationNotices","");}
+   },"nautic-vnf-notices").start();
+  }
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
    if(mapManipulating||!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
   });}

@@ -64,7 +64,9 @@
  tripProgress.setAttribute('aria-label','Calcul du trajet fluvial en cours');
  wrap.append(destinationButton,tripProgress,destinationStatus);
  const tripKey='nautic-last-trip-v1', networkKey='nautic-trip-network-v1';
- const calc=window.NauticTrip;
+ const calc=window.NauticTrip, notices=window.NauticNotices;
+ const liveNotices={};
+ let noticePending=false,lastNoticeCheck=0,noticeDay=notices.dateInFrance();
  const validPoint=p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&Math.abs(p.lat)<=90&&Math.abs(p.lon)<=180;
  let routeState=restoreTrip(), selection=null, tripRequest=null, lastSave=0;
  const formatKm=new Intl.NumberFormat('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1});
@@ -112,15 +114,30 @@
   return null;
  }
  function sectionColor(closed){
-  return closed?'#ff4a42':'#42d67a';
+  return closed?'#ff4a42':'#a4b0bc';
  }
+ function applicableNotices(){
+  return notices.relevant(routeState?.trip,liveNotices,noticeDay);
+ }
+ function checkNavigationNotices(){
+  if(!native?.checkNavigationNotices||noticePending||Date.now()-lastNoticeCheck<20*60*1000||
+    !notices.mapped(routeState?.trip).length)return;
+  lastNoticeCheck=Date.now();noticePending=true;
+  native.checkNavigationNotices();
+ }
+ window.nauticNavigationNotices=raw=>{
+  noticePending=false;
+  if(!raw)return;
+  try{Object.assign(liveNotices,notices.verifyResponse(JSON.parse(raw).items));}catch(_){return;}
+  renderTrip();
+ };
  function tripData(){
   if(!routeState)return {type:'FeatureCollection',features:[]};
   const {trip,closures,end}=routeState;
   if(!trip)return {type:'FeatureCollection',features:[{type:'Feature',properties:{color:'#bdc5d2'},
    geometry:{type:'Point',coordinates:[end.lon,end.lat]}}]};
   const xy=p=>[p.lon,p.lat];
-  const segments=calc.sections(trip,closures);
+  const segments=calc.sections(trip,closures,notices.closedEdges(trip,applicableNotices()));
   const properties=closed=>({color:sectionColor(closed)});
   const features=segments.map(segment=>({type:'Feature',properties:properties(segment.closed),
    geometry:{type:'LineString',coordinates:segment.coordinates.map(xy)}}));
@@ -141,6 +158,7 @@
   vector?.getSource('nautic-trip')?.setData(data);
   renderTripCounters();
   showDestination(selection?selectionPrompt(selection.type):tripSummary());
+  checkNavigationNotices();
  }
  function renderTripCounters(){
   for(const [id,label,value] of [
@@ -160,7 +178,7 @@
   destinationStatus.textContent=message;
   destinationStatus.hidden=!message;
   tripProgress.hidden=!tripRequest;
-  destinationStatus.style.borderLeft=routeState?.trip?'3px solid '+sectionColor(routeState.closures.length>0||routeState.trip.restricted):'';
+  destinationStatus.style.borderLeft=routeState?.trip?'3px solid '+sectionColor(routeState.closures.length>0||routeState.trip.restricted||applicableNotices().some(notice=>notice.active)):'';
  }
  function tripSummary(){
   if(!routeState)return '';
@@ -174,10 +192,31 @@
    parts.push(dates.length===1?dates[0]:'Dates dans Destination');
   }
   if(trip.restricted)parts.push(trip.closedEdges?'Restriction OpenStreetMap':'Restriction à localiser');
+  const verified=applicableNotices();
+  if(verified.length){
+   const dates=[...new Set(verified.map(notice=>notice.active?'Fermeture VNF en cours':'Fermeture VNF dès le '+noticeDate(notice.start)))];
+   parts.push(...dates);
+  }
+  if(calc.sections(trip,closures,notices.closedEdges(trip,verified)).some(part=>!part.closed))parts.push('Gris · état inconnu');
   if(note)parts.push(note);
   if(trip.pk!=null)parts.push('Arrivée PK '+formatPk.format(trip.pk));
   parts.push(distance);
   return parts.join(' · ');
+ }
+ function noticeDate(value){
+  return formatDate.format(new Date(value+'T12:00:00'));
+ }
+ function showNavigationNotices(){
+  const entries=applicableNotices().map(notice=>'<p><strong>'+notice.title+'</strong><br>'+notice.reference+' · '+
+   (notice.active?'Fermeture en cours':'Fermeture annoncée')+' du '+noticeDate(notice.start)+' au '+
+   noticeDate(notice.end)+' inclus.<br>'+
+   (notice.tentative&&notice.tentative>notice.end?'Prolongation probable jusqu’au '+noticeDate(notice.tentative)+' · à confirmer.<br>':'')+
+   (notice.live?'Vérifié via EuRIS':'Avis embarqué')+'</p>').join('');
+  modal('Avis de navigation',
+   (entries||'<p>Aucun avis VNF associé aux tronçons de ce trajet.</p>')+
+   '<p>Gris · état inconnu. Rouge · fermeture ou restriction signalée.</p>'+
+   '<p><a href="https://avisbat.vnf.fr/">Consulter les avis officiels VNF</a></p>'+
+   '<small>API/Service Notices to Skippers incorporated from EuRIS (eurisportal.eu)</small>');
  }
  function closureDate(closure){
   const date=closure.date?new Date(closure.date+'T12:00:00'):null;
@@ -202,7 +241,7 @@
    '<button type="button" id="tripChange">Nouvelle destination</button> '+
    '<button type="button" id="tripChooseStart">Choisir le départ sur la carte</button> '+
    (!routeState.trip?'<button type="button" id="tripRetry">Relancer le calcul</button> ':
-    '<button type="button" id="tripClosure">Signaler un tronçon fermé</button> ')+
+    '<button type="button" id="tripNotices">Avis de navigation</button> <button type="button" id="tripClosure">Signaler un tronçon fermé</button> ')+
    routeState.closures.map((closure,i)=>'<button type="button" data-trip-closure="'+i+'">'+
     (closure.from?'Tronçon '+(i+1):'Parcours entier')+' · '+closureDate(closure)+'</button> ').join('')+
    '<button type="button" id="tripClear">Effacer le trajet</button>');
@@ -210,6 +249,7 @@
   $('tripChange').onclick=()=>{$('dialog').close();choose(stableFix?'end':'start');};
   $('tripChooseStart').onclick=()=>{$('dialog').close();choose('start');};
   if($('tripRetry'))$('tripRetry').onclick=()=>{$('dialog').close();calculateTrip(routeState.start,routeState.end,true);};
+  if($('tripNotices'))$('tripNotices').onclick=()=>{$('dialog').close();showNavigationNotices();};
   if($('tripClosure'))$('tripClosure').onclick=()=>{$('dialog').close();choose('closureStart');};
   $('dialog').querySelectorAll('[data-trip-closure]').forEach(button=>{
    button.onclick=()=>editClosure(routeState.closures[Number(button.dataset.tripClosure)],Number(button.dataset.tripClosure));
@@ -347,6 +387,11 @@
   showDestination(tripSummary());
  });
  window.addEventListener('nauticmapidle',()=>{sync();setTimeout(updateWorks,1200);});
+ window.nauticEvery(()=>{
+  const today=notices.dateInFrance();
+  if(today!==noticeDay){noticeDay=today;renderTrip();}
+  else checkNavigationNotices();
+ },60000,true);
  window.nauticEvery(sync,350,true);let routeCount=-1;window.nauticEvery(()=>{if(active&&vector&&points.length!==routeCount){routeCount=points.length;vector.getSource('nautic-route')?.setData(routeData());}updateWorks();},3000,true);
  new ResizeObserver(()=>{vector?.resize();sync();}).observe(wrap);
  function selectedSignature(){return W.categories.filter(([key])=>options.waterwayTypes?.[key]!==false).map(([key])=>key).join(',');}
@@ -402,7 +447,7 @@
  function showItem(id){const p=lastList.find(x=>x.id===id);if(!p)return;modal('Ouvrage fluvial',info(p)+'<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');}
  function showList(list=lastList){modal(selectedWorkPoint?'Ouvrages autour du point choisi':'Ouvrages autour du bateau', (options.waterwayTypes?.sondeurAlert === false ? '' : '<button type="button" id="waterwaySondeurAlerts">Points d’alerte du sondeur</button>')+`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));const alertsButton=$('waterwaySondeurAlerts');if(alertsButton)alertsButton.onclick=()=>{$('dialog').close();$('sondeurAlertList')?.click();};$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();
  try{cache=JSON.parse(localStorage.getItem('nautic-waterways-cache')||'null');if(cache&&Array.isArray(cache.elements))data=W.parse(cache.elements);else cache=null;}catch(_){cache=null;}
- if(routeState&&(!routeState.trip?.closedEdges||routeState.trip.restrictionVersion!==2)){
+ if(routeState&&(!routeState.trip?.closedEdges||routeState.trip.restrictionVersion!==3)){
   const updated=cachedRoute(routeState.start,routeState.end);
   if(updated){Object.assign(routeState,updated);saveTrip();renderTrip();}
  }

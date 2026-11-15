@@ -83,3 +83,23 @@ const blockedAfterBriare = sections(localRoute,[{from:p(47.639,2.745),to:localRo
 assert.deepEqual(blockedAfterBriare.map(section=>section.closed),[false,true]);
 assert(blockedAfterBriare[1].coordinates.length>500);
 console.log('PASS: actual connected Châtillon–Briare–Montargis canal geometry without network access');
+
+const notices = require('../../app/src/main/assets/nautic-notices.js');
+assert.equal(notices.dateInFrance(new Date('2026-11-15T23:01:00Z')), '2026-11-16');
+const upcoming = notices.relevant(localRoute,{},'2026-11-15');
+assert.equal(upcoming.length,2);
+assert.deepEqual(notices.closedEdges(localRoute,upcoming),[]);
+const active = notices.relevant(localRoute,{},'2026-11-16');
+const closed = notices.closedEdges(localRoute,active);
+assert.equal(active.length,2);
+assert(closed.length>0 && closed.length<localRoute.wayIds.length);
+const officialSections = sections(localRoute,[],closed);
+assert(officialSections.some(section=>section.closed));
+assert(officialSections.some(section=>!section.closed));
+assert.deepEqual(notices.relevant(localRoute,{},'2027-01-01'),[]);
+const published = {countryCode:'FR',number:'2026/8405/0',state:80,limitations:['OBSTRU'],dateStart:'2026-11-16',dateEnd:'2027-02-28'};
+const verified = notices.verifyResponse([published]);
+assert.equal(notices.relevant(localRoute,verified,'2027-01-01').length,1);
+assert.deepEqual(notices.verifyResponse([{...published,state:1}]),{});
+assert.deepEqual(notices.verifyResponse([{...published,limitations:[]}]),{});
+console.log('PASS: French dates, mapped VNF closures, unknown reaches, and confirmed extensions');

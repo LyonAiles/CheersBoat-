@@ -138,7 +138,7 @@
   if(!route)return null;
   const coordinates=route.legs.length?[route.legs[0].a,...route.legs.map(leg=>leg.b)].map(point):[point(route.end)];
   const closedEdges=route.legs.flatMap((leg,i)=>leg.edge.restricted?[i]:[]);
-  return {coordinates,total:route.total,pk:route.pk,estimated:route.estimated,restricted:closedEdges.length>0,closedEdges,restrictionVersion:2};
+  return {coordinates,total:route.total,pk:route.pk,estimated:route.estimated,restricted:closedEdges.length>0,closedEdges,wayIds:route.legs.map(leg=>leg.edge.wayId),restrictionVersion:3};
  }
 
  function geometry(coordinates) {
@@ -157,7 +157,7 @@
   return best;
  }
 
- function sections(trip, closures=[]) {
+ function sections(trip, closures=[], verifiedEdges=[]) {
   const {coordinates}=trip;
   const {offsets,total}=geometry(coordinates);
   const spans=[];
@@ -166,7 +166,7 @@
    const a=locate(coordinates,closure.from),b=locate(coordinates,closure.to);
    if(a&&b&&a.distance<=300&&b.distance<=300)spans.push([Math.min(a.offset,b.offset),Math.max(a.offset,b.offset)]);
   }
-  const known=new Set(trip.closedEdges||[]);
+  const known=new Set([...(trip.closedEdges||[]),...verifiedEdges]);
   const cuts=spans.flat().sort((a,b)=>a-b);
   let cursor=0;
   const result=[];
