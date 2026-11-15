@@ -464,7 +464,7 @@ function settingsDialog(){
  <h3>Analyse du réseau local</h3><button type="button" id="settingPlugsButton">🔌 Prises</button><button type="button" id="settingDiscoverDevices">🔎 Analyser le réseau Wi-Fi</button><div id="settingNetworkReport">${networkAddressReport()}</div><div id="settingDiscoverResults" class="muted">Aucune adresse ne sera remplacée sans validation.</div><h3>Prises intelligentes — libellés et adresses</h3>
  ${state.smartPlugs.map((p,i)=>`<section class="emPanel"><h3>Prise ${i+1}</h3>${field('Libellé','settingPlug'+i+'Label',p.label)}${field('Adresse IP locale','settingPlug'+i+'Ip',p.ip)}</section>`).join('')}
  <p class="muted">Ces paramètres préparent la connexion locale Tuya. Les interrupteurs ne seront activés qu'après validation du protocole de commande.</p>
- <h3>Caméras — réglages indépendants</h3><label class="settingRow"><input type="checkbox" id="settingCameraSimulation42" ${state.cameraSimulation42===false?'':'checked'}><span>Simulation : afficher la caméra 42 dans les emplacements 41 et 43</span></label>
+ <h3>Caméras — réglages indépendants</h3><label class="settingRow"><input type="checkbox" id="settingCameraSimulation42" ${state.cameraSimulation42===false?'':'checked'}><span>Simulation : utiliser la caméra 42 si la 41 ou la 43 est sans adresse</span></label>
  <p class="muted">Appui de plus d’une seconde pour zoomer sur un point, puis simple toucher pour revenir. Double-touche une vidéo pour la relancer. Pince pour zoomer, puis glisse pour déplacer l’image. En paysage, touche le médaillon pour inverser les vues.</p>
  ${[1,2,3].map(i=>`<section class="emPanel"><h3>Caméra ${i}</h3>
  ${field('Nom du panneau','settingCam'+i+'Name',state['camera'+i].name)}

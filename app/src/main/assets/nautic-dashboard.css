@@ -198,5 +198,9 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
 dialog .settingRow {position:relative}
 dialog .settingRow > .nautic-field-number {position:absolute;top:2px;left:2px}
 
-#cam1Body,#cam2Body {touch-action:none}
 .map-camera-view img,#app .camCard .camBody img {object-position:var(--camera-position,50% 50%)}
+
+#app #weatherCard {justify-content:center;align-items:center;text-align:center;gap:3px}
+#app #weatherCard :is(#weatherTime,.gaugeTop) {position:static;margin:0;line-height:1.1}
+#weatherGustLine {width:86%;height:clamp(12px,3dvh,30px);min-height:10px;flex:0 1 auto}
+#weatherGustLine path {fill:none;stroke:#ffd479;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

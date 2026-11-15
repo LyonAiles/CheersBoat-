@@ -43,8 +43,6 @@ header{gap:clamp(4px,1vw,12px)!important}#nauticExitButton{padding:7px 9px;font-
 #speedValue{font-size:clamp(25px,3.6vw,48px)!important;font-weight:800;line-height:1.12;letter-spacing:.3px;margin:auto 0 5px}
 #speedCard .arc{margin:3px auto 6px}
 #speedCard small{font-size:clamp(10px,1.2vw,14px);line-height:1.3}
-#windRefreshTrack{height:6px;border-radius:6px;background:#10344a;margin:8px 8px 0;overflow:hidden;border:1px solid #38768d}
-#windRefreshBar{width:0%;height:100%;background:#54d6df;transition:width 1s linear}
 #weatherCard{display:flex;flex-direction:column;align-items:center;justify-content:space-around}
 #weatherTime{font-size:clamp(10px,1vw,13px);text-align:center}
 .card h3,.camCard h3{overflow-wrap:anywhere}
@@ -98,7 +96,6 @@ header #connection{font-size:clamp(9px,.9vw,12px)}
 #speedCard .speedUnit{font-size:9px;margin:0}
 .gauges{min-height:0}
 .gauges>.gauge{min-height:0;overflow:hidden}
-#weatherCard .weatherSymbol{font-size:clamp(15px,2vw,25px)}
 #weatherTime{font-size:clamp(9px,.8vw,11px)}
 #windWidget{padding:4px 7px}
 #windWidget strong{font-size:clamp(13px,1.3vw,18px)}
@@ -133,7 +130,6 @@ header #connection{font-size:clamp(9px,.9vw,12px)}
  .right .camBody small{display:none}
  #speedCard .arc{width:min(95px,72%)}
  #speedCard .gaugeTop{font-size:clamp(23px,6vw,34px)!important}
- #weatherCard .weatherSymbol{display:none}
  #weatherTime{font-size:9px}
  #mapGps{font-size:9px}
  #windWidget{max-width:45%;padding:3px 5px}
@@ -150,7 +146,6 @@ header #connection{font-size:clamp(9px,.9vw,12px)}
  #speedCard .arc{width:min(84px,68%)}
  #speedCard .gaugeTop{font-size:25px!important}
  #speedCard .speedUnit{display:none}
- #weatherCard .weatherSymbol{display:none}
 }
 
 /* Ajustement fluide : aucun instrument ne doit sortir de son panneau. */
@@ -172,8 +167,6 @@ html,body,#app{width:100%;height:100%;max-width:100%;overflow:hidden}
 #app #speedCard .arcInner{bottom:0}
 #app .compassFace{flex:0 1 auto;max-height:75%;aspect-ratio:1/1}
 #app #weatherCard .gaugeTop{margin:0;font-size:clamp(13px,1.5vw,22px)}
-#app #weatherCard .weatherSymbol{line-height:1}
-#app #weatherCard #windRefreshTrack{width:90%;flex:0 0 auto;margin:3px 0 0}
 #app header>*{min-width:0}
 #nauticTapoButton{padding:clamp(4px,.6vw,8px);font-size:clamp(10px,1vw,14px);white-space:nowrap}
 dialog.nautic-full{width:100vw!important;height:100dvh!important;max-width:100vw!important;max-height:100dvh!important;overflow:hidden;padding:clamp(5px,1vw,14px)!important}

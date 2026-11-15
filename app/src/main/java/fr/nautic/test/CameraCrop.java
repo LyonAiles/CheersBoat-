@@ -33,7 +33,7 @@ final class CameraCrop {
 
  static String key(int camera) { return "nautic-camera-crop-" + camera; }
 
- static boolean supported(int camera) { return camera == 1 || camera == 2; }
+ static boolean supported(int camera) { return camera >= 1 && camera <= 3; }
 
  float translateX(float overflow) { return x * Math.max(0, overflow) / 2; }
  float translateY(float overflow) { return y * Math.max(0, overflow) / 2; }

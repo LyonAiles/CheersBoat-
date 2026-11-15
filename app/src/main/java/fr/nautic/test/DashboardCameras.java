@@ -15,7 +15,7 @@ import java.util.*;
 final class DashboardCameras {
  final MainActivity activity;final FrameLayout layer;
  final SharedPreferences settings;
- final CameraCrop[] crops={CameraCrop.CENTER,CameraCrop.CENTER,CameraCrop.CENTER};
+ final CameraCrop[] crops={CameraCrop.CENTER,CameraCrop.CENTER,CameraCrop.CENTER,CameraCrop.CENTER};
  int draggingCamera;
  final Map<String,Tile> tiles=new LinkedHashMap<>();
  final Map<String,Source> sources=new LinkedHashMap<>();
@@ -40,7 +40,6 @@ final class DashboardCameras {
   final String id;final FrameLayout frame;final ImageView mirror;final TextView message,banner,footer,beacon;
   boolean alarm=false,active=false;
   int displayedCamera=0,displayedLens=0,cropCamera=0;
-  boolean longClicked;
   Bitmap snapshot;
   Source source;
   TextView refresh;
@@ -62,6 +61,7 @@ final class DashboardCameras {
      frame.setOutlineProvider(new ViewOutlineProvider(){
       @Override public void getOutline(View view,Outline outline){outline.setOval(0,0,view.getWidth(),view.getHeight());}
      });
+     installCropGesture();
     }else installTransparencyGesture();
     banner.setTextSize(10);
     banner.setBackgroundColor(0xd9ffe24b);
@@ -73,8 +73,7 @@ final class DashboardCameras {
     return;
    }
    refresh=overlay(20);refresh.setText("↻");refresh.setContentDescription("Rafraîchir cette caméra");frame.addView(refresh,new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.TOP|Gravity.RIGHT));refresh.setOnClickListener(v->{refreshTile(id);activity.refreshDashboardVideos();});
-   frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{longClicked=true;activity.dashboardClick(id,true);return true;});layer.addView(frame);
-   if(id.equals("cam1Body")||id.equals("cam2Body"))installCropGesture(id.charAt(3)-'0');
+   frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{activity.dashboardClick(id,true);return true;});layer.addView(frame);
   }
   void setSnapshot(Bitmap bitmap){
    snapshot=bitmap;
@@ -101,19 +100,22 @@ final class DashboardCameras {
     mirror.setImageMatrix(matrix);
    }
   }
-  void installCropGesture(int camera){
+  void installCropGesture(){
    frame.setOnTouchListener(new View.OnTouchListener(){
     float startX,startY;
+    int camera;
     CameraCrop initial;
     boolean dragging;
     @Override public boolean onTouch(View view,MotionEvent event){
      switch(event.getActionMasked()){
       case MotionEvent.ACTION_DOWN:
+       camera=cropCamera;
+       if(!CameraCrop.supported(camera))return false;
        initial=crops[camera];startX=event.getRawX();startY=event.getRawY();
-       dragging=false;longClicked=false;
+       dragging=false;
        return false;
       case MotionEvent.ACTION_MOVE:
-       if(initial==null||longClicked)return false;
+       if(initial==null)return false;
        float dx=event.getRawX()-startX,dy=event.getRawY()-startY;
        if(!dragging){
         if(Math.hypot(dx,dy)<=ViewConfiguration.get(activity).getScaledTouchSlop())return false;
@@ -126,7 +128,7 @@ final class DashboardCameras {
        return true;
       case MotionEvent.ACTION_UP:
       case MotionEvent.ACTION_CANCEL:
-       if(!dragging)return false;
+       if(!dragging){initial=null;return false;}
        if(event.getActionMasked()==MotionEvent.ACTION_UP){
         settings.edit().putString(CameraCrop.key(camera),crops[camera].encode()).apply();
         activity.refreshDashboardVideos();
@@ -244,7 +246,7 @@ final class DashboardCameras {
  DashboardCameras(MainActivity activity,FrameLayout layer){
   this.activity=activity;this.layer=layer;
   settings=activity.getSharedPreferences("nautic_settings",MainActivity.MODE_PRIVATE);
-  for(int camera=1;camera<=2;camera++)crops[camera]=CameraCrop.read(settings.getString(CameraCrop.key(camera),""));
+  for(int camera=1;camera<=3;camera++)crops[camera]=CameraCrop.read(settings.getString(CameraCrop.key(camera),""));
  }
  void applyCameraCrop(int camera,CameraCrop crop){
   crops[camera]=crop;
@@ -254,7 +256,7 @@ final class DashboardCameras {
   if(stopped||mapPaused)return;
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
-   for(int camera=1;camera<=2;camera++)if(camera!=draggingCamera){
+   for(int camera=1;camera<=3;camera++)if(camera!=draggingCamera){
     applyCameraCrop(camera,CameraCrop.read(settings.getString(CameraCrop.key(camera),"")));
    }
    if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
@@ -271,7 +273,7 @@ final class DashboardCameras {
     int index=inMap?item.optInt("camera",2):mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
     tile.cropCamera=inMap?index:mobile?0:id.charAt(3)-'0';
     tile.applyCrop();
-    int lens=inMap&&index==2?item.optInt("lens",2):0;
+    int lens=inMap?item.optInt("lens",index==2?2:0):0;
     if(inMap){
      if(index<1||index>3)continue;
      if(tile.displayedCamera!=index||tile.displayedLens!=lens){
@@ -280,7 +282,7 @@ final class DashboardCameras {
      String number=item.optString("number","");
      tile.banner.setText(number.isEmpty()?"":number+" · "+(40+index));
      tile.banner.setVisibility(number.isEmpty()?View.GONE:View.VISIBLE);
-     String action=id.equals("mapCameraPreview")?(index==2?" · changer d’objectif":""):" · échanger avec la vue centrale";
+     String action=id.equals("mapCameraPreview")?"":" · toucher pour échanger, glisser pour recadrer";
      tile.frame.setContentDescription("Caméra "+(40+index)+action);
     }
     String url=TrematageAccess.address(activity,index);

@@ -21,6 +21,7 @@ public class CameraCropTest {
   assertSame(CameraCrop.CENTER,CameraCrop.read("invalid"));
   assertTrue(CameraCrop.supported(1));
   assertTrue(CameraCrop.supported(2));
-  assertFalse(CameraCrop.supported(3));
+  assertTrue(CameraCrop.supported(3));
+  assertFalse(CameraCrop.supported(4));
  }
 }

@@ -220,7 +220,7 @@ async function loadWeather(){
   $('windSpeed').textContent=Math.round(weather.wind_speed_10m)+' km/h';
   $('windDirection').textContent=Math.round(weather.wind_direction_10m)+'°';
   $('weatherLabel').textContent=weatherIcon(weather.weather_code)+' '+Math.round(weather.temperature_2m)+'°C';
-  const symbol=$('weatherCard').querySelector('.weatherSymbol');if(symbol)symbol.textContent=weatherIcon(weather.weather_code);
+  renderWeatherGustLine();
   const angle=(weather.wind_direction_10m+180-(heading??0))%360;$('windArrow').style.transform=`rotate(${angle}deg)`;
   updateWindCountdown();
  }catch(e){$('weatherTime').textContent='Météo indisponible · toucher pour réessayer';const box=$('localWeatherForecast');if(box&&!weatherForecast)box.textContent='Météo indisponible. Vérifie la connexion, puis rouvre le panneau.'}
@@ -231,8 +231,24 @@ function updateWindCountdown(){
  const remain=Math.max(0,WIND_PERIOD-(Date.now()-weatherAt)),mins=Math.floor(remain/60000),secs=Math.floor(remain%60000/1000);
  const v=Math.round(weather?.wind_speed_10m??0),g=weather?.wind_gusts_10m;
  el.textContent='Vent '+v+' · Raf. '+(Number.isFinite(g)?Math.round(g):'—')+' km/h · '+String(mins).padStart(2,'0')+':'+String(secs).padStart(2,'0');
- const bar=$('windRefreshBar');if(bar)bar.style.width=(100-remain/WIND_PERIOD*100).toFixed(1)+'%';
 }
+function weatherRows(forecast,now=Date.now()/1000){
+ return forecast.time.map((t,i)=>({t,v:forecast.wind_speed_10m[i],g:forecast.wind_gusts_10m[i],rain:forecast.precipitation[i]}))
+  .filter(row=>row.t>=now).slice(0,10);
+}
+function forecastLine(rows,key,x,y){
+ return rows.map((row,i)=>Number.isFinite(row[key])
+  ?(Number.isFinite(rows[i-1]?.[key])?'L':'M')+x(i)+','+y(row[key]):'').join(' ');
+}
+function renderWeatherGustLine(){
+ const chart=$('weatherGustLine');
+ const rows=weatherRows(weatherForecast);
+ const gusts=rows.map(row=>row.g).filter(Number.isFinite);
+ const maximum=Math.max(10,...gusts);
+ chart.querySelector('path').setAttribute('d',forecastLine(rows,'g',i=>2+i*96/Math.max(1,rows.length-1),v=>26-v*24/maximum));
+ chart.setAttribute('aria-hidden',String(gusts.length<2));
+}
+
 window.nauticEvery(()=>{if(latest)loadWeather()},WIND_PERIOD);
 window.nauticEvery(updateWindCountdown,1000);
 function updateLog(){$('distance').textContent=(travel/1000).toFixed(2)+' km';$('routeDistance').textContent=(travel/1000).toFixed(2)+' km';$('recordState').textContent=recording?'Enregistrement actif':'En pause';$('recordDot').classList.toggle('live',recording);if(recording){let s=Math.floor((Date.now()-started)/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;$('elapsed').textContent=[h,m,ss].map(x=>String(x).padStart(2,'0')).join(':')}}window.nauticEvery(updateLog,1000);updateLog();
@@ -275,13 +291,12 @@ function renderWeatherForecast(){
  const box=$('localWeatherForecast');if(!box||!$('nauticWeatherPopup')?.open)return;
  if(!latest){box.textContent='Position GPS nécessaire pour la météo locale.';return}
  if(!weatherForecast||!weather){box.textContent='Météo indisponible. Vérifie la connexion, puis rouvre le panneau.';return}
- const h=weatherForecast,now=Date.now()/1000;
- const rows=h.time.map((t,i)=>({t,v:h.wind_speed_10m[i],g:h.wind_gusts_10m[i],rain:h.precipitation[i]})).filter(p=>p.t>=now).slice(0,10);
+ const rows=weatherRows(weatherForecast);
  const valid=rows.filter(p=>Number.isFinite(p.v)&&Number.isFinite(p.g));
  if(!valid.length){box.textContent='Prévisions de vent indisponibles.';return}
  const max=Math.max(10,Math.ceil(Math.max(...valid.map(p=>Math.max(p.v,p.g)))/10)*10);
  const x=i=>48+i*58,y=v=>205-v/max*170;
- const line=key=>rows.map((p,i)=>Number.isFinite(p[key])?`${i===0||!Number.isFinite(rows[i-1][key])?'M':'L'}${x(i)},${y(p[key])}`:'').join(' ');
+ const line=key=>forecastLine(rows,key,x,y);
  const time=t=>new Date(t*1000).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
  const condition=code=>code===0?'Ciel dégagé':code<=2?'Éclaircies':code===3?'Ciel couvert':code<=48?'Brouillard':code<=67?'Pluie':code<=77?'Neige':code<=82?'Averses':code<=86?'Averses de neige':'Orages';
  const rain=rows.every(p=>Number.isFinite(p.rain))?rows.reduce((n,p)=>n+p.rain,0):null;
