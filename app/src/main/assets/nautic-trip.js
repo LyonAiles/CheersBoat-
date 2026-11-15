@@ -138,7 +138,7 @@
   if(!route)return null;
   const coordinates=route.legs.length?[route.legs[0].a,...route.legs.map(leg=>leg.b)].map(point):[point(route.end)];
   const closedEdges=route.legs.flatMap((leg,i)=>leg.edge.restricted?[i]:[]);
-  return {coordinates,total:route.total,pk:route.pk,estimated:route.estimated,restricted:closedEdges.length>0,closedEdges};
+  return {coordinates,total:route.total,pk:route.pk,estimated:route.estimated,restricted:closedEdges.length>0,closedEdges,restrictionVersion:2};
  }
 
  function geometry(coordinates) {
@@ -196,14 +196,8 @@
   return result;
  }
 
- function approximate(start, end, via = []) {
-  const coordinates = [start,...via,end].map(point);
-  const total = coordinates.reduce((sum,p,i)=>i ? sum+W.distance(coordinates[i-1],p)/1000 : sum,0);
-  return {coordinates,total,pk:null,estimated:true,restricted:false,approximate:true};
- }
-
  const remaining = (totalKm, coveredMetres) => Math.max(0, totalKm - coveredMetres / 1000);
- const api = {create, fromNetwork, locate, sections, approximate, remaining};
+ const api = {create, fromNetwork, locate, sections, remaining};
  if (typeof module !== 'undefined') module.exports = api;
  else root.NauticTrip = api;
 })(typeof window !== 'undefined' ? window : globalThis);

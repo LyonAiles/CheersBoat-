@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const {create, remaining, fromNetwork, approximate, locate, sections} = require('../../app/src/main/assets/nautic-trip.js');
+const {create, remaining, fromNetwork, locate, sections} = require('../../app/src/main/assets/nautic-trip.js');
 
 const p = (lat, lon = 0) => ({lat, lon});
 const way = (id, nodes, geometry, name = 'Canal') => ({
@@ -51,13 +51,6 @@ const restricted = fromNetwork([water[0],denied],p(0),p(.018,.004));
 assert.equal(restricted.restricted,true);
 assert(restricted.coordinates.length>2);
 assert.equal(fromNetwork(water,p(0),p(.018,.004)).restricted,false);
-const direct = approximate(p(0),p(.018,.004));
-const indicative = approximate(p(0),p(.018,.004),[p(.009)]);
-assert.equal(direct.approximate,true);
-assert(indicative.total>direct.total);
-assert.equal(indicative.coordinates.length,3);
-console.log('PASS: restricted paths remain traceable and offline waypoints refine the distance');
-
 assert.deepEqual(restricted.closedEdges,[1,2]);
 const drawn = sections(restricted);
 assert.deepEqual(drawn.map(part=>part.closed),[false,true]);

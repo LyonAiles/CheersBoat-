@@ -5,11 +5,15 @@
  function project(p,a,b){const k=Math.cos(rad(p.lat)),x=(b.lon-a.lon)*k,y=b.lat-a.lat,t=Math.max(0,Math.min(1,((p.lon-a.lon)*k*x+(p.lat-a.lat)*y)/(x*x+y*y||1)));const q={lat:a.lat+t*y,lon:a.lon+t*(b.lon-a.lon)};return {...q,t,d:distance(p,q)};}
  const categories=[['lock','Écluses'],['port','Ports et marinas'],['halt','Haltes et amarrages'],['bridge','Ponts'],['dam','Barrages'],['weir','Seuils'],['tunnel','Tunnels'],['slipway','Cales de mise à l’eau']];
  const categoryOf=type=>({'Écluse':'lock','Port':'port','Halte':'halt','Pont':'bridge','Barrage':'dam','Seuil':'weir','Tunnel':'tunnel','Cale':'slipway'})[type];
+ function restrictedAccess(tags){
+  const access=tags.motorboat??tags.boat??tags.access;
+  return access==='no'||access==='private'||tags.opening_hours?.trim().toLowerCase()==='off';
+ }
  function parse(elements){
   const unique=new Map();for(const e of elements){const key=e.type+'/'+e.id,old=unique.get(key);if(!old||e.geometry||!old.geometry)unique.set(key,e);}elements=[...unique.values()];
   const edges=[],nodes=new Map(),items=[];
   const point=g=>({lat:g.lat,lon:g.lon});
-  for(const e of elements){const t=e.tags||{};if(e.type==='way'&&/^(canal|river|fairway)$/.test(t.waterway||'')&&e.geometry){for(let i=1;i<e.geometry.length;i++){const a=point(e.geometry[i-1]),b=point(e.geometry[i]),from=String(e.nodes?.[i-1]??`${a.lat},${a.lon}`),to=String(e.nodes?.[i]??`${b.lat},${b.lon}`);nodes.set(from,a);nodes.set(to,b);edges.push({from,to,a,b,length:distance(a,b),waterway:t.name||"way/"+e.id,restricted:t.boat==='no'||t.motorboat==='no'});}}
+  for(const e of elements){const t=e.tags||{};if(e.type==='way'&&/^(canal|river|fairway)$/.test(t.waterway||'')&&e.geometry){for(let i=1;i<e.geometry.length;i++){const a=point(e.geometry[i-1]),b=point(e.geometry[i]),from=String(e.nodes?.[i-1]??`${a.lat},${a.lon}`),to=String(e.nodes?.[i]??`${b.lat},${b.lon}`);nodes.set(from,a);nodes.set(to,b);edges.push({from,to,a,b,length:distance(a,b),waterway:t.name||"way/"+e.id,restricted:restrictedAccess(t)});}}
   }
   for(const e of elements){const t=e.tags||{};let type=t.waterway==='lock_gate'||t.lock==='yes'?'Écluse':t.waterway==='dam'?'Barrage':t.waterway==='weir'?'Seuil':t.bridge&&t.bridge!=='no'?'Pont':t.tunnel&&t.tunnel!=='no'&&t.waterway?'Tunnel':t.leisure==='marina'||t.harbour==='yes'||t.harbour==='marina'||t.industrial==='port'||t['seamark:type']==='harbour'?'Port':t.mooring&& !['no','private'].includes(t.mooring)?'Halte':t.leisure==='slipway'?'Cale':null;if(!type)continue;
    const g=e.geometry||[],p=e.lat!==undefined?point(e):e.center?point(e.center):g.length?point(g[Math.floor(g.length/2)]):null;if(!p)continue;

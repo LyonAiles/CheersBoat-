@@ -158,18 +158,12 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
  font-size:clamp(19px,min(4vw,4dvh),30px)!important;
 }
 
-#mapCameraTools {
- position:absolute;z-index:852;left:4px;right:4px;bottom:4px;
- display:flex;justify-content:center;gap:3px;pointer-events:none;
+#mapCameraQuality {
+ position:absolute;z-index:852;left:8px;bottom:8px;min-width:44px;min-height:44px;
+ padding:3px 7px;font-size:14px;background:#092f43ec;color:#fff;
 }
-#mapCameraTools[hidden],#mapCameraTools button[hidden],#app.hide-mapCameraOverlay #mapCameraTools {display:none!important}
-#mapCameraTools button {
- flex:0 1 auto;min-width:0;min-height:40px;padding:5px clamp(4px,1vw,10px);
- font-size:clamp(10px,1.5vw,14px);background:#092f43ec;pointer-events:auto;
-}
-#mapCameraTools #mapCameraSwitch {min-width:36px;font-size:19px}
-#mapCameraTools #mapCameraQuality[aria-pressed="true"] {background:#1b6257}
-#mapCameraOverlay:not([hidden]) {bottom:49px}
+#mapCameraQuality[hidden],#app.hide-mapCameraOverlay #mapCameraQuality {display:none!important}
+#mapCameraQuality[aria-pressed="true"] {background:#1b6257}
 
 #app.hide-mapZoomIn :is(.leaflet-control-zoom-in,.maplibregl-ctrl-zoom-in),
 #app.hide-mapZoomOut :is(.leaflet-control-zoom-out,.maplibregl-ctrl-zoom-out) {display:none!important}
@@ -203,3 +197,15 @@ dialog .settingRow > .nautic-field-number {position:absolute;top:2px;left:2px}
 #app .camera-still {position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:var(--camera-position,50% 50%);pointer-events:none}
 
 #mapFallback {inset:auto auto 8px 8px;max-width:68%;padding:4px 7px;border-radius:5px;font-size:11px;pointer-events:none;background:#092f43e8}
+
+/* Dashboard and modal labels are display text. Form values remain editable. */
+html,body,body * {-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none}
+input:is([type=text],[type=number],[type=password],[type=tel],[type=url],[type=email],[type=search]):not([readonly]),
+input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true] {
+ -webkit-user-select:text!important;user-select:text!important;-webkit-touch-callout:default;
+}
+#nauticTripProgress {position:absolute;z-index:740;left:8px;top:69px;width:min(160px,55%);height:5px;accent-color:#54d6df}
+#nauticTripProgress[hidden] {display:none}
+#nauticTripProgress:not([hidden]) + #nauticDestinationStatus {top:81px}
+
+#nauticDestinationStatus {pointer-events:auto;cursor:pointer}
