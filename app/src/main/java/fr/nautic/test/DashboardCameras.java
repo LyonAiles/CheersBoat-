@@ -35,6 +35,8 @@ final class DashboardCameras {
  class Tile{
   final String id;final FrameLayout frame;final ImageView mirror;final TextView message,banner,footer,beacon;
   boolean alarm=false,active=false;
+  int displayedCamera=0,displayedLens=0;
+  TextView refresh;
   final CameraGarland garland=new CameraGarland(activity.getResources().getDisplayMetrics().density);
   int dp(float n){return (int)(n*activity.getResources().getDisplayMetrics().density+.5f);}
   TextView overlay(int size){TextView t=new TextView(activity);t.setTextColor(Color.WHITE);t.setTextSize(size);t.setGravity(Gravity.CENTER);t.setPadding(dp(4),dp(3),dp(4),dp(3));t.setBackgroundColor(0xb3075e9f);return t;}
@@ -51,13 +53,16 @@ final class DashboardCameras {
       @Override public void getOutline(View view,Outline outline){outline.setOval(0,0,view.getWidth(),view.getHeight());}
      });
     }else installTransparencyGesture();
+    banner.setTextSize(10);
+    banner.setBackgroundColor(0xd9ffe24b);
+    banner.setTextColor(Color.BLACK);
+    banner.setLayoutParams(new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.CENTER_HORIZONTAL));
     banner.setVisibility(View.GONE);
-    frame.setContentDescription("Changer la caméra affichée sur la carte");
     frame.setOnClickListener(v->activity.dashboardClick(id,false));
     layer.addView(frame);
     return;
    }
-   TextView refresh=overlay(20);refresh.setText("↻");refresh.setContentDescription("Rafraîchir cette caméra");frame.addView(refresh,new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.TOP|Gravity.RIGHT));refresh.setOnClickListener(v->{refreshTile(id);activity.refreshDashboardVideos();});
+   refresh=overlay(20);refresh.setText("↻");refresh.setContentDescription("Rafraîchir cette caméra");frame.addView(refresh,new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.TOP|Gravity.RIGHT));refresh.setOnClickListener(v->{refreshTile(id);activity.refreshDashboardVideos();});
    frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{activity.dashboardClick(id,true);return true;});layer.addView(frame);
   }
   void installTransparencyGesture(){
@@ -97,7 +102,12 @@ final class DashboardCameras {
   }
   void decorate(JSONObject data){
    active=data.optBoolean("active",false);
-   banner.setText((data.optString("number","").isEmpty()?"":data.optString("number")+" · ")+data.optString("label","📷"));footer.setText(data.optString("status",""));footer.setVisibility(footer.length()==0?View.GONE:View.VISIBLE);
+   String number=data.optString("number","");
+   int refreshNumber=100+data.optInt("number",0);
+   refresh.setText(number.isEmpty()?"↻":"↻"+refreshNumber);
+   refresh.setTextSize(number.isEmpty()?20:9);
+   refresh.setContentDescription("Rafraîchir cette caméra"+(number.isEmpty()?"":" · "+refreshNumber));
+   banner.setText((number.isEmpty()?"":number+" · ")+data.optString("label","📷"));footer.setText(data.optString("status",""));footer.setVisibility(footer.length()==0?View.GONE:View.VISIBLE);
    boolean next=data.optBoolean("alarm",false);
    if(next!=alarm){alarm=next;beacon.clearAnimation();beacon.setVisibility(alarm?View.VISIBLE:View.GONE);
     if(alarm){android.view.animation.AlphaAnimation blink=new android.view.animation.AlphaAnimation(1f,.12f);blink.setDuration(500);blink.setRepeatMode(android.view.animation.Animation.REVERSE);blink.setRepeatCount(android.view.animation.Animation.INFINITE);beacon.startAnimation(blink);}
@@ -144,8 +154,8 @@ final class DashboardCameras {
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
    if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
-   int mapCameraIndex=data.optInt("mapCameraIndex",2)==1?1:2;
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();
+   Set<Tile> changedFeeds=new HashSet<>();
    for(int i=0;i<list.length();i++){
     JSONObject item=list.getJSONObject(i);String id=item.getString("id");if(!id.matches("cam[123]Body|trematagePreview|mapCameraPreview|mapCameraPort|mapCameraStarboard"))continue;
     visible.add(id);Tile tile=tiles.get(id);if(tile==null){tile=new Tile(id);tiles.put(id,tile);}
@@ -154,8 +164,19 @@ final class DashboardCameras {
     if(inMap){tile.frame.setAlpha(mapAlpha);tile.frame.bringToFront();}
     if(!inMap)tile.decorate(item);
     boolean mobile=id.equals("trematagePreview");
-    // The map alternates the two lenses of the same camera, using its saved credentials.
-    int index=inMap?2:mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
+    int index=inMap?item.optInt("camera",2):mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
+    int lens=inMap&&index==2?item.optInt("lens",2):0;
+    if(inMap){
+     if(index<1||index>3)continue;
+     if(tile.displayedCamera!=index||tile.displayedLens!=lens){
+      changedFeeds.add(tile);tile.displayedCamera=index;tile.displayedLens=lens;
+     }
+     String number=item.optString("number","");
+     tile.banner.setText(number.isEmpty()?"":number+" · "+(40+index));
+     tile.banner.setVisibility(number.isEmpty()?View.GONE:View.VISIBLE);
+     String action=id.equals("mapCameraPreview")?(index==2?" · changer d’objectif":""):" · échanger avec la vue centrale";
+     tile.frame.setContentDescription("Caméra "+(40+index)+action);
+    }
     String url=TrematageAccess.address(activity,index);
     if(!url.startsWith("rtsp://")){tile.message.setText("📷");continue;}
     Uri uri=Uri.parse(url);android.content.SharedPreferences p=activity.getSharedPreferences("nautic_camera_private",0);
@@ -163,11 +184,8 @@ final class DashboardCameras {
     if(user.isEmpty()){tile.message.setText("⚙ Identifiants caméra");continue;}
     String tapoHost=Uri.parse(TrematageAccess.address(activity,TrematageAccess.index(activity))).getHost();
     String path=uri.getPath();
-    if(inMap){
-     int lens=id.equals("mapCameraPort")?3-mapCameraIndex:id.equals("mapCameraPreview")?mapCameraIndex:2;
-     path=lens==2?"/stream1":"/stream6";
-    }
-    path=CameraStreamPolicy.preview(path,mobile,inMap||index==1||java.util.Objects.equals(tapoHost,uri.getHost()));
+    if(lens!=0)path=lens==1?"/stream6":"/stream1";
+    path=CameraStreamPolicy.preview(path,mobile,lens!=0||index==1||java.util.Objects.equals(tapoHost,uri.getHost()));
     String stream="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+uri.getHost()+":"+(uri.getPort()>0?uri.getPort():554)+path;
     if(!grouped.containsKey(stream))grouped.put(stream,new ArrayList<>());if(id.equals("mapCameraPreview"))grouped.get(stream).add(0,tile);else grouped.get(stream).add(tile);
    }
@@ -189,6 +207,7 @@ final class DashboardCameras {
     if(stalled)retryAt.put(entry.getKey(),now+2000);
     if(group==null||group.get(0)!=source.owner||!selected.contains(entry.getKey())||source.failed||stalled){source.close();iterator.remove();if(stalled||source.failed)selected.remove(entry.getKey());}
    }
+   for(Tile tile:changedFeeds){tile.mirror.setImageDrawable(null);}
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
     if(!selected.contains(e.getKey()))continue;
     Source source=sources.get(e.getKey());if(source==null){Tile owner=e.getValue().get(0);owner.message.setText("◌");source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);}
@@ -207,7 +226,7 @@ final class DashboardCameras {
    cameraSwitch.setTextSize(20);
    cameraSwitch.setTextColor(Color.WHITE);
    cameraSwitch.setGravity(Gravity.CENTER);
-   cameraSwitch.setContentDescription("Changer de caméra");
+   cameraSwitch.setContentDescription("Changer l’objectif central");
    android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
    background.setShape(android.graphics.drawable.GradientDrawable.OVAL);
    background.setColor(0xc0123b4d);
@@ -219,6 +238,9 @@ final class DashboardCameras {
    Math.max(1,(int)(bounds.optDouble("w")*scale)),Math.max(1,(int)(bounds.optDouble("h")*scale)));
   layout.leftMargin=(int)(bounds.optDouble("x")*scale);
   layout.topMargin=(int)(bounds.optDouble("y")*scale);
+  String number=bounds.optString("number","");
+  cameraSwitch.setText(number.isEmpty()?"⇄":"⇄ "+number);
+  cameraSwitch.setTextSize(number.isEmpty()?20:13);
   cameraSwitch.setLayoutParams(layout);
   cameraSwitch.setVisibility(View.VISIBLE);
   cameraSwitch.bringToFront();

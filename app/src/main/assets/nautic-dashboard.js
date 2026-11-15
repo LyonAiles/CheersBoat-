@@ -32,14 +32,54 @@
  window.nauticCamera42Result=message=>{pending42=false;if(camera42)camera42.title=message||'';refresh();previews();};
  let pending=false,lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
  let extraNumbers={};try{extraNumbers=JSON.parse(call('readSetting','nautic-control-numbers')||localStorage.getItem('nautic-control-numbers')||'{}');}catch(_){}
+ const fixedNumbers={clock:10,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapCameraPort:45,mapCameraPreview:46,mapCameraStarboard:47,mapCameraSwitch:48,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
+ const reservedNumbers=new Set(Object.values(fixedNumbers));
+ const controls='button,[role=button],input:not([type=hidden]),select,textarea,summary,.leaflet-bar a';
  function numberButtons(){
   let enabled=true;try{enabled=JSON.parse(call('readSetting','nautic-extensions')||localStorage.getItem('nautic-extensions')||'{}').objectNumbers!==false;}catch(_){}
-  if(!enabled){document.querySelectorAll('.nautic-object-tag').forEach(e=>e.remove());document.querySelectorAll('[data-object-number]').forEach(e=>e.dataset.objectNumber='');}
-  const fixed={clock:10,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
-  const reservedNumbers=new Set(Object.values(fixed));
-  const zoomIn=document.querySelector('.leaflet-control-zoom-in'),zoomOut=document.querySelector('.leaflet-control-zoom-out');if(zoomIn)zoomIn.id='mapZoomIn';if(zoomOut)zoomOut.id='mapZoomOut';
-  const elements=new Set(Object.keys(fixed).map($).filter(Boolean));for(const e of document.querySelectorAll('#app button,#app [role=button],#app .leaflet-bar a,#dialog button'))if(e.id!=='dashboardPhone'&&e.id!=='mapCameraSwitch'&&!e.classList.contains('sondeur-map-alert'))elements.add(e);
-  for(const e of elements){if(!e.id)e.id='nauticControl'+[...document.querySelectorAll('#app button,#app [role=button],#app .leaflet-bar a,#dialog button')].indexOf(e);let n=fixed[e.id];if(n===undefined){if(!Number.isInteger(extraNumbers[e.id])||extraNumbers[e.id]<60||reservedNumbers.has(extraNumbers[e.id])){extraNumbers[e.id]=Math.max(59,...reservedNumbers,...Object.values(extraNumbers).filter(x=>Number.isInteger(x)&&x>=60))+1;const saved=JSON.stringify(extraNumbers);if(bridge)call('writeSetting','nautic-control-numbers',saved);else try{localStorage.setItem('nautic-control-numbers',saved);}catch(_){}}n=extraNumbers[e.id];}e.dataset.objectNumber=enabled?String(n):'';let tag=[...e.children].find(x=>x.classList.contains('nautic-object-tag'));if(!enabled){tag?.remove();continue;}if(!tag){tag=document.createElement('span');tag.className='nautic-object-tag';e.appendChild(tag);}tag.textContent=String(n);if(getComputedStyle(e).position==='static')e.style.position='relative';tag.style.cssText='position:absolute;top:1px;left:1px;z-index:500;background:#ffe24b;color:#111;font:bold 10px Arial;border-radius:3px;padding:1px 3px;pointer-events:none';}
+  document.querySelector('.leaflet-control-zoom-in')?.setAttribute('id','mapZoomIn');
+  document.querySelector('.leaflet-control-zoom-out')?.setAttribute('id','mapZoomOut');
+  const extras=['app','dialog','nauticWeatherPopup'].flatMap(id=>[...($(id)?.querySelectorAll(controls)||[])]);
+  const entries=new Map(Object.keys(fixedNumbers).map(id=>[$(id),id]).filter(([node])=>node));
+  extras.forEach((node,i)=>{
+   if(node.id==='dashboardPhone'||entries.has(node))return; // The phone already carries its container number.
+   entries.set(node,node.id||'#'+(node.closest('dialog')?.querySelector('h2')?.textContent||'tableau')+'/'+i);
+  });
+  let next=Math.max(59,...reservedNumbers,...Object.values(extraNumbers).filter(Number.isInteger))+1;
+  let dirty=false;
+  for(const [node,key] of entries){
+   let number=fixedNumbers[key];
+   if(number===undefined&&enabled){
+    if(!Number.isInteger(extraNumbers[key])||extraNumbers[key]<60||reservedNumbers.has(extraNumbers[key])){
+     extraNumbers[key]=next++;
+     dirty=true;
+    }
+    number=extraNumbers[key];
+   }
+   node.dataset.objectNumber=enabled?String(number):'';
+   const field=node.matches('input,select,textarea');
+   if(field){
+    let tag=node.previousElementSibling;
+    if(!tag?.classList.contains('nautic-field-number'))tag=null;
+    if(!enabled){tag?.remove();continue;}
+    if(!tag){tag=document.createElement('span');tag.className='nautic-object-tag nautic-field-number';node.before(tag);}
+    tag.setAttribute('aria-hidden','true');
+    if(tag.textContent!==String(number))tag.textContent=String(number);
+    continue;
+   }
+   let tag=[...node.children].find(child=>child.classList.contains('nautic-object-tag')&&!child.classList.contains('nautic-field-number'));
+   if(!enabled){tag?.remove();continue;}
+   if(!tag){tag=document.createElement('span');tag.className='nautic-object-tag';tag.setAttribute('aria-hidden','true');node.appendChild(tag);}
+   if(tag.textContent!==String(number))tag.textContent=String(number);
+   if(getComputedStyle(node).position==='static')node.style.position='relative';
+  }
+  if(dirty){
+   const saved=JSON.stringify(extraNumbers);
+   if(bridge)call('writeSetting','nautic-control-numbers',saved);
+   else try{localStorage.setItem('nautic-control-numbers',saved);}catch(_){}
+  }
+  const directory=$('nauticNumberDirectory');
+  if(directory)directory.textContent=enabled?'41–43 · Caméras | 45 · Médaillon gauche | 46 · Vue centrale | 47 · Médaillon droit | 48 · Objectif central':'';
  }
  window.nauticNumberDashboard=()=>{numberButtons();previews();};
  function refresh(){try{
@@ -62,11 +102,25 @@
  window.nauticTrematageAlert=()=>{alarmUntil=Date.now()+30000;refresh();};
  const mapCamera=document.createElement('div');
  mapCamera.hidden=true;
- const mapViews=['mapCameraPort','mapCameraPreview','mapCameraStarboard'];
+ const leftMedallion='mapCameraPort', centerView='mapCameraPreview', rightMedallion='mapCameraStarboard';
+ const mapViews=[centerView,leftMedallion,rightMedallion]; // Draw the medallions above the central image.
+ const feeds={
+  [leftMedallion]:{camera:1},
+  [centerView]:{camera:2,lens:2},
+  [rightMedallion]:{camera:3}
+ };
  for(const id of mapViews){
   const view=document.createElement('div');
   view.id=id;
   view.className='map-camera-view';
+  view.setAttribute('role','button');
+  view.tabIndex=0;
+  view.onclick=()=>activateMapView(id);
+  view.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();view.click();}};
+  const label=document.createElement('span');
+  label.className='map-camera-label';
+  label.setAttribute('aria-hidden','true');
+  view.append(label);
   mapCamera.append(view);
  }
  mapCamera.id='mapCameraOverlay';
@@ -74,18 +128,39 @@
  mapSwitch.id='mapCameraSwitch';
  mapSwitch.type='button';
  mapSwitch.textContent='⇄';
- mapSwitch.title='Changer de caméra';
+ mapSwitch.title='Changer l’objectif central';
  mapSwitch.setAttribute('aria-label',mapSwitch.title);
  mapSwitch.hidden=true;
  mapSwitch.onclick=switchMapCamera;
  $('mapWrap').append(mapCamera,mapSwitch);
  let mapCameraAlpha=1;
- let mapCameraIndex=2;
+ function refreshMapViews(){
+  for(const id of mapViews){
+   const view=$(id);
+   const camera=40+feeds[id].camera;
+   const label=id===centerView?'Vue centrale':'Médaillon '+(id===leftMedallion?'gauche':'droit');
+   view.setAttribute('aria-label',label+' · caméra '+camera+(id===centerView?'':' · échanger avec la vue centrale'));
+   view.querySelector('.map-camera-label').textContent=String(camera);
+  }
+  mapSwitch.hidden=mapCamera.hidden||feeds[centerView].camera!==2;
+ }
  function switchMapCamera(){
-  if(mapCamera.hidden||mapCamera.classList.contains('nautic-hidden'))return;
-  mapCameraIndex=3-mapCameraIndex;
+  if(mapCamera.hidden||mapCamera.classList.contains('nautic-hidden')||feeds[centerView].camera!==2)return;
+  feeds[centerView]={camera:2,lens:3-feeds[centerView].lens};
   previews();
  }
+ function activateMapView(id){
+  if(mapCamera.hidden||mapCamera.classList.contains('nautic-hidden'))return;
+  if(id===centerView){
+   if(!dragged)switchMapCamera();
+   dragged=false;
+   return;
+  }
+  [feeds[centerView],feeds[id]]=[feeds[id],feeds[centerView]];
+  refreshMapViews();
+  previews();
+ }
+ refreshMapViews();
  window.nauticMapCameraAlpha=value=>{
   mapCameraAlpha=Number(value);
   mapCamera.style.opacity=mapCameraAlpha;
@@ -112,21 +187,19 @@
  function toggleMapCamera(){
   if(mapCamera.classList.contains('nautic-hidden'))return;
   mapCamera.hidden=!mapCamera.hidden;
-  mapSwitch.hidden=mapCamera.hidden;
+  refreshMapViews();
   speedCard.setAttribute('aria-pressed',String(!mapCamera.hidden));
   previews();
  }
  speedCard.onclick=toggleMapCamera;
  speedCard.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleMapCamera();}};
- mapCamera.onclick=()=>{if(!dragged)switchMapCamera();dragged=false;};
  window.addEventListener('DOMContentLoaded',()=>{
   const settings=$('sondeurSettings');
   if(settings)new MutationObserver(previews).observe(settings,{attributes:true,attributeFilter:['hidden']});
  });
- window.nauticDashboardClick=id=>{if(id===mapSwitch.id||mapViews.includes(id))switchMapCamera();else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
+ window.nauticDashboardClick=id=>{if(id===mapSwitch.id)switchMapCamera();else if(mapViews.includes(id))activateMapView(id);else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
  window.nauticDashboardHold=id=>{if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
  function previews(){
-  if(!bridge)return;
   const sonarSettings=$('sondeurSettings');
   const settingsOpen=sonarSettings&&!sonarSettings.hidden;
   mapCamera.style.visibility=settingsOpen?'hidden':'';
@@ -134,26 +207,38 @@
   mapSwitch.style.visibility=hidden?'hidden':'';
   if(!hidden&&window.nauticQuietMode)return;
   const tiles=[];
-  if(!hidden)for(const id of ['trematagePreview','cam1Body','cam2Body','cam3Body','mapCameraPreview','mapCameraPort','mapCameraStarboard']){
-   const inMap=mapViews.includes(id);
-   const e=$(id);if(!e||e.closest('[hidden],.nautic-hidden')||getComputedStyle(e).display==='none')continue;
-   if(id!=='trematagePreview'){
-    const index=inMap?'2':id.charAt(3);let url='';try{url=JSON.parse(call('readSetting','nautic-v04')||'{}')['cam'+index]||'';}catch(_){}
-    if(/^https?:\/\//i.test(url)){if(e.dataset.previewUrl!==url){const img=new Image();img.alt='Caméra '+index;img.src=url;e.replaceChildren(img);e.dataset.previewUrl=url;}continue;}
-    if(e.dataset.previewUrl){e.replaceChildren();delete e.dataset.previewUrl;}
+  let config={};try{config=JSON.parse(call('readSetting','nautic-v04')||localStorage.getItem('nautic-v04')||'{}');}catch(_){}
+  if(!hidden)for(const id of ['trematagePreview','cam1Body','cam2Body','cam3Body',...mapViews]){
+   const feed=feeds[id],inMap=!!feed;
+   const e=$(id);
+   if(!e||e.closest('[hidden],.nautic-hidden')||getComputedStyle(e).display==='none')continue;
+   const mobile=id==='trematagePreview';
+   if(!mobile){
+    const index=feed?.camera||id.charAt(3);
+    const url=config['cam'+index]||'';
+    if(/^https?:\/\//i.test(url)){
+     if(e.dataset.previewUrl!==url){
+      const img=new Image();img.alt='Caméra '+(40+Number(index));img.src=url;
+      if(inMap){e.querySelector('img')?.remove();e.prepend(img);}else e.replaceChildren(img);
+      e.dataset.previewUrl=url;
+     }
+     continue;
+    }
+    if(e.dataset.previewUrl){e.querySelector('img')?.remove();delete e.dataset.previewUrl;}
    }
    const r=e.getBoundingClientRect();if(r.width<2||r.height<2)continue;
-   const card=e.closest('.camCard'),mobile=id==='trematagePreview';
+   const card=e.closest('.camCard');
    const heading=card?.querySelector('h3')?.cloneNode(true);heading?.querySelectorAll('.nautic-object-tag').forEach(t=>t.remove());
-   tiles.push({id,x:r.left,y:r.top,w:r.width,h:r.height,label:mobile?'Trématage':heading?.textContent.trim()||'📷',number:card?.dataset.objectNumber||'',active:(mobile||id==='cam2Body')&&card.classList.contains('trematage-active'),alarm:mobile&&card.classList.contains('trematage-alert'),status:mobile?$('trematageState').textContent:id==='cam2Body'?camera42?.dataset.watchStatus||'':''});
+   tiles.push({id,x:r.left,y:r.top,w:r.width,h:r.height,camera:feed?.camera,lens:feed?.lens,
+    label:mobile?'Trématage':heading?.textContent.trim()||'📷',number:(inMap?e:card)?.dataset.objectNumber||'',
+    active:(mobile||id==='cam2Body')&&card.classList.contains('trematage-active'),
+    alarm:mobile&&card.classList.contains('trematage-alert'),status:mobile?$('trematageState').textContent:id==='cam2Body'?camera42?.dataset.watchStatus||'':''});
   }
   const rect=mapSwitch.getBoundingClientRect();
   const switchButton=!hidden&&!mapCamera.classList.contains('nautic-hidden')&&!mapSwitch.hidden&&rect.width>0
-   ?{x:rect.left,y:rect.top,w:rect.width,h:rect.height}:null;
-  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapCameraIndex,tiles,switchButton}));
+   ?{x:rect.left,y:rect.top,w:rect.width,h:rect.height,number:mapSwitch.dataset.objectNumber}:null;
+  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,tiles,switchButton}));
  }
- // Use real HTTP/MJPEG previews in web builds; Android handles RTSP without a relay.
- if(!bridge)for(let i=1;i<=3;i++){try{const saved=JSON.parse(localStorage.getItem('nautic-v04')||'{}'),url=saved['cam'+i];if(/^https?:\/\//i.test(url||'')){const img=new Image();img.alt='Caméra '+i;img.src=url;$('cam'+i+'Body').replaceChildren(img);}}catch(e){}}
  window.nauticEvery(()=>{numberButtons();refresh();previews();},800);
  window.nauticDashboardResume=()=>{if(window.nauticQuietMode){previews();return;}refresh();for(let i=1;i<=3;i++){const e=$('cam'+i+'Body');if(e)delete e.dataset.previewUrl;}previews();};
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.nauticDashboardResume();else previews();});window.addEventListener('resize',previews);
