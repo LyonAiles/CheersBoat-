@@ -19,7 +19,9 @@ final class DashboardCameras {
  int draggingCamera;
  final Map<String,Tile> tiles=new LinkedHashMap<>();
  final Map<String,Source> sources=new LinkedHashMap<>();
- final Map<String,Long> retryAt=new HashMap<>();
+ static final long FIRST_FRAME_TIMEOUT=20000, LIVE_SLICE=8000;
+ final Map<String,Long> retryAt=new HashMap<>(),lastStarted=new HashMap<>();
+ long lastConcurrentStartupTimeout=0;
  final Map<String,String> failures=new HashMap<>();
  final Set<String> useConfiguredStream=new HashSet<>();
  int decoderBudget=4;
@@ -222,6 +224,7 @@ final class DashboardCameras {
   final ExoPlayer player;final TextureView texture;final Tile owner;final List<Tile> mirrors=new ArrayList<>();
   float videoRatio=16f/9f;
   volatile long lastFrame=0;
+  long firstFrame=0;
   final long created=System.currentTimeMillis();
   boolean failed=false;
   Source(String uri,Tile owner){
@@ -235,6 +238,7 @@ final class DashboardCameras {
    player.addListener(new Player.Listener(){
     @Override public void onRenderedFirstFrame(){
      if(owner.source!=Source.this)return;
+     if(firstFrame==0){firstFrame=System.currentTimeMillis();lastFrame=Math.max(lastFrame,firstFrame);}
      failures.remove(uri);
      owner.setSnapshot(null);
      owner.message.setText("");
@@ -242,7 +246,7 @@ final class DashboardCameras {
     @Override public void onPlayerError(PlaybackException e){
      failed=true;retryAt.put(uri,System.currentTimeMillis()+4000);
      if(e.getErrorCodeName().contains("DECOD"))decoderBudget=Math.max(1,Math.min(decoderBudget,sources.size()-1));
-     else if(lastFrame==0)useConfiguredStream.add(uri);
+     else if(firstFrame==0)useConfiguredStream.add(uri);
      String message=e.getErrorCodeName().replace("ERROR_CODE_","");
      failures.put(uri,message);
      owner.message.setText(message);
@@ -261,7 +265,7 @@ final class DashboardCameras {
    }
   }
   Bitmap capture(){
-   if(!texture.isAvailable()||lastFrame==0)return null;
+   if(!texture.isAvailable()||firstFrame==0)return null;
    // View transformations only affect display. Each tile crops its own copy of the full frame.
    int width=Math.max(1,Math.round(320*Math.min(1,videoRatio)));
    int height=Math.max(1,Math.round(320*Math.min(1,1/videoRatio)));
@@ -364,6 +368,27 @@ final class DashboardCameras {
    for(Tile t:tiles.values())if(!visible.contains(t.id))t.frame.setVisibility(View.GONE);
    updateCameraSwitch(data.optJSONObject("switchButton"),scale);
    long now=System.currentTimeMillis();
+   int activeCount=sources.size();
+   Iterator<Map.Entry<String,Source>> iterator=sources.entrySet().iterator();
+   while(iterator.hasNext()){
+    Map.Entry<String,Source> entry=iterator.next();
+    List<Tile> group=grouped.get(entry.getKey());
+    Source source=entry.getValue();
+    boolean starting=source.firstFrame==0;
+    boolean stalled=starting?now-source.created>=FIRST_FRAME_TIMEOUT:now-source.lastFrame>9000;
+    if(stalled){
+     retryAt.put(entry.getKey(),now+2000);
+     failures.put(entry.getKey(),starting?"Aucune première image (20 s)":"Le flux s’est arrêté");
+     if(starting){
+      useConfiguredStream.add(entry.getKey());
+      if(activeCount>1){
+       if(lastConcurrentStartupTimeout!=0&&now-lastConcurrentStartupTimeout<FIRST_FRAME_TIMEOUT)decoderBudget=1;
+       lastConcurrentStartupTimeout=now;
+      }
+     }
+    }
+    if(group==null||group.get(0)!=source.owner||source.failed||stalled){source.close();iterator.remove();}
+   }
    List<String> eligible=new ArrayList<>();String priority=null;
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
     if(retryAt.getOrDefault(e.getKey(),0L)>now){
@@ -373,19 +398,19 @@ final class DashboardCameras {
     }
     eligible.add(e.getKey());for(Tile tile:e.getValue())if(tile.id.equals("mapCameraPreview")||(priority==null&&tile.id.equals("trematagePreview")&&tile.active))priority=e.getKey();
    }
-   Set<String> selected=new HashSet<>();if(priority!=null){selected.add(priority);eligible.remove(priority);}
-   int start=eligible.isEmpty()?0:(int)((now/8000)%eligible.size());
-   for(int i=0;i<eligible.size()&&selected.size()<decoderBudget;i++)selected.add(eligible.get((start+i)%eligible.size()));
-   Iterator<Map.Entry<String,Source>> iterator=sources.entrySet().iterator();while(iterator.hasNext()){
-    Map.Entry<String,Source> entry=iterator.next();List<Tile> group=grouped.get(entry.getKey());
-    Source source=entry.getValue();
-    boolean stalled=now-(source.lastFrame==0?source.created:source.lastFrame)>(source.lastFrame==0?14000:9000);
-    if(stalled){
-     retryAt.put(entry.getKey(),now+2000);
-     failures.put(entry.getKey(),"Flux sans image");
-     if(source.lastFrame==0)useConfiguredStream.add(entry.getKey());
-    }
-    if(group==null||group.get(0)!=source.owner||!selected.contains(entry.getKey())||source.failed||stalled){source.close();iterator.remove();if(stalled||source.failed)selected.remove(entry.getKey());}
+   Set<String> selected=new HashSet<>();
+   if(priority!=null)selected.add(priority);
+   // A newly opened stream keeps its slot through negotiation and its first frames.
+   for(String key:eligible){
+    Source source=sources.get(key);
+    if(source!=null&&(source.firstFrame==0||now-source.firstFrame<LIVE_SLICE)&&selected.size()<decoderBudget)selected.add(key);
+   }
+   eligible.sort(Comparator.comparingLong(key->lastStarted.getOrDefault(key,0L)));
+   for(String key:eligible)if(selected.size()<decoderBudget)selected.add(key);
+   iterator=sources.entrySet().iterator();
+   while(iterator.hasNext()){
+    Map.Entry<String,Source> entry=iterator.next();
+    if(!selected.contains(entry.getKey())){entry.getValue().close();iterator.remove();}
    }
    for(Tile tile:changedFeeds){tile.setSnapshot(null);}
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
@@ -395,7 +420,7 @@ final class DashboardCameras {
      Tile owner=e.getValue().get(0);
      owner.message.setText(failures.getOrDefault(e.getKey(),owner.snapshot==null?"Connexion…":""));
      try{
-      source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);
+      source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);lastStarted.put(e.getKey(),now);
      }catch(RuntimeException error){
       retryAt.put(e.getKey(),now+4000);
       failures.put(e.getKey(),"Lecteur vidéo indisponible");
