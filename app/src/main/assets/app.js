@@ -184,6 +184,7 @@ function onPos(result){
    else if(d>=Math.max(12,p.acc,stableFix.acc||0))updateCourse(bearing(stableFix,p),now);
   }
   stableFix=p;gpsFollowTarget=p;
+  window.nauticTripGpsLeg?.(d);
   stationarySince=0;
   fuelTick(now,true);
   if(recording){let last=points.at(-1);

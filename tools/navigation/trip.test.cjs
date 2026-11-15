@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const {create, progress} = require('../../app/src/main/assets/nautic-trip.js');
+const {create, remaining} = require('../../app/src/main/assets/nautic-trip.js');
 
 const p = (lat, lon = 0) => ({lat, lon});
 const way = (id, nodes, geometry, name = 'Canal') => ({
@@ -18,9 +18,11 @@ const trip = create(elements, p(0), p(.0175, .004));
 assert.equal(trip.pk, 44.4);
 assert.equal(trip.estimated, false);
 assert(Math.abs(trip.total - 2.4) < 1e-8);
-assert(Math.abs(progress(trip, p(.009)) - 1) < 1e-8);
-assert(Math.abs(progress(trip, p(.018, .004)) - trip.total) < 1e-8);
-assert.equal(progress(trip, p(.009, .008)), null);
+assert.equal(remaining(22, 5800), 16.2);
+assert.equal(remaining(22, 23000), 0);
+const pkExample = [...water, pk(20, p(0), 192), pk(21, p(.018, .004), 170)];
+assert.equal(create(pkExample, p(0), p(.018, .004)).total, 22);
+assert.equal(create(pkExample, p(.018, .004), p(0)).total, 22);
 
 const reverse = create(elements, p(.018, .004), p(0));
 assert.equal(reverse.pk, 42);
@@ -42,4 +44,4 @@ const reset = create([
 assert.equal(reset.pk, 1);
 assert.equal(reset.estimated, true);
 assert(reset.total > 2 && reset.total < 3);
-console.log('PASS: PK calibration, partial segment, reverse direction, progress, missing PK, network gaps and numbering changes');
+console.log('PASS: PK calibration, partial segment, reverse direction, GPS distance subtraction, missing PK, network gaps and numbering changes');

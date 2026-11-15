@@ -59,8 +59,8 @@
  destinationStatus.id = 'nauticDestinationStatus';
  destinationStatus.setAttribute('role', 'status');
  wrap.append(destinationButton, destinationStatus);
- let choosingDestination = false, destination = null, trip = null, covered = 0;
- let tripRequest = null, lastTripFix = null;
+ let choosingDestination = false, destination = null, trip = null, coveredMetres = 0;
+ let tripRequest = null;
  const kmFormat = new Intl.NumberFormat('fr-FR', {minimumFractionDigits: 1, maximumFractionDigits: 1});
  const pkFormat = new Intl.NumberFormat('fr-FR', {maximumFractionDigits: 3});
  const km = value => kmFormat.format(value) + ' km';
@@ -93,8 +93,8 @@
 
  function renderTripCounters(available = !!trip) {
   for (const [id, label, value] of [
-   ['tripCovered', 'Distance parcourue', covered],
-   ['tripRemaining', 'Distance restante', trip ? Math.max(0, trip.total - covered) : 0]
+   ['tripCovered', 'Distance parcourue', coveredMetres / 1000],
+   ['tripRemaining', 'Distance restante', trip ? window.NauticTrip.remaining(trip.total, coveredMetres) : 0]
   ]) {
    const element = $(id);
    const text = available ? km(value) : '—';
@@ -159,8 +159,7 @@
   const end = {lat:position.lat, lon:position.lng};
   destination = end;
   trip = null;
-  covered = 0;
-  lastTripFix = null;
+  coveredMetres = 0;
   renderTrip();
   renderTripCounters();
   showDestination('Calcul du trajet fluvial…');
@@ -185,7 +184,7 @@
    renderTrip();
    if (trip) {
     showDestination(tripSummary());
-    updateTrip();
+    renderTripCounters();
    } else showDestination('Aucun trajet fluvial raccordé dans la zone chargée');
   } catch (_) {
    if (tripRequest === controller) showDestination('Réseau fluvial indisponible · réessaie');
@@ -195,22 +194,14 @@
   }
  }
 
- function updateTrip() {
-  if (!trip || !stableFix || stableFix === lastTripFix) return;
-  lastTripFix = stableFix;
-  const progress = window.NauticTrip.progress(trip, stableFix, covered);
-  if (progress === null) {
-   renderTripCounters(false);
-   showDestination('Hors du tracé · ' + tripSummary());
-   return;
-  }
-  covered = progress;
-  renderTripCounters();
-  if (!choosingDestination) showDestination(tripSummary());
- }
+ // The GPS filter in onPos confirms each leg before it gets counted.
+ window.nauticTripGpsLeg = metres => {
+  if (!trip && !tripRequest) return;
+  coveredMetres += metres;
+  if (trip) renderTripCounters();
+ };
 
  showDestination();
- window.nauticEvery(updateTrip, 1000, true);
  function routeData(){return {type:'FeatureCollection',features:points.length>1?[{type:'Feature',geometry:{type:'LineString',coordinates:points.map(p=>[p.lon,p.lat])},properties:{}}]:[]};}
  function worksData(){return {type:'FeatureCollection',features:(options.waterwayWorks===false?[]:lastList).map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{id:p.id,category:p.category||W.categoryOf(p.type)}}))};}
  function positionBoat(){const boat=$('mapBoat'),p=stableFix||latest;if(!boat||!p)return;if(!window.nauticMapFreePan){boat.style.setProperty('left','50%','important');boat.style.setProperty('top','66.666667%','important');return;}let q;if(active&&vector)q=vector.project([p.lon,p.lat]);else if(map){q=map.latLngToContainerPoint([p.lat,p.lon]);const r=$('map').getBoundingClientRect(),w=wrap.getBoundingClientRect();q={x:q.x+r.left-w.left,y:q.y+r.top-w.top};}if(q){const angle=active&&vector?(heading??0)-vector.getBearing():(heading??0);boat.style.transform=`translate(-50%,-50%) rotate(${angle}deg)`;boat.style.setProperty('left',q.x+'px','important');boat.style.setProperty('top',q.y+'px','important');}}

@@ -81,6 +81,10 @@
   const legs = shortestPath(edges, start, nearestPost || target);
   if (!legs) return null;
 
+  const departurePost = posts.find(p => p.edge.waterway === start.edge.waterway && W.distance(p, start) < 1);
+  const singleWaterway = nearestPost && departurePost &&
+   nearestPost.edge.waterway === departurePost.edge.waterway &&
+   legs.every(leg => leg.edge.waterway === departurePost.edge.waterway);
   let length = 0;
   const anchors = [];
   const byEdge = new Map();
@@ -112,35 +116,24 @@
     intervals.push({start: Math.max(0, a.at), end: Math.min(length, b.at), factor: pkLength / measured});
    }
   }
-  function kilometresAt(offset) {
-   let metres = offset;
-   for (const interval of intervals) {
-    metres += Math.max(0, Math.min(offset, interval.end) - interval.start) * (interval.factor - 1);
+  if (singleWaterway) {
+   const direction = Math.sign(nearestPost.pk - departurePost.pk);
+   const ordered = [departurePost, ...anchors.filter(p => p.at > 0 && p.at < length), nearestPost];
+   if (direction && ordered.every((p, i) => !i || (p.pk - ordered[i - 1].pk) * direction >= 0)) {
+    return {legs, end: point(nearestPost), pk: nearestPost.pk,
+     total: Math.abs(nearestPost.pk - departurePost.pk), estimated: false};
    }
-   return metres / 1000;
   }
+  const calibrated = intervals.reduce((total, item) => total + item.end - item.start, 0);
+  const correction = intervals.reduce((total, item) => total + (item.end - item.start) * (item.factor - 1), 0);
   return {
    legs, end: point(nearestPost || target), pk: nearestPost?.pk ?? null,
-   total: kilometresAt(length), kilometresAt,
-   estimated: length - intervals.reduce((total, item) => total + item.end - item.start, 0) > 1
+   total: (length + correction) / 1000, estimated: length - calibrated > 1
   };
  }
 
- function progress(route, position, previous = 0) {
-  if (!route.legs.length) return 0;
-  let best = null;
-  for (const leg of route.legs) {
-   const projection = W.project(position, leg.a, leg.b);
-   const km = route.kilometresAt(leg.offset + projection.t * leg.length);
-   if (!best || projection.d < best.d - 1 ||
-       (Math.abs(projection.d - best.d) <= 1 && Math.abs(km - previous) < Math.abs(best.km - previous))) {
-    best = {d: projection.d, km};
-   }
-  }
-  return best.d <= maxBankOffset ? best.km : null;
- }
-
- const api = {create, progress};
+ const remaining = (totalKm, coveredMetres) => Math.max(0, totalKm - coveredMetres / 1000);
+ const api = {create, remaining};
  if (typeof module !== 'undefined') module.exports = api;
  else root.NauticTrip = api;
 })(typeof window !== 'undefined' ? window : globalThis);
