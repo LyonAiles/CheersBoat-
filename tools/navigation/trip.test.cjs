@@ -154,7 +154,31 @@ for(const [destination,min,max] of [[avignon,650,720],[p(48.5833,7.7458),650,750
  assert(states.some(section=>section.closed)&&states.some(section=>section.state==='unknown'));
 }
 const updated=euris.merge(seed,{scopes:['FR150'],items:[],refs:[]});
-assert.equal(updated.items.length,1);
+assert.equal(updated.items.length,2);
 assert.match(updated.items[0].ntsNumber,/8405/);
-assert.equal(updated.refs.length,2);
+assert.equal(updated.refs.length,4);
 console.log('PASS: national routes to Avignon, Strasbourg and Brussels and official impact boundaries');
+
+const oldCentre=notices.relevant(longTrip,{},'2026-11-16').find(item=>item.number==='2026/8407/0');
+assert(oldCentre?.active);
+const newCentre=euris.matching(fromNetwork(nationalNetwork,chatillonPort,avignon,5000),impacts,nationalCatalog,{locate},moment)
+ .find(item=>item.reference.includes('8407'));
+assert(newCentre?.active && newCentre.indices.length>100);
+console.log('PASS: the Canal du Centre closure applies to saved OSM and EuRIS Avignon routes');
+
+const {departurePlan}=require('../../app/src/main/assets/nautic-trip.js');
+const reopening=departurePlan(longTrip,[
+ {indices:[20,21],date:'2026-12-01'},{indices:[230],date:'2026-12-14'}
+]);
+assert.equal(reopening.date,'2026-12-14');
+assert.deepEqual(reopening.stages.map(item=>item.date),['2026-12-01','2026-12-14']);
+assert(reopening.progressive);
+const notProgressive=departurePlan(longTrip,[
+ {indices:[20],date:'2026-12-14'},{indices:[230],date:'2026-12-01'}
+]);
+assert.equal(notProgressive.date,'2026-12-14');
+assert(!notProgressive.progressive);
+assert(departurePlan(longTrip,[{indices:[20],date:null}]).unknown);
+const resumedAt=locate(longTrip.coordinates,longTrip.coordinates[22]).offset;
+assert.equal(departurePlan(longTrip,[{indices:[20],date:null}],resumedAt).unknown,false);
+console.log('PASS: departure date, progressive closures, unknown dates and already passed restrictions');

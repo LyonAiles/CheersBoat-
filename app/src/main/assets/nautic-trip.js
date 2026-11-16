@@ -235,8 +235,34 @@
   return {offset:hit.offset,total:length?trip.total*(1-hit.offset/length):0};
  }
 
+ function departurePlan(trip, restrictions, departureOffset=0) {
+  const {offsets,total}=geometry(trip.coordinates);
+  const spans=restrictions.flatMap(restriction=>{
+   const {indices,from,to}=restriction;
+   if(indices){
+    return indices.flatMap(index=>offsets[index+1]>departureOffset?
+     [{...restriction,fromOffset:Math.max(departureOffset,offsets[index])}]:[]);
+   }
+   const a=from&&locate(trip.coordinates,from),b=to&&locate(trip.coordinates,to);
+   if(from&&(!a||!b||a.distance>300||b.distance>300))return [];
+   const end=a?Math.max(a.offset,b.offset):total;
+   if(end<=departureOffset)return [];
+   return [{...restriction,fromOffset:Math.max(departureOffset,a?Math.min(a.offset,b.offset):0)}];
+  });
+  spans.sort((a,b)=>a.fromOffset-b.fromOffset||
+   (b.date||'9999').localeCompare(a.date||'9999'));
+  const stages=[];
+  for(const item of spans){
+   if(!item.date)break;
+   if(!stages.length||item.date>stages.at(-1).date)stages.push(item);
+  }
+  const unknown=spans.some(item=>!item.date);
+  return {stages,unknown,date:unknown?null:stages.at(-1)?.date||null,
+   progressive:stages.length>1,firstOffset:spans[0]?.fromOffset-departureOffset};
+ }
+
  const remaining = (totalKm, coveredMetres) => Math.max(0, totalKm - coveredMetres / 1000);
- const api = {create, fromNetwork, locate, sections, resume, remaining};
+ const api = {create, fromNetwork, locate, sections, resume, departurePlan, remaining};
  if (typeof module !== 'undefined') module.exports = api;
  else root.NauticTrip = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -209,3 +209,11 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 #nauticTripProgress:not([hidden]) + #nauticDestinationStatus {top:81px}
 
 #nauticDestinationStatus {pointer-events:auto;cursor:pointer}
+#nauticDestinationStatus .nautic-departure-date {
+ display:block;
+ margin-top:4px;
+ padding-top:3px;
+ border-top:1px solid #49829a;
+ font-size:inherit;
+ color:#e1f6ff;
+}

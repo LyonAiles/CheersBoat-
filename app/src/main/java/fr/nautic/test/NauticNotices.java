@@ -22,7 +22,7 @@ import org.json.JSONException;
 
 final class NauticNotices {
  static String lookup()throws IOException{
-  String filter="countryCode eq 'FR' and (number eq '2026/8405/0' or number eq '2026/8406/0')";
+  String filter="countryCode eq 'FR' and (number eq '2026/8405/0' or number eq '2026/8406/0' or number eq '2026/8407/0')";
   String endpoint="https://www.eurisportal.eu/api/v3/nts?%24filter="+Uri.encode(filter);
   return read(endpoint);
  }

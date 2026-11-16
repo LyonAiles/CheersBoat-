@@ -56,7 +56,7 @@
  const destinationButton = document.createElement('button');
  destinationButton.type = 'button';
  destinationButton.id = 'nauticDestination';
- const destinationStatus = document.createElement('span');
+ const destinationStatus = document.createElement('div');
  destinationStatus.id = 'nauticDestinationStatus';
  destinationStatus.setAttribute('role', 'status');
  const tripProgress=document.createElement('progress');
@@ -248,12 +248,65 @@
    element.setAttribute('aria-label',label+' : '+(routeState?.trip?text:'indisponible'));
   }
  }
+ function dayAfter(value){
+  const day=new Date(value+'T12:00:00Z');
+  day.setUTCDate(day.getUTCDate()+1);
+  return day.toISOString().slice(0,10);
+ }
+ const reopeningClock=new Intl.DateTimeFormat('fr-FR',{
+  timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'
+ });
+ function reopeningLabel(value){
+  const [date,time]=value.split('T');
+  return noticeDate(date)+(time?' à '+time.replace(':',' h '):'');
+ }
+ function departureText(item){
+  const {trip,closures,departure}=item;
+  const official=applicableNotices(trip);
+  const live=routeImpacts(trip);
+  const restrictions=currentClosures(closures).map(closure=>({...closure,date:closure.date||null}));
+  for(const notice of official.filter(item=>item.active)){
+   restrictions.push({indices:notices.closedEdges(trip,[notice]),date:dayAfter(notice.tentative||notice.end),
+    tentative:!!notice.tentative,title:notice.title});
+  }
+  for(const notice of live.filter(item=>item.active&&item.closure&&item.indices.length)){
+   const tentative=notices.tentativeEnd(notice.reference);
+   const day=notices.dateInFrance(new Date(notice.end));
+   const nearMidnight=notices.dateInFrance(new Date(notice.end+60000))!==day;
+   restrictions.push({indices:notice.indices,
+    date:tentative&&tentative>day?dayAfter(tentative):nearMidnight?dayAfter(day):
+     day+'T'+reopeningClock.format(new Date(notice.end)),
+    tentative:!!tentative&&tentative>day,title:notice.title});
+  }
+  restrictions.push({indices:trip.closedEdges||[],date:null});
+  const plan=calc.departurePlan(trip,restrictions,departure?.offset);
+  const uncertain=live.some(item=>item.active&&item.closure&&!item.indices.length);
+  const stages=plan.progressive?' · Réouvertures successives depuis le départ : '+
+    plan.stages.map(stage=>reopeningLabel(stage.date)+(stage.tentative?' (à confirmer)':'')).join(' → '):'';
+  if(plan.unknown||uncertain)return 'Départ complet : date inconnue'+stages;
+  if(!plan.date)return live.some(item=>item.closure&&!item.active)||official.some(item=>!item.active)?
+   'Départ : fermeture annoncée sur le trajet':'Départ : aucune date confirmée';
+  const tentative=plan.stages.some(stage=>stage.tentative);
+  const main='Départ pour tout le trajet : dès le '+reopeningLabel(plan.date)+(tentative?' · à confirmer':' · selon les avis');
+  if(stages)return main+stages;
+  if(plan.firstOffset>100)return main+' · Premier blocage à '+km(plan.firstOffset/1000);
+  return main;
+ }
  function showDestination(message=''){
   destinationButton.textContent=selection?'Annuler le choix':'Destination';
   destinationButton.setAttribute('aria-pressed',String(!!selection));
   wrap.classList.toggle('nautic-select-destination',!!selection);
   destinationStatus.textContent=message;
-  destinationStatus.hidden=!message;
+  if(!selection){
+   for(const item of (displayed.length?displayed:routeState?[routeState]:[])){
+    if(!item.trip)continue;
+    const line=document.createElement('small');
+    line.className='nautic-departure-date';
+    line.textContent=(displayed.length&&item.name?item.name+' · ':'')+departureText(item);
+    destinationStatus.append(line);
+   }
+  }
+  destinationStatus.hidden=!message&&!destinationStatus.childElementCount;
   tripProgress.hidden=!tripRequest;
   const blocked=routeState?.trip&&(currentClosures(routeState.closures).length>0||routeState.trip.restricted||
    applicableNotices().some(notice=>notice.active)||
@@ -327,7 +380,8 @@
    dates.map(item=>'<li>'+esc(item.title)+' · '+esc(item.detail)+'</li>').join('')+'</ul>':'';
   modal('Avis de navigation',
    reopenings+
-   (entries||'<p>Aucun avis VNF associé aux tronçons de ce trajet.</p>')+
+   (onlineEntries?'<h3>Avis EuRIS sur le parcours</h3><ul>'+onlineEntries+'</ul>':'')+entries+
+   (!onlineEntries&&!entries?'<p>Aucun avis VNF associé aux tronçons de ce trajet.</p>':'')+
    '<p>Vert · navigation indiquée sur la carte. Gris · état inconnu. Rouge · fermeture ou restriction en cours.</p>'+
    '<p>Actualisation automatique des avis associés aux tronçons répertoriés.</p>'+
    '<p><a href="https://avisbat.vnf.fr/">Consulter les avis officiels VNF</a></p>'+
