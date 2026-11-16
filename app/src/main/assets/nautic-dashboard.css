@@ -217,3 +217,44 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
  font-size:inherit;
  color:#e1f6ff;
 }
+
+#mapWrap {
+ --nautic-map-control:rgba(9, 47, 67, .66);
+ --nautic-map-control-strong:rgba(9, 47, 67, .76);
+}
+#mapWrap :is(#mapRecenter,#mapLayers,#compass,#nauticDestination,#nauticWaterwayStatus) {
+ background:var(--nautic-map-control);
+ backdrop-filter:blur(2px);
+}
+#mapWrap #nauticDestination[aria-pressed="true"] {
+ background:rgba(20, 91, 99, .78);
+}
+#mapWrap #nauticDestinationStatus { background:var(--nautic-map-control-strong); }
+#mapWrap :is(.leaflet-control-zoom,.maplibregl-ctrl-group) {
+ background:transparent;
+}
+#mapWrap :is(.leaflet-control-zoom-in,.leaflet-control-zoom-out,.maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out) {
+ background:var(--nautic-map-control);
+ color:white;
+}
+#mapWrap :is(.maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out) .maplibregl-ctrl-icon {
+ filter:invert(1);
+}
+
+#nauticAccessibleStatus {
+ position:absolute;
+ z-index:738;
+ left:8px;
+ bottom:40px;
+ max-width:65%;
+ padding:4px 7px;
+ border-radius:5px;
+ background:var(--nautic-map-control-strong);
+ color:#e1f6ff;
+ font-size:11px;
+ pointer-events:none;
+}
+.nautic-access-choice {display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.nautic-access-choice input {width:auto}
+.nautic-access-fields {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.nautic-access-fields input {margin-top:4px;padding:5px}

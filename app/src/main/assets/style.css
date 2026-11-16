@@ -348,3 +348,21 @@ body > #clock{width:auto!important;min-width:76px!important;height:32px!importan
  .saved-route { grid-template-columns: 1fr; gap: 2px; }
  .saved-route-actions { padding-left: 29px; }
 }
+
+#dialog:not(.nautic-full),
+#nauticWeatherPopup {
+ background:rgba(11, 41, 62, .82);
+ backdrop-filter:blur(3px);
+}
+#dialog:not(.nautic-full)::backdrop,
+#nauticWeatherPopup::backdrop {
+ background:rgba(0, 0, 0, .38);
+}
+#dialog:not(.nautic-full) button,
+#nauticWeatherPopup button {
+ background-color:rgba(23, 76, 103, .61);
+}
+#dialog .destination-menu #tripClear,
+#dialog .saved-route-actions button:last-child {
+ background-color:rgba(24, 45, 64, .62);
+}

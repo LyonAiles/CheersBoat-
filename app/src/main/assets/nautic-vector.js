@@ -5,7 +5,7 @@
  let options=read(),vector=null,loading=null,failed=false,active=false,request=0,cache=null,data=null,lastQuery=0,busy=false,lastList=[],lastRender='',lastCamera=null,lastWorksCompute=0;
  let selectedWorkPoint=null;
  const wrap=$('mapWrap'),host=document.createElement('div');host.id='nauticVectorMap';host.style.cssText='position:absolute;inset:0;z-index:1;display:none';wrap.appendChild(host);
- const status=document.createElement('button');status.id='nauticWaterwayStatus';status.type='button';status.title='Ouvrages fluviaux · touche la carte pour rechercher ailleurs';status.style.cssText='position:absolute;z-index:740;left:8px;top:8px;max-width:65%;font-size:11px;padding:5px 8px;background:#092f43e8';wrap.appendChild(status);
+ const status=document.createElement('button');status.id='nauticWaterwayStatus';status.type='button';status.title='Ouvrages fluviaux · touche la carte pour rechercher ailleurs';status.style.cssText='position:absolute;z-index:740;left:8px;top:8px;max-width:65%;font-size:11px;padding:5px 8px';wrap.appendChild(status);
  function notice(text){status.textContent=text;}
  function fallback(message){request++;active=false;failed=true;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}window.nauticRestoreLegacy?.();lastRender='';renderWorks();if(message)notice(message+' · retour carte classique');}
  function library(){if(window.maplibregl)return Promise.resolve();if(loading)return loading;loading=new Promise((resolve,reject)=>{const css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css';document.head.appendChild(css);const script=document.createElement('script');script.src='https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js';const timeout=setTimeout(()=>reject(Error('chargement trop long')),20000);script.onload=()=>{clearTimeout(timeout);resolve();};script.onerror=()=>{clearTimeout(timeout);reject(Error('bibliothèque indisponible'));};document.head.appendChild(script);}).finally(()=>{loading=null;});return loading;}
@@ -20,6 +20,9 @@
    attribution?.removeAttribute('open');clearTimeout(timeout);loaded=true;active=true;failed=false;$('map').style.visibility='hidden';map?.eachLayer(l=>{if(window.L&&l instanceof L.TileLayer)map.removeLayer(l);});
    for(const layer of vector.getStyle().layers||[])if(layer.type==='symbol'&&layer.layout?.['text-field']){vector.setLayoutProperty(layer.id,'text-rotation-alignment','viewport');vector.setLayoutProperty(layer.id,'text-pitch-alignment','viewport');vector.setLayoutProperty(layer.id,'symbol-placement','point');vector.setLayoutProperty(layer.id,'text-rotate',0);}
    vector.addSource('nautic-route',{type:'geojson',data:routeData()});vector.addLayer({id:'nautic-route',type:'line',source:'nautic-route',paint:{'line-color':'#20bce9','line-width':4}});
+   vector.addSource('nautic-accessible',{type:'geojson',data:accessData});
+   vector.addLayer({id:'nautic-accessible',type:'line',source:'nautic-accessible',
+    paint:{'line-color':'#3be577','line-width':5,'line-opacity':.85}});
    vector.addSource('nautic-trip', {type:'geojson', data:tripData()});
    vector.addLayer({id:'nautic-trip-line',type:'line',source:'nautic-trip',
     filter:['==','$type','LineString'],paint:{'line-color':['get','color'],'line-width':4}});
@@ -118,6 +121,66 @@
  const euris=window.NauticEuris;
  const fairwayCatalog=euris?.catalog(fairways);
  let impactSnapshot=window.NauticEurisSeed||{},impacts=[],impactPending=false,checkedScopes='',impactCheckedAt=0,eurisStatus='';
+ const accessible=window.NauticAccessible;
+ const france=fairways.filter(section=>section.scope.startsWith('FR'));
+ const franceScopes=[...new Set(france.map(section=>fairwayCatalog.sections.get(section.sourceId)))].sort();
+ const accessKey='nautic-accessible-waterways';
+ let accessProfile={enabled:false,draught:150,air:345,width:430};
+ try{
+  const saved=JSON.parse(native?.readSetting(accessKey)||localStorage.getItem(accessKey)||'null');
+  if(saved&&['draught','air','width'].every(key=>Number.isFinite(saved[key])&&saved[key]>0))accessProfile=saved;
+ }catch(_){}
+ let accessData={type:'FeatureCollection',features:[]},lastAccessGps=null,lastAccessStamp=0,nationalCheckedAt=0;
+ const accessStatus=document.createElement('div');
+ accessStatus.id='nauticAccessibleStatus';accessStatus.hidden=true;accessStatus.setAttribute('role','status');
+ wrap.append(accessStatus);
+ const legacyAccessible=map?L.geoJSON(null,{style:{color:'#3be577',weight:5,opacity:.85,interactive:false}}).addTo(map):null;
+ function updateAccessible(force=false){
+  const gps=accessProfile.enabled?currentDeparture():null;
+  const now=Date.now(),fresh=nationalCheckedAt&&now-nationalCheckedAt<40*60*1000;
+  if(!force&&!!gps===!!lastAccessGps&&now-lastAccessStamp<60000&&(!gps||W.distance(gps,lastAccessGps)<75))return;
+  lastAccessGps=gps;lastAccessStamp=now;
+  let result={features:[],reason:''};
+  if(accessProfile.enabled&&accessible){
+   result=accessible.reachable(france,window.NauticClearances||{},gps,accessProfile,
+    accessible.blockedSections(france,impacts,now));
+  }
+  const messages={
+   gps:'Voies accessibles · attente GPS',
+   'off-network':'GPS hors du réseau français cartographié',
+   closed:'Voies accessibles · départ fermé selon les avis',
+   unknown:'Voies accessibles · gabarit inconnu près du GPS',
+   dimensions:'Voies accessibles · gabarit insuffisant près du GPS'
+  };
+  const waiting='Voies accessibles · '+(impactPending?'vérification des avis EuRIS…':'avis EuRIS récents indisponibles');
+  accessStatus.textContent=messages[result.reason]||(fresh?result.features.length+' tronçons compatibles · données EuRIS':waiting);
+  accessStatus.hidden=!accessProfile.enabled;
+  accessData={type:'FeatureCollection',features:fresh?result.features:[]};
+  legacyAccessible?.clearLayers();legacyAccessible?.addData(accessData);
+  vector?.getSource('nautic-accessible')?.setData(accessData);
+ }
+ function accessSettings(){
+  modal('Voies accessibles','<form id="nauticAccessForm">'+
+   '<label class="nautic-access-choice"><input type="checkbox" id="nauticAccessEnabled"> Afficher en vert depuis le GPS</label>'+
+   '<div class="nautic-access-fields">'+
+   '<label>Tirant d’eau (m)<input id="nauticAccessDraught" type="number" min="0.01" max="50" step="0.01" required></label>'+
+   '<label>Tirant d’air (m)<input id="nauticAccessAir" type="number" min="0.01" max="50" step="0.01" required></label>'+
+   '<label>Largeur (m)<input id="nauticAccessWidth" type="number" min="0.01" max="100" step="0.01" required></label></div>'+
+   '<p>France · limites de gabarit et ponts recensés par EuRIS. Le niveau d’eau réel peut modifier le passage.</p>'+
+   '<button type="submit">Appliquer</button></form>');
+  const fields={draught:$('nauticAccessDraught'),air:$('nauticAccessAir'),width:$('nauticAccessWidth')};
+  const enabled=$('nauticAccessEnabled');
+  enabled.checked=accessProfile.enabled;
+  for(const [key,input] of Object.entries(fields))input.value=accessProfile[key]/100;
+  $('nauticAccessForm').onsubmit=event=>{
+   event.preventDefault();
+   accessProfile={enabled:enabled.checked};
+   for(const [key,input] of Object.entries(fields))accessProfile[key]=Math.round(input.valueAsNumber*100);
+   const saved=JSON.stringify(accessProfile);
+   try{localStorage.setItem(accessKey,saved);native?.writeSetting(accessKey,saved);}catch(_){}
+   $('dialog').close();checkRouteImpacts();updateAccessible(true);
+  };
+ }
  const impactCacheKey='nautic-euris-route-impacts';
  try{
   const snapshot=JSON.parse(native?.readSetting(impactCacheKey)||'null');
@@ -137,8 +200,8 @@
  function checkRouteImpacts(force=false){
   if(!native?.checkRouteImpacts||impactPending||!fairwayCatalog)return;
   const trips=displayed.length?displayed:[routeState];
-  const scopes=[...new Set(trips.flatMap(item=>(item?.trip?.wayIds||[])
-   .map(id=>fairwayCatalog.sections.get(id)).filter(id=>/^(FR|BE)/.test(id))))].sort();
+  const scopes=[...new Set([...(accessProfile.enabled?franceScopes:[]),...trips.flatMap(item=>(item?.trip?.wayIds||[])
+   .map(id=>fairwayCatalog.sections.get(id)).filter(id=>/^(FR|BE)/.test(id)))])].sort();
   if(!scopes.length)return;
   const key=scopes.join(',');
   if(!force&&key===checkedScopes&&Date.now()-impactCheckedAt<20*60*1000)return;
@@ -155,8 +218,11 @@
    impacts=euris.compile(impactSnapshot,fairwayCatalog,calc);
    native?.writeSetting(impactCacheKey,JSON.stringify(impactSnapshot));
    eurisStatus='Avis EuRIS consultés';
+   const received=new Set(feed.scopes);
+   if(franceScopes.length&&franceScopes.every(scope=>received.has(scope)))nationalCheckedAt=Date.now();
   }catch(_){eurisStatus=impacts.length?'EuRIS indisponible · derniers avis mémorisés':'EuRIS indisponible';}
   renderTrip();
+  updateAccessible(true);
  };
  function cachedRoute(start,end){
   let local;
@@ -411,6 +477,7 @@
    '<div class="destination-menu"><button type="button" id="tripChange">Nouvelle destination</button> '+
    '<button type="button" id="tripCity">Rechercher une ville</button> '+
    '<button type="button" id="tripArchive">Trajets enregistrés</button> '+
+   '<button type="button" id="tripAccessible">Voies accessibles</button> '+
    (displayed.length?'<button type="button" id="tripHideGroup">Masquer les trajets sélectionnés</button> '+
     '<button type="button" id="tripGroupNotices">Avis de navigation</button> ':'')+
    (routeState?
@@ -423,6 +490,7 @@
     routeState.closures.map((closure,i)=>'<button type="button" data-trip-closure="'+i+'">'+
      (closure.from?'Tronçon '+(i+1):'Parcours entier')+' · '+closureDate(closure)+'</button> ').join('')+
     '<button type="button" id="tripClear">Effacer le trajet</button>':'')+'</div>');
+  $('tripAccessible').onclick=()=>{$('dialog').close();accessSettings();};
   $('tripCity').onclick=()=>{$('dialog').close();searchCity();};
   $('tripArchive').onclick=()=>{$('dialog').close();showArchive();};
   if($('tripHideGroup'))$('tripHideGroup').onclick=()=>{$('dialog').close();displayed=[];renderTrip();};
@@ -676,7 +744,7 @@
   else if(impacts.length)renderTrip();
   else checkNavigationNotices();
  },60000,true);
- window.nauticEvery(()=>{if(attachDeparture())renderTrip();},1500,true);
+ window.nauticEvery(()=>{if(attachDeparture())renderTrip();if(accessProfile.enabled)updateAccessible();},1500,true);
  window.nauticEvery(sync,350,true);let routeCount=-1;window.nauticEvery(()=>{if(active&&vector&&points.length!==routeCount){routeCount=points.length;vector.getSource('nautic-route')?.setData(routeData());}updateWorks();},3000,true);
  new ResizeObserver(()=>{vector?.resize();sync();}).observe(wrap);
  function selectedSignature(){return W.categories.filter(([key])=>options.waterwayTypes?.[key]!==false).map(([key])=>key).join(',');}
