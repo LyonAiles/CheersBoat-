@@ -203,6 +203,7 @@ assert.deepEqual(ids(missing),['B','C','D']);
 assert.deepEqual(missing.unverified.map(f=>f.properties.section),['A']);
 assert.equal(missing.unverified[0].properties.status,'unknown');
 const tooWide=visible({...profile,width:550},{...capacities,A:[200,0,500]});
-assert.equal(tooWide.insufficient,4);
+assert.equal(tooWide.insufficient.length,4);
+assert(tooWide.insufficient.every(item=>item.properties.status==='insufficient'));
 assert.equal(tooWide.unverified.length,0);
 console.log('PASS: France-wide dimensions filter includes disconnected and closed sections without GPS');

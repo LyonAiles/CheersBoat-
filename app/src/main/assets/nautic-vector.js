@@ -21,10 +21,10 @@
    for(const layer of vector.getStyle().layers||[])if(layer.type==='symbol'&&layer.layout?.['text-field']){vector.setLayoutProperty(layer.id,'text-rotation-alignment','viewport');vector.setLayoutProperty(layer.id,'text-pitch-alignment','viewport');vector.setLayoutProperty(layer.id,'symbol-placement','point');vector.setLayoutProperty(layer.id,'text-rotate',0);}
    vector.addSource('nautic-route',{type:'geojson',data:routeData()});vector.addLayer({id:'nautic-route',type:'line',source:'nautic-route',paint:{'line-color':'#20bce9','line-width':4}});
    vector.addSource('nautic-accessible',{type:'geojson',data:accessData});
-   vector.addLayer({id:'nautic-accessible-unknown',type:'line',source:'nautic-accessible',
-    filter:['==',['get','status'],'unknown'],paint:{'line-color':'#697788','line-width':3,'line-dasharray':[2,2],'line-opacity':.8}});
    vector.addLayer({id:'nautic-accessible',type:'line',source:'nautic-accessible',
-    filter:['==',['get','status'],'compatible'],paint:{'line-color':'#3be577','line-width':5,'line-opacity':.65}});
+    paint:{'line-color':['match',['get','status'],'insufficient','#ef4742','compatible','#3be577','#697788'],
+     'line-width':['match',['get','status'],'unknown',3,5],
+     'line-opacity':['match',['get','status'],'compatible',.65,.85]}});
    vector.addSource('nautic-trip', {type:'geojson', data:tripData()});
    vector.addLayer({id:'nautic-trip-line',type:'line',source:'nautic-trip',
     filter:['==','$type','LineString'],paint:{'line-color':['get','color'],'line-width':4}});
@@ -61,9 +61,11 @@
  const destinationButton = document.createElement('button');
  destinationButton.type = 'button';
  destinationButton.id = 'nauticDestination';
- const destinationStatus = document.createElement('div');
+ let destinationInfoDismissed=false;
+ const destinationStatus = document.createElement('button');
+ destinationStatus.type='button';
  destinationStatus.id = 'nauticDestinationStatus';
- destinationStatus.setAttribute('role', 'status');
+ destinationStatus.title='Masquer les informations du trajet';
  const tripProgress=document.createElement('progress');
  tripProgress.id='nauticTripProgress';tripProgress.hidden=true;
  tripProgress.setAttribute('aria-label','Calcul du trajet fluvial en cours');
@@ -132,21 +134,23 @@
   if(saved&&['draught','air','width'].every(key=>Number.isFinite(saved[key])&&saved[key]>0))accessProfile={enabled:!!saved.enabled,draught:saved.draught,air:saved.air,width:saved.width};
  }catch(_){}
  let accessData={type:'FeatureCollection',features:[]};
- const accessStatus=document.createElement('div');
- accessStatus.id='nauticAccessibleStatus';accessStatus.hidden=true;accessStatus.setAttribute('role','status');
+ const accessStatus=document.createElement('button');
+ accessStatus.type='button';
+ accessStatus.id='nauticAccessibleStatus';accessStatus.hidden=true;accessStatus.title='Masquer le bilan des gabarits';
+ accessStatus.onclick=()=>{accessStatus.hidden=true;};
  wrap.append(accessStatus);
  const legacyAccessible=map?L.geoJSON(null,{style:feature=>feature.properties.status==='unknown'
-  ?{color:'#697788',weight:3,opacity:.8,dashArray:'6 6',interactive:false}
-  :{color:'#3be577',weight:5,opacity:.65,interactive:false}}).addTo(map):null;
+  ?{color:'#697788',weight:3,opacity:.85,interactive:false}
+  :{color:feature.properties.status==='insufficient'?'#ef4742':'#3be577',weight:5,opacity:feature.properties.status==='insufficient'?.85:.65,interactive:false}}).addTo(map):null;
  function updateAccessible(){
   const result=accessProfile.enabled
    ?accessible.compatibleSections(france,window.NauticClearances||{},accessProfile)
-   :{features:[],unverified:[],insufficient:0};
+   :{features:[],unverified:[],insufficient:[]};
   accessStatus.textContent=result.features.length+' tronçons compatibles en France'+
    (result.unverified.length?' · '+result.unverified.length+' à vérifier (gris)':'')+
-   (result.insufficient?' · '+result.insufficient+' insuffisants':'');
+   (result.insufficient.length?' · '+result.insufficient.length+' hors gabarit (rouge)':'');
   accessStatus.hidden=!accessProfile.enabled;
-  accessData={type:'FeatureCollection',features:[...result.unverified,...result.features]};
+  accessData={type:'FeatureCollection',features:[...result.unverified,...result.features,...result.insufficient]};
   legacyAccessible?.clearLayers();legacyAccessible?.addData(accessData);
   vector?.getSource('nautic-accessible')?.setData(accessData);
  }
@@ -162,7 +166,7 @@
    '<label>Tirant d’eau (m)<input id="nauticAccessDraught" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Tirant d’air (m)<input id="nauticAccessAir" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Largeur (m)<input id="nauticAccessWidth" type="number" min="0.01" max="100" step="0.01" required></label></div>'+
-   '<p>Vert : gabarit compatible selon les données disponibles. Gris pointillé : gabarit à vérifier. Les fermetures figurent dans les avis du trajet.</p>'+
+   '<p>Vert : gabarit compatible selon les données disponibles. Gris : gabarit à vérifier. Rouge : gabarit insuffisant. Les fermetures figurent dans les avis du trajet.</p>'+
    '<button type="submit">Appliquer</button></form>');
   const fields={draught:$('nauticAccessDraught'),air:$('nauticAccessAir'),width:$('nauticAccessWidth')};
   const enabled=$('nauticAccessEnabled');
@@ -364,7 +368,7 @@
     destinationStatus.append(line);
    }
   }
-  destinationStatus.hidden=!message&&!destinationStatus.childElementCount;
+  destinationStatus.hidden=(!selection&&destinationInfoDismissed)||(!message&&!destinationStatus.childElementCount);
   tripProgress.hidden=!tripRequest;
   const blocked=routeState?.trip&&(currentClosures(routeState.closures).length>0||routeState.trip.restricted||
    applicableNotices().some(notice=>notice.active)||
@@ -509,7 +513,7 @@
    routeState=null;saveTrip();renderTrip();
   };
  };
- destinationStatus.onclick=()=>destinationButton.click();
+ destinationStatus.onclick=()=>{destinationInfoDismissed=true;destinationStatus.hidden=true;};
  function fitTrip(){
   fitPoints(tripFeatures(routeState).flatMap(feature=>feature.geometry.type==='LineString'?
    feature.geometry.coordinates.map(([lon,lat])=>({lat,lon})):[]).concat(routeState.end));
@@ -559,6 +563,7 @@
   routeState.covered=0;saveTrip();return true;
  }
  function reopenTrip(saved){
+  destinationInfoDismissed=false;
   tripRequest=null;selection=null;displayed=[];
   routeState={...saved,closures:[...saved.closures],savedId:saved.id,covered:0,awaitingGps:true};
   attachDeparture();saveTrip();checkNavigationNotices(true);renderTrip();fitTrip();
@@ -600,6 +605,7 @@
    if(!storeArchive({...archive,selected:[...checked]})){
     $('savedRoutesStatus').textContent='Impossible de mémoriser la sélection';return;
    }
+   destinationInfoDismissed=false;
    displayed=items;selection=null;$('dialog').close();
    checkNavigationNotices(true);renderTrip();fitPoints(items.flatMap(item=>item.trip.coordinates));
   };
@@ -690,6 +696,8 @@
  }
 
  function calculateTrip(start,end,keepExisting=false){
+  destinationInfoDismissed=false;
+  if(accessProfile.enabled)accessStatus.hidden=false;
   displayed=[];
   const request={};
   tripRequest=request;

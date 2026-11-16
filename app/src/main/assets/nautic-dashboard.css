@@ -260,7 +260,9 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
  background:var(--nautic-map-control-strong);
  color:#e1f6ff;
  font-size:11px;
- pointer-events:none;
+ text-align:left;
+ border:0;
+ cursor:pointer;
 }
 .nautic-access-choice {display:flex;align-items:center;gap:8px;margin-bottom:9px}
 .nautic-access-choice input {width:auto}
@@ -274,3 +276,5 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 #app.hide-mapCameraMedallions :is(#mapCameraPort,#mapCameraStarboard) {
  display:none!important;
 }
+
+#nauticDestinationStatus {text-align:left;border:0}

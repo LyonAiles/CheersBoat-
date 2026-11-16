@@ -2,16 +2,15 @@
  function compatibleSections(sections,limits,profile){
   const features=[];
   const unverified=[];
-  let insufficient=0;
+  const insufficient=[];
   for(const section of sections){
    const [draught,air,width]=limits[section.sourceId]||[];
-   if((draught>0&&profile.draught>=draught)||(width>0&&profile.width>=width)||(air>0&&profile.air>=air)){
-    insufficient++;continue;
-   }
+   const tooSmall=(draught>0&&profile.draught>=draught)||(width>0&&profile.width>=width)||(air>0&&profile.air>=air);
    const known=draught>0&&width>0&&(air>0||air===-1);
-   const feature={type:'Feature',properties:{section:section.sourceId,status:known?'compatible':'unknown'},
+   const status=tooSmall?'insufficient':known?'compatible':'unknown';
+   const feature={type:'Feature',properties:{section:section.sourceId,status},
     geometry:{type:'LineString',coordinates:section.geometry.map(point=>[point.lon,point.lat])}};
-   (known?features:unverified).push(feature);
+   (tooSmall?insufficient:known?features:unverified).push(feature);
   }
   return {features,unverified,insufficient};
  }
