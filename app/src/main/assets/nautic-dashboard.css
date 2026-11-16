@@ -270,3 +270,7 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 .nautic-map-transparency {display:block;margin-top:10px}
 .nautic-map-transparency output {font-variant-numeric:tabular-nums}
 .nautic-map-transparency input {display:block;padding:0;margin-top:4px}
+
+#app.hide-mapCameraMedallions :is(#mapCameraPort,#mapCameraStarboard) {
+ display:none!important;
+}

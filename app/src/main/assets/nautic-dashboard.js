@@ -174,6 +174,11 @@
   feeds[centerView]={...feed,lens:3-lens};
   previews();
  }
+ function restoreMedallion(){
+  if(!swappedMedallion)return;
+  [feeds[centerView],feeds[swappedMedallion]]=[feeds[swappedMedallion],feeds[centerView]];
+  swappedMedallion=null;
+ }
  function activateMapView(id){
   if(mapCamera.hidden||mapCamera.classList.contains('nautic-hidden'))return;
   if(id===centerView){
@@ -181,17 +186,21 @@
    dragged=false;
    return;
   }
-  if(swappedMedallion){
-   [feeds[centerView],feeds[swappedMedallion]]=[feeds[swappedMedallion],feeds[centerView]];
-  }
-  if(swappedMedallion===id)swappedMedallion=null;
-  else{
+  if($('app')?.classList.contains('hide-mapCameraMedallions'))return;
+  const previous=swappedMedallion;
+  restoreMedallion();
+  if(previous!==id){
    [feeds[centerView],feeds[id]]=[feeds[id],feeds[centerView]];
    swappedMedallion=id;
   }
   refreshMapViews();
   previews();
  }
+ window.addEventListener('nauticvisibility',()=>{
+  if($('app')?.classList.contains('hide-mapCameraMedallions'))restoreMedallion();
+  refreshMapViews();
+  previews();
+ });
  refreshMapViews();
  window.nauticMapCameraAlpha=value=>{
   mapCameraAlpha=Number(value);
