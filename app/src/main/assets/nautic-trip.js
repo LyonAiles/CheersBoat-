@@ -14,6 +14,26 @@
   return best;
  }
 
+ function reachableEdges(edges,start) {
+  const adjacent=new Map();
+  for(const edge of edges){
+   for(const id of [edge.from,edge.to]){
+    if(!adjacent.has(id))adjacent.set(id,[]);
+    adjacent.get(id).push(edge);
+   }
+  }
+  const reached=new Set(), visited=new Set([start.from]), pending=[start.from];
+  while(pending.length){
+   const id=pending.pop();
+   for(const edge of adjacent.get(id)||[]){
+    reached.add(edge);
+    const to=edge.from===id?edge.to:edge.from;
+    if(!visited.has(to)){visited.add(to);pending.push(to);}
+   }
+  }
+  return [...reached];
+ }
+
  function post(element) {
   const tags = element.tags || {};
   const units = tags['seamark:distance_mark:units'];
@@ -56,7 +76,7 @@
     return route.reverse();
    }
    for (const leg of adjacency.get(id) || []) {
-    const next = cost + leg.length;
+    const next = cost + leg.length * (leg.edge.restricted ? 8 : 1);
     if (next >= (costs.get(leg.to) ?? Infinity)) continue;
     costs.set(leg.to, next);
     parents.set(leg.to, {previous: id, leg});
@@ -68,8 +88,11 @@
 
  function create(elements, location, destination, destinationLimit = maxBankOffset) {
   const {edges} = W.parse(elements.filter(element => element.type === 'way'));
-  const start = snap(edges, location), target = snap(edges, destination);
-  if (!start || start.d > maxBankOffset || !target || target.d > destinationLimit) return null;
+  const start=snap(edges,location);
+  if(!start||start.d>maxBankOffset)return null;
+  const graph=destinationLimit>maxBankOffset?reachableEdges(edges,start.edge):edges;
+  const target=snap(graph,destination);
+  if(!target||target.d>destinationLimit)return null;
   const posts = elements.map(post).filter(Boolean).map(p => {
    const projection = snap(edges, p);
    return {...projection, pk: p.pk};
@@ -78,12 +101,15 @@
    W.distance(p, target) <= maxPostDistance)
    .sort((a, b) => W.distance(a, destination) - W.distance(b, destination));
   const nearestPost = candidates[0];
-  const legs = shortestPath(edges, start, nearestPost || target);
+  let endPost=nearestPost;
+  let legs = shortestPath(graph, start, endPost || target);
+  if(!legs&&endPost){endPost=null;legs=shortestPath(graph,start,target);}
   if (!legs) return null;
 
+  const arrivalOffset=W.distance(destination,endPost||target);
   const departurePost = posts.find(p => p.edge.waterway === start.edge.waterway && W.distance(p, start) < 1);
-  const singleWaterway = nearestPost && departurePost &&
-   nearestPost.edge.waterway === departurePost.edge.waterway &&
+  const singleWaterway = endPost && departurePost &&
+   endPost.edge.waterway === departurePost.edge.waterway &&
    legs.every(leg => leg.edge.waterway === departurePost.edge.waterway);
   let length = 0;
   const anchors = [];
@@ -117,18 +143,18 @@
    }
   }
   if (singleWaterway) {
-   const direction = Math.sign(nearestPost.pk - departurePost.pk);
-   const ordered = [departurePost, ...anchors.filter(p => p.at > 0 && p.at < length), nearestPost];
+   const direction = Math.sign(endPost.pk - departurePost.pk);
+   const ordered = [departurePost, ...anchors.filter(p => p.at > 0 && p.at < length), endPost];
    if (direction && ordered.every((p, i) => !i || (p.pk - ordered[i - 1].pk) * direction >= 0)) {
-    return {legs, end: point(nearestPost), pk: nearestPost.pk,
-     total: Math.abs(nearestPost.pk - departurePost.pk), estimated: false};
+    return {legs, end: point(endPost), pk: endPost.pk,
+     total: Math.abs(endPost.pk - departurePost.pk), estimated: false, arrivalOffset};
    }
   }
   const calibrated = intervals.reduce((total, item) => total + item.end - item.start, 0);
   const correction = intervals.reduce((total, item) => total + (item.end - item.start) * (item.factor - 1), 0);
   return {
-   legs, end: point(nearestPost || target), pk: nearestPost?.pk ?? null,
-   total: (length + correction) / 1000, estimated: length - calibrated > 1
+   legs, end: point(endPost || target), pk: endPost?.pk ?? null,
+   total: (length + correction) / 1000, estimated: length - calibrated > 1, arrivalOffset
   };
  }
 
@@ -138,7 +164,8 @@
   if(!route)return null;
   const coordinates=route.legs.length?[route.legs[0].a,...route.legs.map(leg=>leg.b)].map(point):[point(route.end)];
   const closedEdges=route.legs.flatMap((leg,i)=>leg.edge.restricted?[i]:[]);
-  return {coordinates,total:route.total,pk:route.pk,estimated:route.estimated,restricted:closedEdges.length>0,closedEdges,wayIds:route.legs.map(leg=>leg.edge.wayId),restrictionVersion:3};
+  const openEdges=route.legs.flatMap((leg,i)=>leg.edge.chartedOpen&&!leg.edge.restricted?[i]:[]);
+  return {coordinates,openEdges,arrivalOffset:route.arrivalOffset,total:route.total,pk:route.pk,estimated:route.estimated,restricted:closedEdges.length>0,closedEdges,wayIds:route.legs.map(leg=>leg.edge.wayId),restrictionVersion:3};
  }
 
  function geometry(coordinates) {
@@ -167,6 +194,7 @@
    if(a&&b&&a.distance<=300&&b.distance<=300)spans.push([Math.min(a.offset,b.offset),Math.max(a.offset,b.offset)]);
   }
   const known=new Set([...(trip.closedEdges||[]),...verifiedEdges]);
+  const chartedOpen=new Set(trip.openEdges||[]);
   const cuts=spans.flat().sort((a,b)=>a-b);
   let cursor=0;
   const result=[];
@@ -191,9 +219,10 @@
     const lo=stops[j-1],hi=stops[j],mid=(lo+hi)/2;
     if(lo===hi)continue;
     const closed=known.has(i-1)||spans.some(([from,to])=>from<=mid&&mid<=to);
+    const state=closed?'closed':chartedOpen.has(i-1)?'open':'unknown';
     const previous=result.at(-1);
-    if(previous?.closed===closed)previous.coordinates.push(at(hi));
-    else result.push({closed,coordinates:[at(lo),at(hi)]});
+    if(previous?.state===state)previous.coordinates.push(at(hi));
+    else result.push({closed,state,coordinates:[at(lo),at(hi)]});
    }
   }
   return result;

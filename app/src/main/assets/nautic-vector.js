@@ -112,26 +112,31 @@
   lastSave=Date.now();
  }
 
+ const arrivalLimit=5000;
  function cachedRoute(start,end){
   let local;
   try{local=JSON.parse(localStorage.getItem(networkKey)||'null');}catch(_){}
-  const bundled=window.NauticLocalWaterways||[];
+  const bundled=window.NauticLocalWaterways||[], regional=window.NauticRegionalWaterways||[];
   const downloaded=[...(cache?.elements||[]),...(Array.isArray(local)?local:[])];
-  for(const [elements,note,limit] of [
-   [downloaded,'Réseau en cache',undefined],
-   [bundled,'Voie d’eau embarquée · OpenStreetMap',1000],
-   [[...bundled,...downloaded],'Tracé OpenStreetMap en cache',undefined]
+  for(const [elements,note] of [
+   [downloaded,'Réseau en cache'],
+   [bundled,'Voie d’eau embarquée · OpenStreetMap'],
+   [regional,'Voie d’eau embarquée · OpenStreetMap'],
+   [[...bundled,...downloaded],'Tracé OpenStreetMap en cache']
   ]){
    if(!elements.length)continue;
    try{
-    const trip=calc.fromNetwork(elements,start,end,limit);
+    const trip=calc.fromNetwork(elements,start,end,arrivalLimit);
     if(trip)return {trip,note};
    }catch(_){}
   }
   return null;
  }
- function sectionColor(closed){
-  return closed?'#ff4a42':'#a4b0bc';
+ function sectionColor(state){
+  return state==='closed'?'#ff4a42':state==='open'?'#42d67a':'#a4b0bc';
+ }
+ function currentClosures(closures){
+  return closures.filter(closure=>!closure.date||closure.date>noticeDay);
  }
  function applicableNotices(trip=routeState?.trip){
   return notices.relevant(trip,liveNotices,noticeDay);
@@ -154,19 +159,20 @@
  };
  function tripData(){
   const items=displayed.length?displayed:routeState?[routeState]:[];
-  const features=items.flatMap(tripFeatures).sort((a,b)=>Number(a.properties.closed)-Number(b.properties.closed));
+  const rank={unknown:0,open:1,closed:2};
+  const features=items.flatMap(tripFeatures).sort((a,b)=>rank[a.properties.state]-rank[b.properties.state]);
   return {type:'FeatureCollection',features};
  }
  function tripFeatures(item){
   const {trip,closures,end}=item;
-  if(!trip)return [{type:'Feature',properties:{color:'#bdc5d2'},
+  if(!trip)return [{type:'Feature',properties:{color:'#bdc5d2',state:'unknown'},
    geometry:{type:'Point',coordinates:[end.lon,end.lat]}}];
   const xy=p=>[p.lon,p.lat];
-  const segments=calc.sections(trip,closures,notices.closedEdges(trip,applicableNotices(trip)),item.departure?.offset);
-  const properties=closed=>({color:sectionColor(closed),closed});
-  const features=segments.map(segment=>({type:'Feature',properties:properties(segment.closed),
+  const segments=calc.sections(trip,currentClosures(closures),notices.closedEdges(trip,applicableNotices(trip)),item.departure?.offset);
+  const properties=state=>({color:sectionColor(state),state});
+  const features=segments.map(segment=>({type:'Feature',properties:properties(segment.state),
    geometry:{type:'LineString',coordinates:segment.coordinates.map(xy)}}));
-  features.push({type:'Feature',properties:properties(!!segments.at(-1)?.closed),
+  features.push({type:'Feature',properties:properties(segments.at(-1)?.state||'unknown'),
    geometry:{type:'Point',coordinates:xy(trip.coordinates.at(-1))}});
   return features;
  }
@@ -203,7 +209,8 @@
   destinationStatus.textContent=message;
   destinationStatus.hidden=!message;
   tripProgress.hidden=!tripRequest;
-  destinationStatus.style.borderLeft=routeState?.trip?'3px solid '+sectionColor(routeState.closures.length>0||routeState.trip.restricted||applicableNotices().some(notice=>notice.active)):'';
+  const blocked=routeState?.trip&&(currentClosures(routeState.closures).length>0||routeState.trip.restricted||applicableNotices().some(notice=>notice.active));
+  destinationStatus.style.borderLeft=routeState?.trip?'3px solid '+sectionColor(blocked?'closed':'unknown'):'';
  }
  function tripSummary(){
   if(displayed.length)return [displayed.length+' trajets affichés',
@@ -213,9 +220,10 @@
   if(!trip)return tripRequest?'Calcul du trajet fluvial…':note||'Impossible de calculer le trajet fluvial';
   const distance=(trip.estimated||routeState.departure?.offset>0?'≈ ':'')+km(routeState.departure?.total??trip.total);
   const parts=[];
-  if(closures.length){
-   parts.push(closures.length===1?'Un tronçon fermé':closures.length+' tronçons fermés');
-   const dates=[...new Set(closures.map(closureDate))];
+  const activeClosures=currentClosures(closures);
+  if(activeClosures.length){
+   parts.push(activeClosures.length===1?'Un tronçon fermé':activeClosures.length+' tronçons fermés');
+   const dates=[...new Set(activeClosures.map(closureDate))];
    parts.push(dates.length===1?dates[0]:'Dates dans Destination');
   }
   if(trip.restricted)parts.push(trip.closedEdges?'Restriction OpenStreetMap':'Restriction à localiser');
@@ -224,9 +232,10 @@
    const dates=[...new Set(verified.map(notice=>notice.active?'Fermeture VNF en cours':'Fermeture VNF dès le '+noticeDate(notice.start)))];
    parts.push(...dates);
   }
-  if(calc.sections(trip,closures,notices.closedEdges(trip,verified)).some(part=>!part.closed))parts.push('Gris · état inconnu');
+  if(calc.sections(trip,activeClosures,notices.closedEdges(trip,verified)).some(part=>part.state==='unknown'))parts.push('Gris · état inconnu');
   if(routeState.awaitingGps)parts.push(routeState.gpsMessage||'Départ en attente du GPS');
   if(note)parts.push(note);
+  if(trip.arrivalOffset>150)parts.push('Arrivée sur l’eau à '+km(trip.arrivalOffset/1000)+' du point choisi');
   if(trip.pk!=null)parts.push('Arrivée PK '+formatPk.format(trip.pk));
   if(!routeState.awaitingGps)parts.push(distance);
   return parts.join(' · ');
@@ -241,9 +250,24 @@
    noticeDate(notice.end)+' inclus.<br>'+
    (notice.tentative&&notice.tentative>notice.end?'Prolongation probable jusqu’au '+noticeDate(notice.tentative)+' · à confirmer.<br>':'')+
    (notice.live?'Vérifié via EuRIS':'Avis embarqué')+'</p>').join('');
+  const dates=[...new Map(relevant.map(item=>[item.number,item])).values()].map(item=>({
+   date:item.end,title:item.title,detail:'Fin de fermeture annoncée le '+noticeDate(item.end)+' inclus'+
+    (item.tentative&&item.tentative>item.end?' · prolongation probable jusqu’au '+noticeDate(item.tentative):'')
+  }));
+  for(const item of (displayed.length?displayed:routeState?[routeState]:[])){
+   item.closures.forEach((closure,index)=>{
+    if(closure.date>noticeDay)dates.push({date:closure.date,
+     title:(item.name?item.name+' · ':'')+(closure.from?'Tronçon '+(index+1):'Parcours entier'),
+     detail:closureDate(closure)});
+   });
+  }
+  dates.sort((a,b)=>a.date.localeCompare(b.date));
+  const reopenings=dates.length?'<h3>Réouvertures annoncées</h3><ul>'+
+   dates.map(item=>'<li>'+esc(item.title)+' · '+esc(item.detail)+'</li>').join('')+'</ul>':'';
   modal('Avis de navigation',
+   reopenings+
    (entries||'<p>Aucun avis VNF associé aux tronçons de ce trajet.</p>')+
-   '<p>Gris · état inconnu. Rouge · fermeture ou restriction signalée.</p>'+
+   '<p>Vert · navigation indiquée sur la carte. Gris · état inconnu. Rouge · fermeture ou restriction en cours.</p>'+
    '<p>Actualisation automatique des avis associés aux tronçons répertoriés.</p>'+
    '<p><a href="https://avisbat.vnf.fr/">Consulter les avis officiels VNF</a></p>'+
    '<small>API/Service Notices to Skippers incorporated from EuRIS (eurisportal.eu)</small>');
@@ -253,7 +277,7 @@
   return date&&Number.isFinite(+date)?'Réouverture prévue '+formatDate.format(date):'Réouverture inconnue';
  }
  function selectionPrompt(type){
-  if(type==='start')return 'Touche le point de départ';
+  if(type==='start'||type==='startToCity')return 'Touche le point de départ';
   if(type==='closureStart')return 'Touche le début du tronçon fermé sur le tracé';
   if(type==='closureEnd')return 'Touche la fin du tronçon fermé sur le tracé';
   return 'Touche la destination';
@@ -413,7 +437,7 @@
   if(data.request!==cityRequest||!target||!$('dialog').open)return;
   let count=0;
   for(const city of data.cities||[]){
-   const [lon,lat]=city?.centre?.coordinates||[];
+   const [lon,lat]=(city?.mairie||city?.centre)?.coordinates||[];
    if(!validPoint({lat,lon})||typeof city.nom!=='string')continue;
    const result=document.createElement('button');
    result.type='button';result.textContent=city.nom+' ('+city.codeDepartement+')';
@@ -422,7 +446,15 @@
     if(map){map.setView([lat,lon],13,{animate:false});rotateMap();}
     if(active&&vector)vector.jumpTo({center:[lon,lat],zoom:13,padding:{top:0,bottom:0,left:0,right:0}});
    };
-   target.append(result,' ');count++;
+   const plan=document.createElement('button');
+   plan.type='button';plan.textContent='Tracer vers '+city.nom;
+   plan.onclick=()=>{
+    $('dialog').close();
+    const gps=currentDeparture()||stableFix;
+    if(gps){selection=null;calculateTrip({lat:gps.lat,lon:gps.lon},{lat,lon});}
+    else choose('startToCity',{lat,lon});
+   };
+   const row=document.createElement('p');row.append(result,' ',plan);target.append(row);count++;
   }
   $('cityStatus').textContent=data.failed?'Recherche de ville indisponible':count?'':'Aucune commune trouvée';
  };
@@ -450,6 +482,7 @@
   selection=null;
   const chosen={lat:position.lat,lon:position.lng};
   if(next.type==='start'){choose('end',chosen);return;}
+  if(next.type==='startToCity')return calculateTrip(chosen,next.start);
   if(next.type==='closureStart'||next.type==='closureEnd'){
    const coordinates=routeState.trip.coordinates;
    const hit=calc.locate(coordinates,chosen);
@@ -469,6 +502,41 @@
   return calculateTrip({lat:departure.lat,lon:departure.lon},chosen);
  }
 
+ async function overpassNetwork(_area,query,signal){
+  const response=await fetch('https://overpass-api.de/api/interpreter',{
+   method:'POST',body:new URLSearchParams({data:query}),signal
+  });
+  if(!response.ok)throw Error('OpenStreetMap '+response.status);
+  const result=await response.json();
+  if(result.remark||!Array.isArray(result.elements))throw Error('Réseau incomplet');
+  return result.elements;
+ }
+ async function regionalNetwork(area,_query,signal){
+  const [south,west,north,east]=area.split(',').map(Number);
+  const endpoint='https://services-eu1.arcgis.com/zci5bUiJ8olAal7N/arcgis/rest/services/OpenStreetMap_Waterways_for_Europe/FeatureServer/0/query';
+  const params=new URLSearchParams({
+   f:'geojson',where:"waterway IN ('canal','fairway') OR (waterway='river' AND (name IS NOT NULL OR boat IS NOT NULL OR lock='yes'))",
+   geometry:[west,south,east,north].join(','),geometryType:'esriGeometryEnvelope',inSR:'4326',outSR:'4326',
+   outFields:'osm_id,name,waterway,boat,access,lock',geometryPrecision:'6',resultRecordCount:'2000',orderByFields:'OBJECTID'
+  });
+  const elements=[];
+  for(let offset=0;offset<20000;offset+=2000){
+   params.set('resultOffset',String(offset));
+   const response=await fetch(endpoint+'?'+params,{signal});
+   if(!response.ok)throw Error('Réseau cartographique '+response.status);
+   const result=await response.json();
+   if(!Array.isArray(result.features))throw Error('Réseau incomplet');
+   for(const {geometry,properties} of result.features){
+    if(!geometry||!properties?.osm_id)continue;
+    const {osm_id,name,waterway,boat,access,lock}=properties;
+    const lines=geometry.type==='LineString'?[geometry.coordinates]:geometry.coordinates;
+    lines.forEach((line,index)=>elements.push({type:'way',id:index?osm_id+'-'+index:Number(osm_id),sourceId:Number(osm_id),
+     tags:{name,waterway,boat,access,lock},geometry:line.map(([lon,lat])=>({lat,lon}))}));
+   }
+   if(result.features.length<2000)break;
+  }
+  return elements;
+ }
  async function calculateTrip(start,end,keepExisting=false){
   displayed=[];
   tripRequest?.abort();
@@ -479,27 +547,31 @@
   routeState.trip=cached?.trip||routeState.trip;
   routeState.note=cached?.note||'Impossible de calculer le trajet fluvial';
   saveTrip();renderTrip();
-  const timeout=setTimeout(()=>controller.abort(),50000);
+  if(cached&&W.distance(start,end)>120000){tripRequest=null;renderTrip();return;}
+  const timeout=setTimeout(()=>controller.abort(),70000);
   try{
    const distance=W.distance(start,end);
-   const margin=Math.max(.025,distance/111000*.35);
+   const margin=Math.max(.07,distance/111000*.55);
    const lonMargin=margin/Math.max(.15,Math.cos((start.lat+end.lat)*Math.PI/360));
    const area=[Math.min(start.lat,end.lat)-margin,Math.min(start.lon,end.lon)-lonMargin,
     Math.max(start.lat,end.lat)+margin,Math.max(start.lon,end.lon)+lonMargin].map(n=>n.toFixed(5)).join(',');
    const query='[out:json][timeout:40];(way[waterway~"^(canal|river|fairway)$"]('+area+
     ');node["seamark:distance_mark:distance"]('+area+'););out geom;';
-   const response=await fetch('https://overpass-api.de/api/interpreter',{
-    method:'POST',body:new URLSearchParams({data:query}),signal:controller.signal
-   });
-   if(!response.ok)throw Error('Overpass '+response.status);
-   const result=await response.json();
-   if(tripRequest!==controller)return;
-   if(result.remark||!Array.isArray(result.elements))throw Error('Réseau incomplet');
-   const planned=calc.fromNetwork(result.elements,start,end);
+   const builders=distance>120000?[regionalNetwork,overpassNetwork]:[overpassNetwork,regionalNetwork];
+   let planned=null, elements=null;
+   for(const load of builders){
+    if(controller.signal.aborted)break;
+    try{
+     const network=await load(area,query,controller.signal);
+     if(tripRequest!==controller)return;
+     const candidate=calc.fromNetwork(network,start,end,arrivalLimit);
+     if(candidate){planned=candidate;elements=network;break;}
+    }catch(_){}
+   }
    if(planned){
     routeState.trip=planned;routeState.note='';
-    try{const json=JSON.stringify(result.elements);if(json.length<1800000)localStorage.setItem(networkKey,json);}catch(_){}
-   }else if(!routeState.trip)routeState.note='Impossible de calculer · réseau fluvial non raccordé';
+    try{const json=JSON.stringify(elements);if(json.length<1800000)localStorage.setItem(networkKey,json);}catch(_){}
+   }else if(!routeState.trip)routeState.note='Aucune liaison fluviale trouvée dans le réseau disponible';
   }catch(_){
    if(tripRequest===controller&&!routeState.trip)routeState.note='Impossible de calculer · réseau fluvial indisponible';
   }finally{

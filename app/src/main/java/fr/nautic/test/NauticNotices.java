@@ -17,7 +17,7 @@ final class NauticNotices {
 
  static String searchCity(String name)throws IOException{
   if(name==null||name.trim().length()<2||name.length()>100)throw new IOException("Nom de commune invalide");
-  return read("https://geo.api.gouv.fr/communes?fields=nom,codeDepartement,centre&boost=population&limit=8&nom="+Uri.encode(name.trim()));
+  return read("https://geo.api.gouv.fr/communes?fields=nom,codeDepartement,centre,mairie&boost=population&limit=8&nom="+Uri.encode(name.trim()));
  }
 
  private static String read(String endpoint)throws IOException{

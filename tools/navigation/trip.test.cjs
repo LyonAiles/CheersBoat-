@@ -116,3 +116,19 @@ assert.deepEqual(resumedSections.at(-1).coordinates.at(-1),route.coordinates.at(
 assert.equal(resume(route,route.coordinates.at(-1)).total,0);
 assert.deepEqual(sections(route,[],[],resume(route,route.coordinates.at(-1)).offset),[]);
 console.log('PASS: reopening uses the GPS projection along the stored route and preserves intersected closures');
+
+const region = require('../../app/src/main/assets/nautic-waterways-regional.js');
+const avignon = p(43.9416,4.8333);
+assert.equal(fromNetwork(region,chatillonPort,avignon),null);
+const longTrip = fromNetwork(region,chatillonPort,avignon,5000);
+assert(longTrip.total>650 && longTrip.total<720);
+assert(longTrip.arrivalOffset>150 && longTrip.arrivalOffset<2500);
+assert(longTrip.coordinates.some(q=>q.lat>46.79&&q.lat<46.82&&q.lon>4.85&&q.lon<4.88));
+const loireNotices = notices.relevant(longTrip,{},'2026-11-16');
+const verifiedLongEdges = notices.closedEdges(longTrip,loireNotices);
+assert(verifiedLongEdges.length>500);
+const states = sections(longTrip,[],verifiedLongEdges);
+assert(states.some(part=>part.state==='closed') && states.some(part=>part.state==='open') &&
+       states.some(part=>part.state==='unknown'));
+assert.equal(states[0].state,'closed');
+console.log('PASS: connected Châtillon–Avignon itinerary, waterway arrival, and three distinct navigation states');
