@@ -249,9 +249,23 @@ function renderWeatherGustLine(){
  const chart=$('weatherGustLine');
  const rows=weatherRows(weatherForecast);
  const gusts=rows.map(row=>row.g).filter(Number.isFinite);
- const maximum=Math.max(10,...gusts);
- chart.querySelector('path').setAttribute('d',forecastLine(rows,'g',i=>2+i*96/Math.max(1,rows.length-1),v=>26-v*24/maximum));
- chart.setAttribute('aria-hidden',String(gusts.length<2));
+ const minimum=Math.min(...gusts),maximum=Math.max(...gusts);
+ const x=i=>3+i*94/Math.max(1,rows.length-1);
+ const y=v=>31-v*19/Math.max(10,maximum);
+ chart.querySelector('path').setAttribute('d',forecastLine(rows,'g',x,y));
+ const showLabel=(id,value,above)=>{
+  const label=$(id);
+  label.textContent=Number.isFinite(value)?String(Math.round(value)):'';
+  if(!label.textContent)return;
+  const index=rows.findIndex(row=>row.g===value);
+  label.setAttribute('x',String(Math.max(8,Math.min(92,x(index)))));
+  label.setAttribute('y',String(y(value)+(above?-3:8)));
+ };
+ showLabel('weatherGustMax',maximum,true);
+ showLabel('weatherGustMin',minimum===maximum?NaN:minimum,false);
+ chart.setAttribute('aria-hidden',String(!gusts.length));
+ if(gusts.length)chart.setAttribute('aria-label','Rafales prévues sur dix heures, minimum '+Math.round(minimum)+
+  ', maximum '+Math.round(maximum)+' kilomètres par heure');
 }
 
 window.nauticEvery(()=>{if(latest)loadWeather()},WIND_PERIOD);

@@ -647,7 +647,12 @@ const fixedClock=document.getElementById('clock');
 if(fixedClock){document.body.appendChild(fixedClock);fixedClock.hidden=false;fixedClock.removeAttribute('aria-hidden');}
 const clockElement=document.getElementById('clock');
 if(clockElement){clockElement.hidden=false;clockElement.classList.remove('nautic-hidden');clockElement.removeAttribute('aria-hidden');}
-if(clockElement){clockElement.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});window.nauticEvery(()=>{clockElement.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})},10000);}
+if(clockElement){
+ const clockFormat=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+ const tick=()=>{clockElement.textContent=clockFormat.format(new Date());};
+ tick();window.nauticEvery(tick,1000);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
+}
 if(clockElement){
  clockElement.style.setProperty('display','block','important');
  clockElement.style.setProperty('visibility','visible','important');

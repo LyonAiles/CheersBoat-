@@ -38,9 +38,35 @@ final class NotesPad {
     intent.putExtra(Intent.EXTRA_TITLE,"Nautic-notes-"+new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.FRANCE).format(new java.util.Date())+".txt");activity.startActivityForResult(intent,SAVE_FILE);
    }catch(Exception e){prefs.edit().remove("pendingExport").apply();Toast.makeText(activity,"Enregistrement de fichier indisponible : notes conservées",Toast.LENGTH_LONG).show();}
   });
+  Button carry=new Button(activity);
+  carry.setText("Emporter");
+  try{
+   String settings=activity.getSharedPreferences("nautic_settings",Context.MODE_PRIVATE).getString("nautic-extensions","{}");
+   if(new org.json.JSONObject(settings).optBoolean("objectNumbers",true))carry.setText("Emporter · 391");
+  }catch(org.json.JSONException ignored){}
+  carry.setContentDescription("Emporter tout le texte du bloc-notes");
+  carry.setOnClickListener(v->carryNotes());
+  page.addView(carry,new LinearLayout.LayoutParams(-1,-2));
   dialog.setContentView(page);dialog.setOnDismissListener(d->{save();((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(editor.getWindowToken(),0);dismissed.run();});
   dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);dialog.show();dialog.getWindow().setLayout(-1,-1);
   editor.requestFocus();editor.postDelayed(()->{if(isShowing())((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(editor,InputMethodManager.SHOW_IMPLICIT);},180);
+ }
+ private void carryNotes(){
+  String text=editor.getText().toString();
+  if(text.isEmpty()){
+   Toast.makeText(activity,"Le bloc-notes est vide",Toast.LENGTH_SHORT).show();
+   return;
+  }
+  try{
+   android.content.ClipboardManager clipboard=(android.content.ClipboardManager)activity.getSystemService(Context.CLIPBOARD_SERVICE);
+   if(clipboard==null)throw new IllegalStateException("Presse-papiers indisponible");
+   clipboard.setPrimaryClip(ClipData.newPlainText("Bloc-notes Nautic",text));
+   if(!prefs.edit().putString("draft","").commit())throw new IOException("Brouillon non mémorisé");
+   editor.setText("");
+   Toast.makeText(activity,"Texte emporté dans le presse-papiers",Toast.LENGTH_SHORT).show();
+  }catch(Exception e){
+   Toast.makeText(activity,"Impossible d’emporter le texte. Note conservée.",Toast.LENGTH_LONG).show();
+  }
  }
  boolean result(int request,int result,Intent data){
   if(request!=SAVE_FILE)return false;
