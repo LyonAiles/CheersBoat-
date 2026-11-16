@@ -92,7 +92,7 @@
 /* Bandeau compact et repères stables. */
 #app{grid-template-rows:50px minmax(0,1fr) 0!important}
 #app header{height:50px!important;align-items:center!important;padding-top:0!important}
-body>#clock{top:7px!important;height:32px!important;line-height:32px!important;font-size:21px!important}
+body>#clock{pointer-events:auto!important;top:7px!important;height:32px!important;line-height:32px!important;font-size:21px!important}
 #clockTime{display:block;line-height:inherit}
 #clock[aria-expanded="true"] #clockTime{line-height:20px}
 #clockDate[hidden]{display:none}
@@ -146,7 +146,7 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
  inset:0;
  border-radius:inherit;
  pointer-events:none;
- background:linear-gradient(160deg,rgba(255,255,255,.16) 0%,transparent 25%,transparent 69%,rgba(0,0,0,.24) 100%);
+ background:linear-gradient(160deg,rgba(255,255,255,.36) 0%,transparent 26%,transparent 70%,rgba(0,0,0,.55) 100%);
 }
 #mapCameraPort {left:3%}
 #mapCameraStarboard {right:3%}
@@ -176,6 +176,11 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
 }
 #mapCameraQuality[hidden],#app.hide-mapCameraOverlay #mapCameraQuality {display:none!important}
 #mapCameraQuality[aria-pressed="true"] {background:#1b6257}
+#mapCameraMedallionToggle {
+ position:absolute;z-index:852;right:8px;bottom:8px;min-height:44px;
+ padding:3px 8px;font-size:11px;background:#092f43ec;color:#fff;
+}
+#mapCameraMedallionToggle[hidden] {display:none!important}
 
 #app.hide-mapZoomIn :is(.leaflet-control-zoom-in,.maplibregl-ctrl-zoom-in),
 #app.hide-mapZoomOut :is(.leaflet-control-zoom-out,.maplibregl-ctrl-zoom-out) {display:none!important}
@@ -291,3 +296,6 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 }
 
 #nauticDestinationStatus {text-align:left;border:0}
+
+#nauticSignButton {position:absolute;z-index:740;left:8px;top:69px;font-size:11px;padding:5px 8px}
+#mapWrap:has(#nauticDestinationStatus:not([hidden])) #nauticSignButton {top:auto;bottom:8px}

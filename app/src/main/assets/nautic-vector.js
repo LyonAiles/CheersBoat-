@@ -80,7 +80,10 @@
  const tripProgress=document.createElement('progress');
  tripProgress.id='nauticTripProgress';tripProgress.hidden=true;
  tripProgress.setAttribute('aria-label','Calcul du trajet fluvial en cours');
- wrap.append(destinationButton,tripProgress,destinationStatus);
+ const signButton=document.createElement('button');
+ signButton.type='button';signButton.id='nauticSignButton';signButton.textContent='Panneaux';
+ signButton.hidden=options.waterwayTypes?.notice===false;
+ wrap.append(destinationButton,tripProgress,destinationStatus,signButton);
  const tripKey='nautic-last-trip-v1', networkKey='nautic-trip-network-v1';
  const calc=window.NauticTrip, notices=window.NauticNotices;
  const archiveKey='nautic-saved-trips-v1';
@@ -832,7 +835,7 @@
  renderTrip();
  updateAccessible();
  function routeData(){return {type:'FeatureCollection',features:points.length>1?[{type:'Feature',geometry:{type:'LineString',coordinates:points.map(p=>[p.lon,p.lat])},properties:{}}]:[]};}
- function worksData(){return {type:'FeatureCollection',features:(options.waterwayWorks===false?[]:lastList).map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{id:p.id,category:p.category||W.categoryOf(p.type)}}))};}
+ function worksData(){return {type:'FeatureCollection',features:mapWorks().map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{id:p.id,category:p.category||W.categoryOf(p.type)}}))};}
  function positionBoat(){const boat=$('mapBoat'),p=stableFix||latest;if(!boat||!p)return;if(!window.nauticMapFreePan){boat.style.setProperty('left','50%','important');boat.style.setProperty('top','66.666667%','important');return;}let q;if(active&&vector)q=vector.project([p.lon,p.lat]);else if(map){q=map.latLngToContainerPoint([p.lat,p.lon]);const r=$('map').getBoundingClientRect(),w=wrap.getBoundingClientRect();q={x:q.x+r.left-w.left,y:q.y+r.top-w.top};}if(q){const angle=active&&vector?(heading??0)-vector.getBearing():(heading??0);boat.style.transform=`translate(-50%,-50%) rotate(${angle}deg)`;boat.style.setProperty('left',q.x+'px','important');boat.style.setProperty('top',q.y+'px','important');}}
  window.nauticPositionBoat=positionBoat;window.addEventListener('nauticmapfollow',()=>{selectedWorkPoint=null;lastWorksCompute=0;lastCamera=null;sync();updateWorks();});
  window.nauticPreviewWorkSize=percent=>{options={...options,waterwayIconSize:percent};if(active&&vector?.getLayer('nautic-works'))vector.setLayoutProperty('nautic-works','icon-size',I.expression(percent));lastRender='';renderWorks();};
@@ -840,7 +843,7 @@
  if(!changed)return;lastLegacyZoom=z;lastCamera={lat:c.lat,lon:c.lon,bearing,pitch:mapPitch,h};vector.jumpTo({...(zoomChanged&&z!=null?{zoom:z}:{}),center:[c.lon,c.lat],bearing,pitch:mapPitch,padding:{top:h/3,bottom:0,left:0,right:0}});$('compass').style.transform=`rotate(${bearing}deg)`;
  }
 
- function settings(next){options=next||read();lastQuery=0;if((options.mapEngine||'vector')==='legacy'){request++;failed=false;active=false;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}window.nauticRestoreLegacy?.();}else if(!vector){failed=false;start();}if(active&&vector?.getLayer('nautic-works')){const sizes=I.expression(Number(options.waterwayIconSize)||120);vector.setLayoutProperty('nautic-works','icon-size',sizes);}lastRender='';renderWorks();}
+ function settings(next){options=next||read();lastQuery=0;signButton.hidden=options.waterwayTypes?.notice===false;if((options.mapEngine||'vector')==='legacy'){request++;failed=false;active=false;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}window.nauticRestoreLegacy?.();}else if(!vector){failed=false;start();}if(active&&vector?.getLayer('nautic-works')){const sizes=I.expression(Number(options.waterwayIconSize)||120);vector.setLayoutProperty('nautic-works','icon-size',sizes);}lastRender='';renderWorks();}
  window.nauticApplyNavigation=settings;
  window.nauticApplyMapPitch=()=>{
   if(!vector)return;
@@ -860,9 +863,9 @@
   else checkNavigationNotices();
  },60000,true);
  window.nauticEvery(()=>{if(attachDeparture())renderTrip();},1500,true);
- window.nauticEvery(sync,350,true);let routeCount=-1;window.nauticEvery(()=>{if(active&&vector&&points.length!==routeCount){routeCount=points.length;vector.getSource('nautic-route')?.setData(routeData());}updateWorks();},3000,true);
+ window.nauticEvery(sync,350,true);let routeCount=-1;window.nauticEvery(()=>{if(active&&vector&&points.length!==routeCount){routeCount=points.length;vector.getSource('nautic-route')?.setData(routeData());}updateWorks();updateSigns();},3000,true);
  new ResizeObserver(()=>{vector?.resize();sync();}).observe(wrap);
- function selectedSignature(){return W.categories.filter(([key])=>options.waterwayTypes?.[key]!==false).map(([key])=>key).join(',');}
+ function selectedSignature(){return W.categories.filter(([key])=>key!=='notice'&&options.waterwayTypes?.[key]!==false).map(([key])=>key).join(',');}
  function selectWorkPoint(point){
   if(options.waterwayWorks===false)return;
   selectedWorkPoint={lat:point.lat,lon:point.lng};
@@ -882,11 +885,10 @@
   if(!data||!p)return [];
   const items=selected?data.items.map(item=>({...item,distance:W.distance(p,item),mode:'proximité'}))
    .filter(item=>item.distance<=radius).sort((a,b)=>a.distance-b.distance):W.nearby(data,p,radius,null,true);
-  return items.filter(item=>options.waterwayTypes?.[item.category||W.categoryOf(item.type)]!==false);
+  return items.filter(item=>item.category!=='notice'&&options.waterwayTypes?.[item.category||W.categoryOf(item.type)]!==false);
  }
  function query(p,r){
   const area=`(around:${r},${p.lat},${p.lon})`,local=`(around:${Math.min(r,11500)},${p.lat},${p.lon})`,chosen=new Set(selectedSignature().split(',')),parts=[];
-  if(chosen.has('notice'))parts.push(`nwr["seamark:type"=notice]${area};nwr["seamark:notice:category"]${area};`);
   if(chosen.has('lock'))parts.push(`nwr[waterway=lock_gate]${area};way[waterway][lock=yes]${area};`);
   if(chosen.has('port'))parts.push(`nwr[leisure=marina]${area};nwr[harbour~"^(yes|marina)$"]${area};nwr[industrial=port]${area};nwr["seamark:type"=harbour]${area};`);
   if(chosen.has('halt'))parts.push(`nwr[mooring][mooring!~"^(no|private)$"]${area};`);
@@ -905,15 +907,86 @@
   if(busy||now-lastQuery<(selectedWorkPoint?15000:120000))return;busy=true;lastQuery=now;notice('Recherche des ouvrages…');
   try{const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),55000);let response;try{response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(query(p,radius+1500)),signal:controller.signal});}finally{clearTimeout(timeout);}if(!response.ok)throw Error('HTTP '+response.status);await window.nauticMapIdle?.();const json=await response.json();await window.nauticMapIdle?.();if(!Array.isArray(json.elements)||json.remark)throw Error('Réponse incomplète');cache={center:{lat:p.lat,lon:p.lon},radius,signature,time:Date.now(),elements:json.elements};data=W.parse(cache.elements);try{localStorage.setItem('nautic-waterways-cache',JSON.stringify(cache));}catch(_){}lastList=visibleWorks(workArea());lastRender='';renderWorks();notice('Ouvrages · '+lastList.length);
   }catch(e){notice(data?'Ouvrages · cache · réseau indisponible':'Ouvrages indisponibles · réessai automatique');}finally{busy=false;}}
+ const signCacheKey='nautic-sign-cache-v1';
+ let signCache=null,signs=[],signRequest=null,lastSignAttempt=null;
+ try{
+  const cached=JSON.parse(localStorage.getItem(signCacheKey)||'null');
+  if(cached?.center&&Array.isArray(cached.items))signCache=cached;
+ }catch(_){}
+ function mapWorks(){
+  return [...(options.waterwayWorks===false?[]:lastList),...(signButton.hidden?[]:signs)];
+ }
+ function signArea(){
+  const center=active&&vector?vector.getCenter():map?.getCenter();
+  return center?{lat:center.lat,lon:center.lng}:null;
+ }
+ function signsNear(items,center,radius){
+  return items.map(item=>({...item,distance:W.distance(center,item)}))
+   .filter(item=>item.distance<=radius).sort((a,b)=>a.distance-b.distance);
+ }
+ async function updateSigns(force=false){
+  const center=signArea();
+  if(signButton.hidden||!center)return;
+  const radius=Math.min(10000,Math.max(1000,Number(options.waterwayRadius)||5000));
+  const now=Date.now();
+  const covered=signCache&&W.distance(center,signCache.center)+radius<=signCache.radius;
+  signs=covered?signsNear(signCache.items,center,radius):[];
+  renderWorks();
+  if(covered&&now-signCache.time<86400000&&!force){
+   signButton.textContent='Panneaux · '+signs.length;return;
+  }
+  if(signRequest||(!force&&lastSignAttempt&&now-lastSignAttempt.time<90000&&
+   W.distance(center,lastSignAttempt.center)<radius/2))return;
+  lastSignAttempt={time:now,center};
+  signButton.textContent='Panneaux · recherche…';
+  const fetchRadius=radius+1500;
+  const area=`(around:${fetchRadius},${center.lat},${center.lon})`;
+  const query=`[out:json][timeout:20];(nwr["seamark:type"="notice"]${area};nwr["seamark:notice:category"]${area};);out center;`;
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),25000);
+  signRequest=controller;
+  try{
+   const response=await fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(query),{signal:controller.signal});
+   if(!response.ok)throw Error('HTTP '+response.status);
+   const data=await response.json();
+   if(!Array.isArray(data.elements)||data.remark)throw Error('Réponse incomplète');
+   signCache={center,radius:fetchRadius,time:Date.now(),items:W.parse(data.elements).items.filter(item=>item.category==='notice')};
+   try{localStorage.setItem(signCacheKey,JSON.stringify(signCache));}catch(_){}
+   const current=signArea();
+   signs=current&&W.distance(current,center)+radius<=fetchRadius?signsNear(signCache.items,current,radius):[];
+   signButton.textContent='Panneaux · '+signs.length;
+  }catch(_){
+   signButton.textContent=covered?'Panneaux · cache':'Panneaux · indisponibles';
+  }finally{clearTimeout(timeout);signRequest=null;renderWorks();}
+ }
+ signButton.onclick=async()=>{
+  const current=signArea();
+  if(!current)return;
+  if(!signs.length&&!signRequest)await updateSigns(true);
+  if($('dialog').open)return;
+  const locations=signs.map(item=>'<button type="button" data-sign="'+esc(item.id)+'">'+
+   esc(signDescription(item))+' · '+km(item.distance/1000)+'</button>').join(' ');
+  modal('Panneaux de navigation',locations||
+   '<p>'+esc(signRequest?'Recherche des panneaux en cours.':signButton.textContent.includes('indisponibles')?
+    'La recherche OpenStreetMap a échoué. Réessaie en touchant Panneaux.':
+    'Aucun panneau recensé dans OpenStreetMap autour de la carte.')+'</p>');
+  $('dialogContent').querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>{
+   $('dialog').close();
+   showItem(button.dataset.sign);
+  });
+ };
  let legacyLayer=null;
- function classicMarkers(){const groups=new Map(),bounds=map.getBounds();for(const p of lastList){if(!bounds.contains([p.lat,p.lon]))continue;const pixel=map.project([p.lat,p.lon],map.getZoom()),key=Math.floor(pixel.x/45)+','+Math.floor(pixel.y/45);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p);}
+ function classicMarkers(){const groups=new Map(),bounds=map.getBounds();for(const p of mapWorks()){if(!bounds.contains([p.lat,p.lon]))continue;const pixel=map.project([p.lat,p.lon],map.getZoom()),key=Math.floor(pixel.x/45)+','+Math.floor(pixel.y/45);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p);}
   return [...groups.values()].map(group=>{const lat=group.reduce((s,p)=>s+p.lat,0)/group.length,lon=group.reduce((s,p)=>s+p.lon,0)/group.length,size=I.size(map.getZoom(),Number(options.waterwayIconSize)||120),type=group.length>1?'group':group[0].category||W.categoryOf(group[0].type);const icon=L.divIcon({className:'nautic-work-marker',html:I.svg(type)+(group.length>1?'<span>'+group.length+'</span>':''),iconSize:[size,size],iconAnchor:[size/2,size/2]});return L.marker([lat,lon],{icon}).on('click',()=>{if(group.length===1)showItem(group[0].id);else showList(group);});});
  }
- function renderWorks(){const key=JSON.stringify([active,options.waterwayWorks,options.waterwayIconSize,!active&&map?map.getBounds().toBBoxString():'',lastList.map(x=>x.id).sort()]);if(key===lastRender)return;lastRender=key;vector?.getSource('nautic-works')?.setData(worksData());if(legacyLayer&&map){map.removeLayer(legacyLayer);legacyLayer=null;}if(!active&&window.L&&map&&options.waterwayWorks!==false)legacyLayer=L.layerGroup(classicMarkers()).addTo(map);}
+ function renderWorks(){const key=JSON.stringify([active,options.waterwayWorks,options.waterwayIconSize,!active&&map?map.getBounds().toBBoxString():'',mapWorks().map(x=>x.id).sort()]);if(key===lastRender)return;lastRender=key;vector?.getSource('nautic-works')?.setData(worksData());if(legacyLayer&&map){map.removeLayer(legacyLayer);legacyLayer=null;}if(!active&&window.L&&map&&mapWorks().length)legacyLayer=L.layerGroup(classicMarkers()).addTo(map);}
 
  const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
  function info(p){return `<b>${esc(p.name)}</b> · ${esc(p.type)}<br>${(p.distance/1000).toFixed(2)} km · ${p.mode==='réseau'?'par le réseau d’eau (branche à confirmer)':'à vol d’oiseau'}${p.clearance?'<br>Hauteur déclarée OSM : '+esc(p.clearance):''}${p.width?'<br>Largeur déclarée : '+esc(p.width):''}${p.length?'<br>Longueur déclarée : '+esc(p.length):''}${p.opening?'<br>Horaires déclarés : '+esc(p.opening):''}`;}
- function showItem(id){const p=lastList.find(x=>x.id===id);if(!p)return;
+ function signDescription(item){
+  const code=item.notice[0];
+  return item.name!=='Panneau'?item.name:W.noticeDefinitions[code]||code||item.name;
+ }
+ function showItem(id){const p=mapWorks().find(x=>x.id===id);if(!p)return;
   if(p.category==='notice'){
    const details=p.notice.map(mark=>'<li>'+esc(W.noticeDefinitions[mark]||('Code OSM : '+mark))+'</li>').join('');
    modal('Panneau de navigation','<p><strong>'+esc(p.name)+'</strong></p>'+

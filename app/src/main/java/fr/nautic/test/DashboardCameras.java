@@ -22,7 +22,7 @@ final class DashboardCameras {
  final Map<String,Long> retryAt=new HashMap<>();
  int decoderBudget=4;
  float mapAlpha=1;
- TextView qualityButton;
+ TextView qualityButton,medallionButton;
  boolean adjustingMapAlpha;
  static boolean isMapView(String id){return id.startsWith("mapCamera");}
  void setMapAlpha(float value){
@@ -87,7 +87,7 @@ final class DashboardCameras {
      View sheen=new View(activity);
      android.graphics.drawable.GradientDrawable finish=new android.graphics.drawable.GradientDrawable(
        android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-       new int[]{0x29ffffff,Color.TRANSPARENT,Color.TRANSPARENT,0x3d000000});
+       new int[]{0x5cffffff,Color.TRANSPARENT,Color.TRANSPARENT,0x8c000000});
      sheen.setBackground(finish);
      // Above the video and snapshots, below the camera labels and status.
      frame.addView(sheen,1,new FrameLayout.LayoutParams(-1,-1));
@@ -340,7 +340,10 @@ final class DashboardCameras {
     if(!grouped.containsKey(stream))grouped.put(stream,new ArrayList<>());if(id.equals("mapCameraPreview"))grouped.get(stream).add(0,tile);else grouped.get(stream).add(tile);
    }
    for(Tile t:tiles.values())if(!visible.contains(t.id))t.frame.setVisibility(View.GONE);
-   updateQualityButton(data.optJSONObject("qualityButton"),scale);
+   qualityButton=updateMapButton(qualityButton,data.optJSONObject("qualityButton"),scale,
+     "mapCameraQuality","Qualité vidéo commune aux objectifs");
+   medallionButton=updateMapButton(medallionButton,data.optJSONObject("medallionButton"),scale,
+     "mapCameraMedallionToggle","Afficher ou masquer les médaillons");
 
    long now=System.currentTimeMillis();
    List<String> eligible=new ArrayList<>();String priority=null;
@@ -366,33 +369,36 @@ final class DashboardCameras {
    }
   }catch(Exception ignored){}
  }
- void updateQualityButton(JSONObject bounds,double scale){
+ TextView updateMapButton(TextView button,JSONObject bounds,double scale,String id,String description){
   if(bounds==null){
-   if(qualityButton!=null)qualityButton.setVisibility(View.GONE);
-   return;
+   if(button!=null)button.setVisibility(View.GONE);
+   return button;
   }
-  if(qualityButton==null){
-   qualityButton=new TextView(activity);
-   qualityButton.setGravity(Gravity.CENTER);
-   qualityButton.setTextColor(Color.WHITE);
-   qualityButton.setContentDescription("Qualité vidéo commune aux objectifs");
-   qualityButton.setOnClickListener(v->activity.dashboardClick("mapCameraQuality",false));
-   layer.addView(qualityButton);
+  if(button==null){
+   button=new TextView(activity);
+   button.setGravity(Gravity.CENTER);
+   button.setTextColor(Color.WHITE);
+   button.setOnClickListener(v->activity.dashboardClick(id,false));
+   layer.addView(button);
   }
-  String label=bounds.optString("label","SD"), number=bounds.optString("number","");
-  qualityButton.setText(number.isEmpty()?label:label+" · "+number);
-  qualityButton.setTextSize(number.isEmpty()?14:11);
+  String label=bounds.optString("label"),number=bounds.optString("number","");
+  boolean pressed=bounds.optBoolean("pressed");
+  button.setText(number.isEmpty()?label:label+" · "+number);
+  button.setContentDescription(id.equals("mapCameraMedallionToggle")?
+    (pressed?"Masquer les médaillons":"Afficher les médaillons"):description);
+  button.setTextSize(id.equals("mapCameraQuality")&&number.isEmpty()?14:11);
   android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
-  background.setColor("HD".equals(label)?0xed1b6257:0xed092f43);
+  background.setColor(pressed?0xed1b6257:0xed092f43);
   background.setCornerRadius(8*activity.getResources().getDisplayMetrics().density);
-  qualityButton.setBackground(background);
+  button.setBackground(background);
   FrameLayout.LayoutParams layout=new FrameLayout.LayoutParams(
    Math.max(1,(int)(bounds.optDouble("w")*scale)),Math.max(1,(int)(bounds.optDouble("h")*scale)));
   layout.leftMargin=(int)(bounds.optDouble("x")*scale);
   layout.topMargin=(int)(bounds.optDouble("y")*scale);
-  qualityButton.setLayoutParams(layout);
-  qualityButton.setVisibility(View.VISIBLE);
-  qualityButton.bringToFront();
+  button.setLayoutParams(layout);
+  button.setVisibility(View.VISIBLE);
+  button.bringToFront();
+  return button;
  }
  void refreshTile(String id){Iterator<Map.Entry<String,Source>> entries=sources.entrySet().iterator();while(entries.hasNext()){Map.Entry<String,Source> e=entries.next();Source source=e.getValue();boolean matches=source.owner.id.equals(id);for(Tile t:source.mirrors)matches|=t.id.equals(id);if(matches){source.close();entries.remove();retryAt.remove(e.getKey());}}}
  void close(){stopped=true;for(Source s:sources.values())s.close();sources.clear();layer.removeAllViews();tiles.clear();}

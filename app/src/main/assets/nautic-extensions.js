@@ -299,6 +299,11 @@ const dashboardButtons = [
  ['sondeurReplay', '294 · Relecture du sondeur'], ['sondeurToggle', '297 · Sondeur'],
  ['sondeurPlay', 'Simulation du sondeur'], ['sondeurOptions', '299 · Réglages du sondeur']
 ];
+window.nauticToggleMapMedallions=()=>{
+ state.buttons.mapCameraMedallions=state.buttons.mapCameraMedallions===false;
+ persist();
+ applyVisibility();
+};
 function applyVisibility() {
  const app = get('app');
  for (const [id] of dashboardButtons) {

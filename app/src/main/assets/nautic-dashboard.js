@@ -32,7 +32,7 @@
  window.nauticCamera42Result=message=>{pending42=false;if(camera42)camera42.title=message||'';refresh();previews();};
  let pending=false,lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
  let extraNumbers={};try{extraNumbers=JSON.parse(call('readSetting','nautic-control-numbers')||localStorage.getItem('nautic-control-numbers')||'{}');}catch(_){}
- const fixedNumbers={clock:10,clockDate:11,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,nativeNotesCarry:391,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapCameraPort:45,mapCameraPreview:46,mapCameraStarboard:47,mapCameraQuality:146,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,nauticDestinationStatus:58,nauticAccessibleStatus:59,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
+ const fixedNumbers={clock:10,clockDate:11,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,nativeNotesCarry:391,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapCameraPort:45,mapCameraPreview:46,mapCameraStarboard:47,mapCameraQuality:146,mapCameraMedallionToggle:147,nauticSignButton:583,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,nauticDestinationStatus:58,nauticAccessibleStatus:59,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
  const reservedNumbers=new Set(Object.values(fixedNumbers));
  const controls='button,[role=button],input:not([type=hidden]),select,textarea,summary,.leaflet-bar a';
  function numberButtons(){
@@ -140,7 +140,11 @@
   }catch(_){}
   refreshMapViews();previews();
  };
- $('mapWrap').append(mapCamera,qualityTool);
+ const medallionTool=document.createElement('button');
+ medallionTool.type='button';medallionTool.id='mapCameraMedallionToggle';
+ medallionTool.textContent='Médaillons';medallionTool.hidden=true;
+ medallionTool.onclick=()=>window.nauticToggleMapMedallions();
+ $('mapWrap').append(mapCamera,qualityTool,medallionTool);
  let mapCameraAlpha=1;
  function cameraConfig(){
   try{return JSON.parse(call('readSetting','nautic-v04')||localStorage.getItem('nautic-v04')||'{}');}
@@ -165,6 +169,8 @@
    view.querySelector('.map-camera-label').textContent=String(camera);
   }
   qualityTool.hidden=mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
+  medallionTool.hidden=mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
+  medallionTool.setAttribute('aria-pressed',String(!$('app').classList.contains('hide-mapCameraMedallions')));
   qualityTool.textContent=mapHd?'HD':'SD';
   qualityTool.setAttribute('aria-pressed',String(mapHd));
  }
@@ -199,7 +205,7 @@
  window.addEventListener('nauticvisibility',()=>{
   if($('app')?.classList.contains('hide-mapCameraMedallions'))restoreMedallion();
   refreshMapViews();
-  previews();
+  previews(true);
  });
  refreshMapViews();
  window.nauticMapCameraAlpha=value=>{
@@ -239,7 +245,7 @@
   const settings=$('sondeurSettings');
   if(settings)new MutationObserver(previews).observe(settings,{attributes:true,attributeFilter:['hidden']});
  });
- window.nauticDashboardClick=id=>{if(id===qualityTool.id)qualityTool.click();else if(id===centerView)switchMapCamera();else if(mapViews.includes(id))activateMapView(id);else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
+ window.nauticDashboardClick=id=>{if(id===qualityTool.id||id===medallionTool.id)$(id).click();else if(id===centerView)switchMapCamera();else if(mapViews.includes(id))activateMapView(id);else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
  window.nauticDashboardHold=id=>{if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
  const clampCrop=value=>Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
  const cropKey=camera=>'nautic-camera-crop-'+camera;
@@ -340,13 +346,14 @@
   view.dataset.previewUrl=url;
  }
 
- function previews(){
+ function previews(force=false){
   const sonarSettings=$('sondeurSettings');
   const settingsOpen=sonarSettings&&!sonarSettings.hidden;
   mapCamera.style.visibility=settingsOpen?'hidden':'';
   const hidden=settingsOpen||document.hidden||document.querySelector('dialog[open]')||$('app')?.classList.contains('nautic-edit');
   qualityTool.hidden=!!hidden||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
-  if(!hidden&&window.nauticQuietMode)return;
+  medallionTool.hidden=!!hidden||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
+  if(!hidden&&window.nauticQuietMode&&force!==true)return;
   const tiles=[];
   const config=cameraConfig();
   if(!hidden)for(const id of ['trematagePreview',...previewViews]){
@@ -378,10 +385,14 @@
     active:(mobile||id==='cam2Body')&&card.classList.contains('trematage-active'),
     alarm:mobile&&card.classList.contains('trematage-alert'),status:mobile?$('trematageState').textContent:id==='cam2Body'?camera42?.dataset.watchStatus||'':''});
   }
-  const r=qualityTool.getBoundingClientRect();
-  const qualityButton=!qualityTool.hidden&&!qualityTool.classList.contains('nautic-hidden')&&r.width>0
-   ?{x:r.left,y:r.top,w:r.width,h:r.height,label:qualityTool.textContent,number:qualityTool.dataset.objectNumber}:null;
-  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapHd,tiles,qualityButton}));
+  const controlBounds=control=>{
+   const r=control.getBoundingClientRect();
+   return !control.hidden&&!control.classList.contains('nautic-hidden')&&r.width>0
+    ?{x:r.left,y:r.top,w:r.width,h:r.height,label:control.textContent,number:control.dataset.objectNumber,
+      pressed:control.getAttribute('aria-pressed')==='true'}:null;
+  };
+  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapHd,tiles,
+   qualityButton:controlBounds(qualityTool),medallionButton:controlBounds(medallionTool)}));
  }
  window.nauticEvery(()=>{numberButtons();refresh();previews();},800);
  window.nauticDashboardResume=()=>{if(window.nauticQuietMode){previews();return;}refresh();previews();};
