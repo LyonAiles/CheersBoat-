@@ -84,6 +84,13 @@ final class DashboardCameras {
      frame.setOutlineProvider(new ViewOutlineProvider(){
       @Override public void getOutline(View view,Outline outline){outline.setOval(0,0,view.getWidth(),view.getHeight());}
      });
+     View sheen=new View(activity);
+     android.graphics.drawable.GradientDrawable finish=new android.graphics.drawable.GradientDrawable(
+       android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+       new int[]{0x29ffffff,Color.TRANSPARENT,Color.TRANSPARENT,0x3d000000});
+     sheen.setBackground(finish);
+     // Above the video and snapshots, below the camera labels and status.
+     frame.addView(sheen,1,new FrameLayout.LayoutParams(-1,-1));
      installCropGesture();
     }else installTransparencyGesture();
     banner.setTextSize(10);

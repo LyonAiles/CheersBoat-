@@ -93,6 +93,10 @@
 #app{grid-template-rows:50px minmax(0,1fr) 0!important}
 #app header{height:50px!important;align-items:center!important;padding-top:0!important}
 body>#clock{top:7px!important;height:32px!important;line-height:32px!important;font-size:21px!important}
+#clockTime{display:block;line-height:inherit}
+#clock[aria-expanded="true"] #clockTime{line-height:20px}
+#clockDate[hidden]{display:none}
+#clockDate{display:block;line-height:9px;font-size:8px;font-weight:400;white-space:nowrap}
 #app header #nauticHeaderControls{top:7px!important}
 #app header #nauticHeaderControls #nauticExitButton{width:60px!important;min-width:60px!important}
 #windWidget small{display:none!important}
@@ -135,6 +139,14 @@ body>#clock{top:7px!important;height:32px!important;line-height:32px!important;f
  top:50%;transform:translateY(-50%);
  width:28%;aspect-ratio:1;border-radius:50%;
  z-index:1;
+}
+:is(#mapCameraPort,#mapCameraStarboard)::after {
+ content:"";
+ position:absolute;
+ inset:0;
+ border-radius:inherit;
+ pointer-events:none;
+ background:linear-gradient(160deg,rgba(255,255,255,.16) 0%,transparent 25%,transparent 69%,rgba(0,0,0,.24) 100%);
 }
 #mapCameraPort {left:3%}
 #mapCameraStarboard {right:3%}

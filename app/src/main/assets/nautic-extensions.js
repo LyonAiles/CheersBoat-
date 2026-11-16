@@ -476,7 +476,7 @@ function settingsDialog(){
  <p class="muted">MapLibre utilise le fond vectoriel OpenFreeMap. Si le chargement ou WebGL échoue, retour automatique à la carte classique. Les réglages classiques sont conservés.</p>
  <label class="settingRow"><input type="checkbox" id="settingWaterwayWorks" ${state.waterwayWorks===false?'':'checked'}><span>Afficher les ouvrages fluviaux OpenStreetMap</span></label>
  <label>Taille des pictogrammes : <output id="settingWorkSizeValue">${Number(state.waterwayIconSize)||120}%</output><input type="range" id="settingWaterwayIconSize" min="50" max="200" step="5" value="${Number(state.waterwayIconSize)||120}"></label>
- <p>Ouvrages à positionner :</p>${[['lock','Écluses'],['port','Ports et marinas'],['halt','Haltes et amarrages'],['bridge','Ponts'],['dam','Barrages'],['weir','Seuils'],['tunnel','Tunnels'],['slipway','Cales de mise à l’eau'],['sondeurAlert','Points d’alerte du sondeur']].map(([type,label])=>`<label class="settingRow"><input type="checkbox" data-waterway-type="${type}" ${state.waterwayTypes?.[type]===false?'':'checked'}><span>${label}</span></label>`).join('')}
+ <p>Ouvrages à positionner :</p>${[['lock','Écluses'],['port','Ports et marinas'],['halt','Haltes et amarrages'],['bridge','Ponts'],['dam','Barrages'],['weir','Seuils'],['tunnel','Tunnels'],['slipway','Cales de mise à l’eau'],['notice','Panneaux de navigation'],['sondeurAlert','Points d’alerte du sondeur']].map(([type,label])=>`<label class="settingRow"><input type="checkbox" data-waterway-type="${type}" ${state.waterwayTypes?.[type]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <label>Rayon d’affichage autour du bateau (km, de 1 à 100)<input id="settingWaterwayRadius" type="number" min="1" max="100" step="1" value="${Math.max(1,Math.min(100,(Number(state.waterwayRadius)||5000)/1000))}"></label>
  <p class="muted">Sélection autour du bateau, dans toutes les directions. Au-delà de 10 km, les points lointains utilisent des données allégées et des distances à vol d’oiseau. Actualisation après progression ; cache local. Les distances par le réseau ne désignent pas un itinéraire choisi : bifurcations à confirmer. Sans raccordement, distance à vol d’oiseau explicitement indiquée.</p>
  <h3>Bateau</h3>${field('Nom du bateau','settingBoat',state.boatName)}${field('Téléphone de rappel (inclus dans les SMS)','settingContactPhone',state.contactPhone||testNumber,'tel')}
@@ -648,12 +648,6 @@ if(fixedClock){document.body.appendChild(fixedClock);fixedClock.hidden=false;fix
 const clockElement=document.getElementById('clock');
 if(clockElement){clockElement.hidden=false;clockElement.classList.remove('nautic-hidden');clockElement.removeAttribute('aria-hidden');}
 if(clockElement){
- const clockFormat=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
- const tick=()=>{clockElement.textContent=clockFormat.format(new Date());};
- tick();window.nauticEvery(tick,1000);
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();});
-}
-if(clockElement){
  clockElement.style.setProperty('display','block','important');
  clockElement.style.setProperty('visibility','visible','important');
  clockElement.style.setProperty('opacity','1','important');
@@ -672,7 +666,7 @@ function applyObjectNumbers(){
  if(window.nauticNumberDashboard){window.nauticNumberDashboard();return;}
  document.querySelectorAll('.nautic-object-tag').forEach(e=>e.remove());
  if(!state.objectNumbers)return;
- const named=[['clock',10,'Horloge'],['nauticSettingsButton',20,'Paramètres'],['nauticExitButton',21,'Réduire Nautic'],['gpsCard',31,'GPS'],['boatCard',32,'Mon bateau'],['logCard',33,'Journal'],['fuelCard',34,'Carburant'],['nauticCallsSlot',35,'Conteneur appels'],['speedCard',36,'Vitesse'],['weatherCard',37,'Météo'],['headingCard',38,'Cap'],['mapWrap',40,'Carte'],['cam1Card',41,'Caméra Roof'],['cam2Card',42,'Caméra Côté'],['cam3Card',43,'Caméra Fond']];
+ const named=[['clock',10,'Horloge'],['clockDate',11,'Date'],['nauticSettingsButton',20,'Paramètres'],['nauticExitButton',21,'Réduire Nautic'],['gpsCard',31,'GPS'],['boatCard',32,'Mon bateau'],['logCard',33,'Journal'],['fuelCard',34,'Carburant'],['nauticCallsSlot',35,'Conteneur appels'],['speedCard',36,'Vitesse'],['weatherCard',37,'Météo'],['headingCard',38,'Cap'],['mapWrap',40,'Carte'],['cam1Card',41,'Caméra Roof'],['cam2Card',42,'Caméra Côté'],['cam3Card',43,'Caméra Fond']];
  const used=new Set(named.map(x=>x[0]));
  // Les commandes et les objets possédant un identifiant conservent un numéro stable.
  const extras=[...document.querySelectorAll('#app [id]')].filter(e=>!used.has(e.id)&&!e.closest('dialog')&&!e.closest('.leaflet-container')&&(/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(e.tagName)||e.classList.contains('mapWidget')));

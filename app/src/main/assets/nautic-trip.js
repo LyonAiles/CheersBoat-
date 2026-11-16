@@ -184,7 +184,7 @@
   return best;
  }
 
- function sections(trip, closures=[], verifiedEdges=[], startAt=0) {
+ function sections(trip, closures=[], verifiedEdges=[], startAt=0, vigilanceSections) {
   const {coordinates}=trip;
   const {offsets,total}=geometry(coordinates);
   const spans=[];
@@ -221,8 +221,10 @@
     const closed=known.has(i-1)||spans.some(([from,to])=>from<=mid&&mid<=to);
     const state=closed?'closed':chartedOpen.has(i-1)?'open':'unknown';
     const previous=result.at(-1);
-    if(previous?.state===state)previous.coordinates.push(at(hi));
-    else result.push({closed,state,coordinates:[at(lo),at(hi)]});
+    const section=trip.wayIds?.[i-1];
+    const vigilance=vigilanceSections?.has(section)?section:undefined;
+    if(previous?.state===state&&previous.vigilance===vigilance)previous.coordinates.push(at(hi));
+    else result.push({closed,state,vigilance,coordinates:[at(lo),at(hi)]});
    }
   }
   return result;

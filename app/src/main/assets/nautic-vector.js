@@ -28,7 +28,7 @@
    vector.addSource('nautic-trip', {type:'geojson', data:tripData()});
    vector.addLayer({id:'nautic-trip-line',type:'line',source:'nautic-trip',
     filter:['==','$type','LineString'],paint:{'line-color':['get','color'],'line-width':4}});
-   vector.addLayer({id:'nautic-trip-end',type:'circle',source:'nautic-trip',filter:['==','$type','Point'],paint:{'circle-radius':6,'circle-color':['get','color'],'circle-stroke-width':2,'circle-stroke-color':'#092f43'}});
+   vector.addLayer({id:'nautic-trip-end',type:'circle',source:'nautic-trip',filter:['all',['==','$type','Point'],['!has','vigilance']],paint:{'circle-radius':6,'circle-color':['get','color'],'circle-stroke-width':2,'circle-stroke-color':'#092f43'}});
    vector.on('click', e => {
     if (!selection || e.originalEvent?.target?.closest('.maplibregl-ctrl')) return;
     selectDestination(e.lngLat);
@@ -46,6 +46,8 @@
    vector.on('click','nautic-works',e=>{if(!e.defaultPrevented)showItem(e.features?.[0]?.properties?.id);});
    vector.on('click',e=>{
     if(e.defaultPrevented||e.originalEvent?.target?.closest('.maplibregl-marker,.maplibregl-ctrl'))return;
+    const marker=vector.queryRenderedFeatures(e.point,{layers:['nautic-trip-vigilance']})[0];
+    if(marker&&showVigilance(marker.properties))return;
     const layers=['nautic-works','nautic-work-backings','nautic-work-clusters'];
     if(vector.queryRenderedFeatures(e.point,{layers}).length)return;
     const {x,y}=e.point;
@@ -54,6 +56,10 @@
     if(red&&showAccessLimit(red.properties.section))return;
     selectWorkPoint(e.lngLat);
    });
+   vector.addLayer({id:'nautic-trip-vigilance',type:'symbol',source:'nautic-trip',
+    filter:['all',['==','$type','Point'],['has','vigilance']],
+    layout:{'icon-image':['concat','nautic-',['get','vigilance']],'icon-size':0.6,
+     'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport'}});
    sync();
   });
   vector.on('error',e=>{if(!loaded)notice('Chargement vectoriel…');});
@@ -214,7 +220,7 @@
    accessProfile={enabled:enabled.checked};
    for(const [key,input] of Object.entries(fields))accessProfile[key]=Math.round(input.valueAsNumber*100);
    saveAccessProfile();
-   $('dialog').close();updateAccessible();
+   $('dialog').close();updateAccessible();renderTrip();
   };
  }
  const impactCacheKey='nautic-euris-route-impacts';
@@ -304,7 +310,7 @@
  };
  function tripData(){
   const items=displayed.length?displayed:routeState?[routeState]:[];
-  const rank={unknown:0,open:1,closed:2};
+  const rank={unknown:0,open:1,vigilance:2,closed:3};
   const features=items.flatMap(tripFeatures).sort((a,b)=>rank[a.properties.state]-rank[b.properties.state]);
   return {type:'FeatureCollection',features};
  }
@@ -313,19 +319,57 @@
   if(!trip)return [{type:'Feature',properties:{color:'#bdc5d2',state:'unknown'},
    geometry:{type:'Point',coordinates:[end.lon,end.lat]}}];
   const xy=p=>[p.lon,p.lat];
-  const segments=calc.sections(trip,currentClosures(closures),verifiedEdges(trip),item.departure?.offset);
-  const properties=state=>({color:sectionColor(state),state});
-  const features=segments.map(segment=>({type:'Feature',properties:properties(segment.state),
+  const limiting=new Set((trip.wayIds||[]).filter(section=>
+   accessible.vigilanceLimits(window.NauticClearances?.[section],accessProfile).length));
+  const segments=calc.sections(trip,currentClosures(closures),verifiedEdges(trip),item.departure?.offset,limiting);
+  const properties=state=>({color:state==='vigilance'?'#ffb020':sectionColor(state),state});
+  const features=segments.map(segment=>({type:'Feature',
+   properties:properties(segment.vigilance!==undefined&&segment.state!=='closed'?'vigilance':segment.state),
    geometry:{type:'LineString',coordinates:segment.coordinates.map(xy)}}));
+  const marker=(section,position,vigilance,objectNumber)=>({
+   type:'Feature',properties:{...properties('vigilance'),section,vigilance,objectNumber},
+   geometry:{type:'Point',coordinates:xy(position)}
+  });
+  for(let i=0;i<segments.length;i++){
+   const segment=segments[i],section=segment.vigilance;
+   if(section===undefined)continue;
+   if(segments[i-1]?.vigilance!==section)features.push(marker(section,segment.coordinates[0],'vigilanceStart',581));
+   if(segments[i+1]&&segments[i+1].vigilance===undefined)features.push(marker(section,segment.coordinates.at(-1),'vigilanceEnd',582));
+  }
   features.push({type:'Feature',properties:properties(segments.at(-1)?.state||'unknown'),
    geometry:{type:'Point',coordinates:xy(trip.coordinates.at(-1))}});
   return features;
  }
+ function showVigilance({section,vigilance,objectNumber}){
+  if(selection||$('dialog').open)return false;
+  const limits=accessible.vigilanceLimits(window.NauticClearances?.[section],accessProfile);
+  if(!limits.length)return false;
+  const names={draught:'Tirant d’eau',air:'Tirant d’air',width:'Largeur'};
+  const metres=cm=>(cm/100).toLocaleString('fr-FR',{maximumFractionDigits:2})+' m';
+  const label=vigilance==='vigilanceEnd'?'Fin de vigilance de gabarit':'Vigilance de gabarit';
+  modal(label,
+   '<p><strong>'+esc(fairwayNames.get(section)||section)+'</strong></p><ul>'+
+   limits.map(({key,limit,value})=>{
+    const gap=limit-value;
+    const origin=window.NauticClearanceSources?.[section]?.[key]?.[0];
+    const detail=gap<0?'dépassement de '+metres(-gap):gap===0?'aucune marge':metres(gap)+' de marge théorique';
+    return '<li>'+names[key]+' · bateau '+metres(value)+' · référence '+metres(limit)+' · '+detail+
+     (origin?'<br><small>'+esc(origin)+'</small>':'')+'</li>';
+   }).join('')+'</ul><p class="muted">Références EuRIS de la section. Le niveau d’eau et la position des ouvrages peuvent modifier le passage.</p>'+
+   (options.objectNumbers!==false?'<small>Objet '+objectNumber+'</small>':''));
+  return true;
+ }
  const legacyTrip=map?L.geoJSON(null,{
   style:feature=>({color:feature.properties.color,weight:4,interactive:false}),
-  pointToLayer:(feature,position)=>L.circleMarker(position,{
-   radius:6,color:'#092f43',fillColor:feature.properties.color,fillOpacity:1,interactive:false
-  })
+  pointToLayer:(feature,position)=>{
+   const kind=feature.properties.vigilance;
+   if(kind){
+    const icon=L.divIcon({className:'nautic-work-marker',html:I.svg(kind),iconSize:[24,24],iconAnchor:[12,12]});
+    return L.marker(position,{icon,title:kind==='vigilanceEnd'?'Fin de vigilance de gabarit':'Vigilance de gabarit',
+     bubblingMouseEvents:false}).on('click',()=>showVigilance(feature.properties));
+   }
+   return L.circleMarker(position,{radius:6,color:'#092f43',fillColor:feature.properties.color,fillOpacity:1,interactive:false});
+  }
  }).addTo(map):null;
  function renderTrip(){
   const data=tripData();
@@ -481,7 +525,7 @@
    reopenings+
    (onlineEntries?'<h3>Avis EuRIS sur le parcours</h3><ul>'+onlineEntries+'</ul>':'')+entries+
    (!onlineEntries&&!entries?'<p>Aucun avis VNF associé aux tronçons de ce trajet.</p>':'')+
-   '<p>Vert · navigation indiquée sur la carte. Gris · état inconnu. Rouge · fermeture ou restriction en cours.</p>'+
+   '<p>Vert · navigation indiquée sur la carte. Gris · état inconnu. Rouge · fermeture ou restriction en cours. Orange · vigilance de gabarit.</p>'+
    '<p>Actualisation automatique des avis associés aux tronçons répertoriés.</p>'+
    '<p><a href="https://avisbat.vnf.fr/">Consulter les avis officiels VNF</a></p>'+
    '<small>API/Service Notices to Skippers incorporated from EuRIS (eurisportal.eu). '+
@@ -842,6 +886,7 @@
  }
  function query(p,r){
   const area=`(around:${r},${p.lat},${p.lon})`,local=`(around:${Math.min(r,11500)},${p.lat},${p.lon})`,chosen=new Set(selectedSignature().split(',')),parts=[];
+  if(chosen.has('notice'))parts.push(`nwr["seamark:type"=notice]${area};nwr["seamark:notice:category"]${area};`);
   if(chosen.has('lock'))parts.push(`nwr[waterway=lock_gate]${area};way[waterway][lock=yes]${area};`);
   if(chosen.has('port'))parts.push(`nwr[leisure=marina]${area};nwr[harbour~"^(yes|marina)$"]${area};nwr[industrial=port]${area};nwr["seamark:type"=harbour]${area};`);
   if(chosen.has('halt'))parts.push(`nwr[mooring][mooring!~"^(no|private)$"]${area};`);
@@ -868,7 +913,16 @@
 
  const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
  function info(p){return `<b>${esc(p.name)}</b> · ${esc(p.type)}<br>${(p.distance/1000).toFixed(2)} km · ${p.mode==='réseau'?'par le réseau d’eau (branche à confirmer)':'à vol d’oiseau'}${p.clearance?'<br>Hauteur déclarée OSM : '+esc(p.clearance):''}${p.width?'<br>Largeur déclarée : '+esc(p.width):''}${p.length?'<br>Longueur déclarée : '+esc(p.length):''}${p.opening?'<br>Horaires déclarés : '+esc(p.opening):''}`;}
- function showItem(id){const p=lastList.find(x=>x.id===id);if(!p)return;modal('Ouvrage fluvial',info(p)+'<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');}
+ function showItem(id){const p=lastList.find(x=>x.id===id);if(!p)return;
+  if(p.category==='notice'){
+   const details=p.notice.map(mark=>'<li>'+esc(W.noticeDefinitions[mark]||('Code OSM : '+mark))+'</li>').join('');
+   modal('Panneau de navigation','<p><strong>'+esc(p.name)+'</strong></p>'+
+    (details?'<ul>'+details+'</ul>':'<p>Signification non renseignée dans OpenStreetMap.</p>')+
+    (p.noticeText?'<p>'+esc(p.noticeText)+'</p>':'')+
+    '<small>Source : © contributeurs OpenStreetMap'+(options.objectNumbers!==false?' · Objet 583':'')+'</small>');
+   return;
+  }
+  modal('Ouvrage fluvial',info(p)+'<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');}
  function showList(list=lastList){modal(selectedWorkPoint?'Ouvrages autour du point choisi':'Ouvrages autour du bateau', (options.waterwayTypes?.sondeurAlert === false ? '' : '<button type="button" id="waterwaySondeurAlerts">Points d’alerte du sondeur</button>')+`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));const alertsButton=$('waterwaySondeurAlerts');if(alertsButton)alertsButton.onclick=()=>{$('dialog').close();$('sondeurAlertList')?.click();};$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();
  try{cache=JSON.parse(localStorage.getItem('nautic-waterways-cache')||'null');if(cache&&Array.isArray(cache.elements))data=W.parse(cache.elements);else cache=null;}catch(_){cache=null;}
  if(routeState&&(!routeState.trip?.closedEdges||routeState.trip.restrictionVersion!==3)){

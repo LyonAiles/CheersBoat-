@@ -9,13 +9,16 @@
  weir:['#009ca6','<path d="M7 12q4-4 8 0t8 0 10 0M7 21h10v7h16M7 32q4-4 8 0t8 0 10 0"/>'],
  tunnel:['#5361d8','<path d="M8 32V19a12 12 0 0 1 24 0v13M13 32V20a7 7 0 0 1 14 0v12M17 32l2-8M23 32l-2-8"/>'],
  slipway:['#d53783','<path d="M7 13l25 16M10 12h15l-3 7H14zM7 32q4-4 8 0t8 0 10 0"/>'],
+ notice:['#2554a1','<rect x="11" y="9" width="18" height="22" rx="2"/><path d="M16 16h8M16 21h8M16 26h8"/>'],
  group:['#285b7b','<rect x="9" y="9" width="15" height="15" rx="2"/><rect x="16" y="16" width="15" height="15" rx="2"/>']};
- function svg(type){const [color,path]=shapes[type]||shapes.group;return `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="${color}" stroke="white" stroke-width="2.5"/><g fill="none" stroke="white" stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round">${path}</g></svg>`;}
+ const vigilanceShapes={vigilanceStart:'',vigilanceEnd:'<path d="M8 9l25 24" stroke="#172536" stroke-width="4" stroke-linecap="round"/>'};
+ function svg(type){
+  if(Object.hasOwn(vigilanceShapes,type))return '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 40 40"><path d="M20 5 37 34H3Z" fill="#ffb020" stroke="white" stroke-width="2.5" stroke-linejoin="round"/><path d="M20 14v9m0 5v.5" stroke="#172536" stroke-width="3" stroke-linecap="round"/>'+vigilanceShapes[type]+'</svg>';const [color,path]=shapes[type]||shapes.group;return `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="${color}" stroke="white" stroke-width="2.5"/><g fill="none" stroke="white" stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round">${path}</g></svg>`;}
  const stops=[[6,12],[10,14],[14,18],[18,22]];
  function at(zoom){for(let i=1;i<stops.length;i++){if(zoom<=stops[i][0]){const [a,x]=stops[i-1],[b,y]=stops[i];return x+(y-x)*Math.max(0,(zoom-a)/(b-a));}}return 18;}
  function size(zoom,percent=120){return Math.round(Math.max(8,Math.min(36,at(zoom)*Math.max(.4,Math.min(1.7,percent/120)))));}
  function expression(percent=120){return ['interpolate',['linear'],['zoom'],...stops.flatMap(([zoom])=>[zoom,size(zoom,percent)/40])];}
 
- async function install(map,valid=()=>true){await Promise.all(Object.keys(shapes).map(type=>new Promise(resolve=>{const img=new Image();img.onload=()=>{if(valid()&&!map.hasImage('nautic-'+type))map.addImage('nautic-'+type,img,{pixelRatio:2});resolve();};img.onerror=resolve;img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg(type));})));}
+ async function install(map,valid=()=>true){await Promise.all([...Object.keys(shapes),...Object.keys(vigilanceShapes)].map(type=>new Promise(resolve=>{const img=new Image();img.onload=()=>{if(valid()&&!map.hasImage('nautic-'+type))map.addImage('nautic-'+type,img,{pixelRatio:2});resolve();};img.onerror=resolve;img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg(type));})));}
  const api={svg,size,expression,install,types:Object.keys(shapes)};root.NauticWorkIcons=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

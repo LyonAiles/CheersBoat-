@@ -20,6 +20,14 @@
   }
   return {features,unverified,insufficient};
  }
+ // Seuil d’affichage de vigilance, en centimètres.
+ const vigilanceGap=10;
+ function vigilanceLimits(limits,profile){
+  const [draught,air,width]=limits||[];
+  return Object.entries({draught,air,width})
+   .filter(([key,limit])=>Number.isFinite(limit)&&limit>0&&limit-profile[key]<=vigilanceGap)
+   .map(([key,limit])=>({key,limit,value:profile[key]}));
+ }
  function routeBottlenecks(trip,limits,distance,departureOffset=0){
   const result={draught:{minimum:null,unknown:0},air:{minimum:null,unknown:0}};
   const seen=new Set();
@@ -44,7 +52,7 @@
   }
   return result;
  }
- const api={compatibleSections,exceeded,routeBottlenecks};
+ const api={compatibleSections,exceeded,vigilanceLimits,routeBottlenecks};
  if(typeof module!=='undefined')module.exports=api;
  else root.NauticAccessible=api;
 })(typeof window!=='undefined'?window:globalThis);
