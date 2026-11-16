@@ -351,12 +351,12 @@ body > #clock{width:auto!important;min-width:76px!important;height:32px!importan
 
 #dialog:not(.nautic-full),
 #nauticWeatherPopup {
- background:rgba(11, 41, 62, .82);
+ background:rgba(11, 41, 62, .76);
  backdrop-filter:blur(3px);
 }
 #dialog:not(.nautic-full)::backdrop,
 #nauticWeatherPopup::backdrop {
- background:rgba(0, 0, 0, .38);
+ background:rgba(0, 0, 0, .33);
 }
 #dialog:not(.nautic-full) button,
 #nauticWeatherPopup button {

@@ -103,6 +103,7 @@
  const mapCamera=document.createElement('div');
  mapCamera.hidden=true;
  const leftMedallion='mapCameraPort', centerView='mapCameraPreview', rightMedallion='mapCameraStarboard';
+ let swappedMedallion=null;
  const mapViews=[centerView,leftMedallion,rightMedallion]; // Draw the medallions above the central image.
  const feeds={
   [leftMedallion]:{camera:1},
@@ -180,7 +181,14 @@
    dragged=false;
    return;
   }
-  [feeds[centerView],feeds[id]]=[feeds[id],feeds[centerView]];
+  if(swappedMedallion){
+   [feeds[centerView],feeds[swappedMedallion]]=[feeds[swappedMedallion],feeds[centerView]];
+  }
+  if(swappedMedallion===id)swappedMedallion=null;
+  else{
+   [feeds[centerView],feeds[id]]=[feeds[id],feeds[centerView]];
+   swappedMedallion=id;
+  }
   refreshMapViews();
   previews();
  }

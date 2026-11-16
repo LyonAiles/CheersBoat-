@@ -219,7 +219,7 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 }
 
 #mapWrap {
- --nautic-map-control:rgba(9, 47, 67, .66);
+ --nautic-map-control:rgba(9, 47, 67, .60);
  --nautic-map-control-strong:rgba(9, 47, 67, .76);
 }
 #mapWrap :is(#mapRecenter,#mapLayers,#compass,#nauticDestination,#nauticWaterwayStatus) {
@@ -258,3 +258,7 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 .nautic-access-choice input {width:auto}
 .nautic-access-fields {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .nautic-access-fields input {margin-top:4px;padding:5px}
+
+.nautic-access-opacity {display:block;margin-top:10px}
+.nautic-access-opacity output {font-variant-numeric:tabular-nums}
+.nautic-access-opacity input {display:block;padding:0;margin-top:4px}

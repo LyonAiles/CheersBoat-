@@ -186,24 +186,19 @@ console.log('PASS: departure date, progressive closures, unknown dates and alrea
 const access=require('../../app/src/main/assets/nautic-accessible.js');
 const connected=[
  {sourceId:'A',scope:'FRVN150',nodes:['1','2'],geometry:[p(0),p(.01)],tags:{}},
- {sourceId:'B',scope:'FRVN150',nodes:['2','3'],geometry:[p(.01),p(.02)],tags:{}},
+ {sourceId:'B',scope:'FRVN150',nodes:['2','3'],geometry:[p(.01),p(.02)],tags:{boat:'no'}},
  {sourceId:'C',scope:'FRVN150',nodes:['3','4'],geometry:[p(.02),p(.03)],tags:{}},
  {sourceId:'D',scope:'FRVN150',nodes:['8','9'],geometry:[p(.04),p(.05)],tags:{}}
 ];
 const capacities={A:[200,400,500],B:[200,360,500],C:[200,-1,500],D:[200,-1,500]};
 const profile={draught:150,air:345,width:430};
-const visible=(position,dimensions=profile,closed=new Set())=>
- access.reachable(connected,capacities,position,dimensions,closed);
+const visible=(position,dimensions=profile)=>
+ access.reachable(connected,capacities,position,dimensions);
 assert.deepEqual(visible(p(.005)).features.map(f=>f.properties.section),['A','B','C']);
 assert.deepEqual(visible(p(.005),{...profile,air:375}).features.map(f=>f.properties.section),['A']);
-assert.deepEqual(visible(p(.005),profile,new Set(['B'])).features.map(f=>f.properties.section),['A']);
 assert.equal(visible(p(.005),{...profile,width:550}).reason,'dimensions');
 assert.equal(visible(p(.005),{...profile,draught:210}).reason,'dimensions');
-assert.equal(visible(p(.005),profile,new Set(['A'])).reason,'closed');
 assert.equal(visible(p(.044)).features[0].properties.section,'D');
 assert.equal(visible(p(.1)).reason,'off-network');
-assert.equal(access.reachable(connected,{...capacities,A:[200,0,500]},p(.005),profile,new Set()).reason,'unknown');
-const franceNetwork=nationalNetwork.filter(section=>section.scope.startsWith('FR'));
-assert.equal(access.reachable(franceNetwork,{},chatillonPort,profile,
- access.blockedSections(franceNetwork,impacts,moment)).reason,'closed');
-console.log('PASS: GPS reachability, independent dimensions, disconnected components and current VNF closures');
+assert.equal(access.reachable(connected,{...capacities,A:[200,0,500]},p(.005),profile).reason,'unknown');
+console.log('PASS: offline GPS reachability uses dimensions and continuity even on a closed section');

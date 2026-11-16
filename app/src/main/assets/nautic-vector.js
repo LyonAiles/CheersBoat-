@@ -22,7 +22,7 @@
    vector.addSource('nautic-route',{type:'geojson',data:routeData()});vector.addLayer({id:'nautic-route',type:'line',source:'nautic-route',paint:{'line-color':'#20bce9','line-width':4}});
    vector.addSource('nautic-accessible',{type:'geojson',data:accessData});
    vector.addLayer({id:'nautic-accessible',type:'line',source:'nautic-accessible',
-    paint:{'line-color':'#3be577','line-width':5,'line-opacity':.85}});
+    paint:{'line-color':'#3be577','line-width':5,'line-opacity':accessProfile.opacity/100}});
    vector.addSource('nautic-trip', {type:'geojson', data:tripData()});
    vector.addLayer({id:'nautic-trip-line',type:'line',source:'nautic-trip',
     filter:['==','$type','LineString'],paint:{'line-color':['get','color'],'line-width':4}});
@@ -123,41 +123,38 @@
  let impactSnapshot=window.NauticEurisSeed||{},impacts=[],impactPending=false,checkedScopes='',impactCheckedAt=0,eurisStatus='';
  const accessible=window.NauticAccessible;
  const france=fairways.filter(section=>section.scope.startsWith('FR'));
- const franceScopes=[...new Set(france.map(section=>fairwayCatalog.sections.get(section.sourceId)))].sort();
  const accessKey='nautic-accessible-waterways';
- let accessProfile={enabled:false,draught:150,air:345,width:430};
+ let accessProfile={enabled:false,draught:150,air:345,width:430,opacity:65};
  try{
   const saved=JSON.parse(native?.readSetting(accessKey)||localStorage.getItem(accessKey)||'null');
-  if(saved&&['draught','air','width'].every(key=>Number.isFinite(saved[key])&&saved[key]>0))accessProfile=saved;
+  if(saved&&['draught','air','width'].every(key=>Number.isFinite(saved[key])&&saved[key]>0))accessProfile={...accessProfile,...saved,opacity:Number.isFinite(saved.opacity)?Math.min(95,Math.max(20,saved.opacity)):65};
  }catch(_){}
- let accessData={type:'FeatureCollection',features:[]},lastAccessGps=null,lastAccessStamp=0,nationalCheckedAt=0;
+ let accessData={type:'FeatureCollection',features:[]},lastAccessGps=null,lastAccessStamp=0;
  const accessStatus=document.createElement('div');
  accessStatus.id='nauticAccessibleStatus';accessStatus.hidden=true;accessStatus.setAttribute('role','status');
  wrap.append(accessStatus);
- const legacyAccessible=map?L.geoJSON(null,{style:{color:'#3be577',weight:5,opacity:.85,interactive:false}}).addTo(map):null;
+ const legacyAccessible=map?L.geoJSON(null,{style:()=>({color:'#3be577',weight:5,opacity:accessProfile.opacity/100,interactive:false})}).addTo(map):null;
  function updateAccessible(force=false){
   const gps=accessProfile.enabled?currentDeparture():null;
-  const now=Date.now(),fresh=nationalCheckedAt&&now-nationalCheckedAt<40*60*1000;
+  const now=Date.now();
   if(!force&&!!gps===!!lastAccessGps&&now-lastAccessStamp<60000&&(!gps||W.distance(gps,lastAccessGps)<75))return;
   lastAccessGps=gps;lastAccessStamp=now;
   let result={features:[],reason:''};
   if(accessProfile.enabled&&accessible){
-   result=accessible.reachable(france,window.NauticClearances||{},gps,accessProfile,
-    accessible.blockedSections(france,impacts,now));
+   result=accessible.reachable(france,window.NauticClearances||{},gps,accessProfile);
   }
   const messages={
    gps:'Voies accessibles · attente GPS',
    'off-network':'GPS hors du réseau français cartographié',
-   closed:'Voies accessibles · départ fermé selon les avis',
    unknown:'Voies accessibles · gabarit inconnu près du GPS',
    dimensions:'Voies accessibles · gabarit insuffisant près du GPS'
   };
-  const waiting='Voies accessibles · '+(impactPending?'vérification des avis EuRIS…':'avis EuRIS récents indisponibles');
-  accessStatus.textContent=messages[result.reason]||(fresh?result.features.length+' tronçons compatibles · données EuRIS':waiting);
+  accessStatus.textContent=messages[result.reason]||(result.features.length+' tronçons compatibles avec le gabarit');
   accessStatus.hidden=!accessProfile.enabled;
-  accessData={type:'FeatureCollection',features:fresh?result.features:[]};
+  accessData={type:'FeatureCollection',features:result.features};
   legacyAccessible?.clearLayers();legacyAccessible?.addData(accessData);
   vector?.getSource('nautic-accessible')?.setData(accessData);
+  if(vector?.getLayer('nautic-accessible'))vector.setPaintProperty('nautic-accessible','line-opacity',accessProfile.opacity/100);
  }
  function accessSettings(){
   modal('Voies accessibles','<form id="nauticAccessForm">'+
@@ -166,19 +163,26 @@
    '<label>Tirant d’eau (m)<input id="nauticAccessDraught" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Tirant d’air (m)<input id="nauticAccessAir" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Largeur (m)<input id="nauticAccessWidth" type="number" min="0.01" max="100" step="0.01" required></label></div>'+
-   '<p>France · limites de gabarit et ponts recensés par EuRIS. Le niveau d’eau réel peut modifier le passage.</p>'+
+   '<label class="nautic-access-opacity">Transparence du tracé <output id="nauticAccessTransparencyValue"></output>'+
+   '<input id="nauticAccessTransparency" type="range" min="5" max="80" step="5"></label>'+
+   '<p>France · compatibilité du gabarit selon EuRIS. Les fermetures restent indiquées par les avis du trajet.</p>'+
    '<button type="submit">Appliquer</button></form>');
   const fields={draught:$('nauticAccessDraught'),air:$('nauticAccessAir'),width:$('nauticAccessWidth')};
   const enabled=$('nauticAccessEnabled');
   enabled.checked=accessProfile.enabled;
+  const transparency=$('nauticAccessTransparency');
+  transparency.value=100-accessProfile.opacity;
+  const showTransparency=()=>{$('nauticAccessTransparencyValue').textContent=transparency.value+' %';};
+  transparency.oninput=showTransparency;
+  showTransparency();
   for(const [key,input] of Object.entries(fields))input.value=accessProfile[key]/100;
   $('nauticAccessForm').onsubmit=event=>{
    event.preventDefault();
-   accessProfile={enabled:enabled.checked};
+   accessProfile={enabled:enabled.checked,opacity:100-Number(transparency.value)};
    for(const [key,input] of Object.entries(fields))accessProfile[key]=Math.round(input.valueAsNumber*100);
    const saved=JSON.stringify(accessProfile);
    try{localStorage.setItem(accessKey,saved);native?.writeSetting(accessKey,saved);}catch(_){}
-   $('dialog').close();checkRouteImpacts();updateAccessible(true);
+   $('dialog').close();updateAccessible(true);
   };
  }
  const impactCacheKey='nautic-euris-route-impacts';
@@ -200,8 +204,8 @@
  function checkRouteImpacts(force=false){
   if(!native?.checkRouteImpacts||impactPending||!fairwayCatalog)return;
   const trips=displayed.length?displayed:[routeState];
-  const scopes=[...new Set([...(accessProfile.enabled?franceScopes:[]),...trips.flatMap(item=>(item?.trip?.wayIds||[])
-   .map(id=>fairwayCatalog.sections.get(id)).filter(id=>/^(FR|BE)/.test(id)))])].sort();
+  const scopes=[...new Set(trips.flatMap(item=>(item?.trip?.wayIds||[])
+   .map(id=>fairwayCatalog.sections.get(id)).filter(id=>/^(FR|BE)/.test(id))))].sort();
   if(!scopes.length)return;
   const key=scopes.join(',');
   if(!force&&key===checkedScopes&&Date.now()-impactCheckedAt<20*60*1000)return;
@@ -218,11 +222,8 @@
    impacts=euris.compile(impactSnapshot,fairwayCatalog,calc);
    native?.writeSetting(impactCacheKey,JSON.stringify(impactSnapshot));
    eurisStatus='Avis EuRIS consultés';
-   const received=new Set(feed.scopes);
-   if(franceScopes.length&&franceScopes.every(scope=>received.has(scope)))nationalCheckedAt=Date.now();
   }catch(_){eurisStatus=impacts.length?'EuRIS indisponible · derniers avis mémorisés':'EuRIS indisponible';}
   renderTrip();
-  updateAccessible(true);
  };
  function cachedRoute(start,end){
   let local;
