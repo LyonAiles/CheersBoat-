@@ -488,6 +488,31 @@
    'Réseau adapté du jeu de données de Baart et Turpijn, <a href="https://doi.org/10.5281/zenodo.20793663">CC BY 4.0</a>. '+
    'Data provided by EuRIS (www.eurisportal.eu) and Rijkswaterstaat.</small>');
  }
+ function showTripBottlenecks(){
+  const items=displayed.length?displayed:routeState?.trip?[routeState]:[];
+  const metres=cm=>(cm/100).toLocaleString('fr-FR',{maximumFractionDigits:2})+' m';
+  const labels={draught:'Tirant d’eau maximal',air:'Hauteur libre'};
+  const content=items.map(item=>{
+   const minima=accessible.routeBottlenecks(item.trip,window.NauticClearances||{},W.distance,item.departure?.offset);
+   const rows=Object.entries(minima).map(([dimension,{minimum,unknown}])=>{
+    let detail='Minimum indisponible';
+    if(minimum){
+     const gap=minimum.limit-accessProfile[dimension];
+     const location=fairwayNames.get(minimum.section)||minimum.section;
+     const source=window.NauticClearanceSources?.[minimum.section]?.[dimension]?.[0];
+     const difference=gap===0?'aucune marge à la valeur de référence':
+      (gap>0?metres(gap)+' de marge théorique':'limite inférieure de '+metres(-gap));
+     detail=metres(minimum.limit)+' · bateau '+metres(accessProfile[dimension])+' · '+difference+
+      '<br>'+esc(location)+(source?' · '+esc(source):'')+' · à environ '+km(minimum.offset/1000)+' du départ';
+    }
+    return '<li><strong>'+labels[dimension]+'</strong><br>'+detail+
+     (unknown?'<br><small>'+unknown+' tronçons sans valeur · minimum réel du trajet non établi</small>':'')+'</li>';
+   }).join('');
+   return (item.name?'<h3>'+esc(item.name)+'</h3>':'')+'<ul>'+rows+'</ul>';
+  }).join('');
+  modal('Points de gabarit limitants',content+
+   '<p class="muted">Valeurs de référence EuRIS. Le niveau d’eau, la passe sous une voûte et la position d’un pont mobile peuvent modifier la marge.</p>');
+ }
  function closureDate(closure){
   const date=closure.date?new Date(closure.date+'T12:00:00'):null;
   return date&&Number.isFinite(+date)?'Réouverture prévue '+formatDate.format(date):'Réouverture inconnue';
@@ -510,6 +535,7 @@
    '<div class="destination-menu"><button type="button" id="tripChange">Nouvelle destination</button> '+
    '<button type="button" id="tripCity">Rechercher une ville</button> '+
    '<button type="button" id="tripArchive">Trajets enregistrés</button> '+
+   (displayed.length||routeState?.trip?'<button type="button" id="tripBottlenecks">Points de gabarit limitants</button> ':'')+
    '<button type="button" id="tripAccessible">Voies accessibles</button> '+
    (accessProfile.enabled?'<button type="button" id="tripClearAccessible">Effacer les tracés verts</button> ':'')+
    (displayed.length?'<button type="button" id="tripHideGroup">Masquer les trajets sélectionnés</button> '+
@@ -524,6 +550,7 @@
     routeState.closures.map((closure,i)=>'<button type="button" data-trip-closure="'+i+'">'+
      (closure.from?'Tronçon '+(i+1):'Parcours entier')+' · '+closureDate(closure)+'</button> ').join('')+
     '<button type="button" id="tripClear">Effacer le trajet</button>':'')+'</div>');
+  if($('tripBottlenecks'))$('tripBottlenecks').onclick=()=>{$('dialog').close();showTripBottlenecks();};
   $('tripAccessible').onclick=()=>{$('dialog').close();accessSettings();};
   if($('tripClearAccessible'))$('tripClearAccessible').onclick=()=>{
    accessProfile.enabled=false;

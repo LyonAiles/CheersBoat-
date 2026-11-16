@@ -213,3 +213,9 @@ assert.deepEqual(access.exceeded([100,180,230],{draught:100,air:200,width:200}),
 assert.deepEqual(access.exceeded([0,-1,200],{draught:100,air:200,width:210}),[
  {key:'width',limit:200,value:210}
 ]);
+const constraining=access.routeBottlenecks(
+ {coordinates:[p(0),p(.01),p(.02),p(.03),p(.04)],wayIds:['A','B','B','C']},
+ {A:[180,400,400],B:[140,0,400],C:[170,270,400]},()=>100
+);
+assert.deepEqual(constraining.draught,{minimum:{limit:140,section:'B',offset:100},unknown:0});
+assert.deepEqual(constraining.air,{minimum:{limit:270,section:'C',offset:300},unknown:1});

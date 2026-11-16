@@ -20,7 +20,31 @@
   }
   return {features,unverified,insufficient};
  }
- const api={compatibleSections,exceeded};
+ function routeBottlenecks(trip,limits,distance,departureOffset=0){
+  const result={draught:{minimum:null,unknown:0},air:{minimum:null,unknown:0}};
+  const seen=new Set();
+  let offset=0;
+  for(let i=0;i<trip.coordinates.length-1;i++){
+   const start=offset;
+   offset+=distance(trip.coordinates[i],trip.coordinates[i+1]);
+   if(offset<=departureOffset)continue;
+   const section=trip.wayIds?.[i];
+   const key=section??'edge-'+i;
+   if(seen.has(key))continue;
+   seen.add(key);
+   const [draught,air]=limits[section]||[];
+   for(const [dimension,limit] of Object.entries({draught,air})){
+    const summary=result[dimension];
+    if(dimension==='air'&&limit===-1)continue;
+    if(!Number.isFinite(limit)||limit<=0){summary.unknown++;continue;}
+    if(!summary.minimum||limit<summary.minimum.limit){
+     summary.minimum={limit,section,offset:Math.max(0,start-departureOffset)};
+    }
+   }
+  }
+  return result;
+ }
+ const api={compatibleSections,exceeded,routeBottlenecks};
  if(typeof module!=='undefined')module.exports=api;
  else root.NauticAccessible=api;
 })(typeof window!=='undefined'?window:globalThis);
