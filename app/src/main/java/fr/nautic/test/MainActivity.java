@@ -170,6 +170,17 @@ public class MainActivity extends Activity {
   }
   @JavascriptInterface public void openNotes(){runOnUiThread(()->{dashboardVisible=false;if(dashboardCameras!=null){dashboardCameras.close();dashboardCameras=null;}notesPad.show();});}
   @JavascriptInterface public void mapInteraction(boolean active){runOnUiThread(()->{mapManipulating=active;if(dashboardCameras!=null)dashboardCameras.pauseForMap(active);});}
+  @JavascriptInterface public void searchMapCity(String name,int request){
+   new Thread(()->{
+    org.json.JSONObject result=new org.json.JSONObject();
+    try{
+     result.put("request",request);
+     try{result.put("cities",new org.json.JSONArray(NauticNotices.searchCity(name)));}
+     catch(Exception e){result.put("failed",true);}
+     if(!isDestroyed())js("nauticCitySearchResult",result.toString());
+    }catch(org.json.JSONException ignored){}
+   },"nautic-map-city").start();
+  }
   @JavascriptInterface public void checkNavigationNotices(){
    new Thread(()->{
     try{if(!isDestroyed())js("nauticNavigationNotices",NauticNotices.lookup());}

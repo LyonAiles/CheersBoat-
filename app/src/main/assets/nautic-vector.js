@@ -65,6 +65,23 @@
  wrap.append(destinationButton,tripProgress,destinationStatus);
  const tripKey='nautic-last-trip-v1', networkKey='nautic-trip-network-v1';
  const calc=window.NauticTrip, notices=window.NauticNotices;
+ const archiveKey='nautic-saved-trips-v1';
+ let archive={trips:[],selected:[]}, displayed=[],noticeStatus='';
+ try{
+  const saved=JSON.parse(native?.readSetting(archiveKey)||localStorage.getItem(archiveKey)||'null');
+  if(Array.isArray(saved?.trips))archive={
+   trips:saved.trips.filter(item=>typeof item?.name==='string'&&item.trip?.coordinates?.length>1),
+   selected:Array.isArray(saved.selected)?saved.selected:[]
+  };
+ }catch(_){}
+ function storeArchive(next){
+  try{
+   const json=JSON.stringify(next);
+   if(native?.writeSetting){if(!native.writeSetting(archiveKey,json))return false;}
+   else localStorage.setItem(archiveKey,json);
+   archive=next;return true;
+  }catch(_){return false;}
+ }
  const liveNotices={};
  let noticePending=false,lastNoticeCheck=0,noticeDay=notices.dateInFrance();
  const validPoint=p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&Math.abs(p.lat)<=90&&Math.abs(p.lon)<=180;
@@ -116,34 +133,42 @@
  function sectionColor(closed){
   return closed?'#ff4a42':'#a4b0bc';
  }
- function applicableNotices(){
-  return notices.relevant(routeState?.trip,liveNotices,noticeDay);
+ function applicableNotices(trip=routeState?.trip){
+  return notices.relevant(trip,liveNotices,noticeDay);
  }
- function checkNavigationNotices(){
-  if(!native?.checkNavigationNotices||noticePending||Date.now()-lastNoticeCheck<20*60*1000||
-    !notices.mapped(routeState?.trip).length)return;
-  lastNoticeCheck=Date.now();noticePending=true;
+ function checkNavigationNotices(force=false){
+  const trips=displayed.length?displayed:[routeState];
+  if(!native?.checkNavigationNotices||noticePending||(!force&&Date.now()-lastNoticeCheck<20*60*1000)||
+    !trips.some(item=>notices.mapped(item?.trip).length))return;
+  lastNoticeCheck=Date.now();noticePending=true;noticeStatus='Vérification des avis VNF…';
   native.checkNavigationNotices();
  }
  window.nauticNavigationNotices=raw=>{
   noticePending=false;
-  if(!raw)return;
-  try{Object.assign(liveNotices,notices.verifyResponse(JSON.parse(raw).items));}catch(_){return;}
+  try{
+   const updates=notices.verifyResponse(JSON.parse(raw).items);
+   Object.assign(liveNotices,updates);
+   noticeStatus=Object.keys(updates).length?'Avis VNF consultés':'Aucun avis associé confirmé par EuRIS';
+  }catch(_){noticeStatus='EuRIS indisponible · avis connus affichés';}
   renderTrip();
  };
  function tripData(){
-  if(!routeState)return {type:'FeatureCollection',features:[]};
-  const {trip,closures,end}=routeState;
-  if(!trip)return {type:'FeatureCollection',features:[{type:'Feature',properties:{color:'#bdc5d2'},
-   geometry:{type:'Point',coordinates:[end.lon,end.lat]}}]};
+  const items=displayed.length?displayed:routeState?[routeState]:[];
+  const features=items.flatMap(tripFeatures).sort((a,b)=>Number(a.properties.closed)-Number(b.properties.closed));
+  return {type:'FeatureCollection',features};
+ }
+ function tripFeatures(item){
+  const {trip,closures,end}=item;
+  if(!trip)return [{type:'Feature',properties:{color:'#bdc5d2'},
+   geometry:{type:'Point',coordinates:[end.lon,end.lat]}}];
   const xy=p=>[p.lon,p.lat];
-  const segments=calc.sections(trip,closures,notices.closedEdges(trip,applicableNotices()));
-  const properties=closed=>({color:sectionColor(closed)});
+  const segments=calc.sections(trip,closures,notices.closedEdges(trip,applicableNotices(trip)),item.departure?.offset);
+  const properties=closed=>({color:sectionColor(closed),closed});
   const features=segments.map(segment=>({type:'Feature',properties:properties(segment.closed),
    geometry:{type:'LineString',coordinates:segment.coordinates.map(xy)}}));
   features.push({type:'Feature',properties:properties(!!segments.at(-1)?.closed),
    geometry:{type:'Point',coordinates:xy(trip.coordinates.at(-1))}});
-  return {type:'FeatureCollection',features};
+  return features;
  }
  const legacyTrip=map?L.geoJSON(null,{
   style:feature=>({color:feature.properties.color,weight:4,interactive:false}),
@@ -163,9 +188,9 @@
  function renderTripCounters(){
   for(const [id,label,value] of [
    ['tripCovered','Distance parcourue',(routeState?.covered||0)/1000],
-   ['tripRemaining','Distance restante',routeState?.trip?calc.remaining(routeState.trip.total,routeState.covered):0]
+   ['tripRemaining','Distance restante',routeState?.trip?calc.remaining(routeState.departure?.total??routeState.trip.total,routeState.covered):0]
   ]){
-   const element=$(id),text=routeState?.trip?km(value):'—';
+   const element=$(id),text=routeState?.trip&&!routeState.awaitingGps?km(value):'—';
    if(element.textContent===text)continue;
    element.textContent=text;
    element.setAttribute('aria-label',label+' : '+(routeState?.trip?text:'indisponible'));
@@ -181,10 +206,12 @@
   destinationStatus.style.borderLeft=routeState?.trip?'3px solid '+sectionColor(routeState.closures.length>0||routeState.trip.restricted||applicableNotices().some(notice=>notice.active)):'';
  }
  function tripSummary(){
+  if(displayed.length)return [displayed.length+' trajets affichés',
+   displayed.some(item=>notices.mapped(item.trip).length)?noticeStatus:'État VNF inconnu'].filter(Boolean).join(' · ');
   if(!routeState)return '';
   const {trip,closures,note}=routeState;
   if(!trip)return tripRequest?'Calcul du trajet fluvial…':note||'Impossible de calculer le trajet fluvial';
-  const distance=(trip.estimated?'≈ ':'')+km(trip.total);
+  const distance=(trip.estimated||routeState.departure?.offset>0?'≈ ':'')+km(routeState.departure?.total??trip.total);
   const parts=[];
   if(closures.length){
    parts.push(closures.length===1?'Un tronçon fermé':closures.length+' tronçons fermés');
@@ -198,16 +225,18 @@
    parts.push(...dates);
   }
   if(calc.sections(trip,closures,notices.closedEdges(trip,verified)).some(part=>!part.closed))parts.push('Gris · état inconnu');
+  if(routeState.awaitingGps)parts.push(routeState.gpsMessage||'Départ en attente du GPS');
   if(note)parts.push(note);
   if(trip.pk!=null)parts.push('Arrivée PK '+formatPk.format(trip.pk));
-  parts.push(distance);
+  if(!routeState.awaitingGps)parts.push(distance);
   return parts.join(' · ');
  }
  function noticeDate(value){
   return formatDate.format(new Date(value+'T12:00:00'));
  }
  function showNavigationNotices(){
-  const entries=applicableNotices().map(notice=>'<p><strong>'+notice.title+'</strong><br>'+notice.reference+' · '+
+  const relevant=displayed.length?displayed.flatMap(item=>applicableNotices(item.trip)):applicableNotices();
+  const entries=[...new Map(relevant.map(item=>[item.number,item])).values()].map(notice=>'<p><strong>'+notice.title+'</strong><br>'+notice.reference+' · '+
    (notice.active?'Fermeture en cours':'Fermeture annoncée')+' du '+noticeDate(notice.start)+' au '+
    noticeDate(notice.end)+' inclus.<br>'+
    (notice.tentative&&notice.tentative>notice.end?'Prolongation probable jusqu’au '+noticeDate(notice.tentative)+' · à confirmer.<br>':'')+
@@ -215,6 +244,7 @@
   modal('Avis de navigation',
    (entries||'<p>Aucun avis VNF associé aux tronçons de ce trajet.</p>')+
    '<p>Gris · état inconnu. Rouge · fermeture ou restriction signalée.</p>'+
+   '<p>Actualisation automatique des avis associés aux tronçons répertoriés.</p>'+
    '<p><a href="https://avisbat.vnf.fr/">Consulter les avis officiels VNF</a></p>'+
    '<small>API/Service Notices to Skippers incorporated from EuRIS (eurisportal.eu)</small>');
  }
@@ -235,26 +265,38 @@
 
  destinationButton.onclick=()=>{
   if(selection){selection=null;showDestination(tripSummary());return;}
-  if(!routeState){choose(stableFix?'end':'start');return;}
+
   modal('Destination',
-   '<button type="button" id="tripFit">Voir le parcours</button> '+
    '<button type="button" id="tripChange">Nouvelle destination</button> '+
-   '<button type="button" id="tripChooseStart">Choisir le départ sur la carte</button> '+
-   (!routeState.trip?'<button type="button" id="tripRetry">Relancer le calcul</button> ':
-    '<button type="button" id="tripNotices">Avis de navigation</button> <button type="button" id="tripClosure">Signaler un tronçon fermé</button> ')+
-   routeState.closures.map((closure,i)=>'<button type="button" data-trip-closure="'+i+'">'+
-    (closure.from?'Tronçon '+(i+1):'Parcours entier')+' · '+closureDate(closure)+'</button> ').join('')+
-   '<button type="button" id="tripClear">Effacer le trajet</button>');
-  $('tripFit').onclick=()=>{$('dialog').close();fitTrip();};
-  $('tripChange').onclick=()=>{$('dialog').close();choose(stableFix?'end':'start');};
-  $('tripChooseStart').onclick=()=>{$('dialog').close();choose('start');};
+   '<button type="button" id="tripCity">Rechercher une ville</button> '+
+   '<button type="button" id="tripArchive">Trajets enregistrés</button> '+
+   (displayed.length?'<button type="button" id="tripHideGroup">Masquer les trajets sélectionnés</button> '+
+    '<button type="button" id="tripGroupNotices">Avis de navigation</button> ':'')+
+   (routeState?
+    '<button type="button" id="tripFit">Voir le parcours</button> '+
+    '<button type="button" id="tripChooseStart">Choisir le départ sur la carte</button> '+
+    (!routeState.trip?'<button type="button" id="tripRetry">Relancer le calcul</button> ':
+     '<button type="button" id="tripNotices">Avis de navigation</button> '+
+     '<button type="button" id="tripSave">Mémoriser ce trajet</button> '+
+     '<button type="button" id="tripClosure">Signaler un tronçon fermé</button> ')+
+    routeState.closures.map((closure,i)=>'<button type="button" data-trip-closure="'+i+'">'+
+     (closure.from?'Tronçon '+(i+1):'Parcours entier')+' · '+closureDate(closure)+'</button> ').join('')+
+    '<button type="button" id="tripClear">Effacer le trajet</button>':''));
+  $('tripCity').onclick=()=>{$('dialog').close();searchCity();};
+  $('tripArchive').onclick=()=>{$('dialog').close();showArchive();};
+  if($('tripHideGroup'))$('tripHideGroup').onclick=()=>{$('dialog').close();displayed=[];renderTrip();};
+  if($('tripGroupNotices'))$('tripGroupNotices').onclick=()=>{$('dialog').close();showNavigationNotices();};
+  if($('tripFit'))$('tripFit').onclick=()=>{$('dialog').close();displayed=[];renderTrip();fitTrip();};
+  if($('tripSave'))$('tripSave').onclick=()=>{$('dialog').close();saveToArchive();};
+  $('tripChange').onclick=()=>{$('dialog').close();displayed=[];renderTrip();choose(stableFix?'end':'start');};
+  if($('tripChooseStart'))$('tripChooseStart').onclick=()=>{$('dialog').close();displayed=[];renderTrip();choose('start');};
   if($('tripRetry'))$('tripRetry').onclick=()=>{$('dialog').close();calculateTrip(routeState.start,routeState.end,true);};
   if($('tripNotices'))$('tripNotices').onclick=()=>{$('dialog').close();showNavigationNotices();};
-  if($('tripClosure'))$('tripClosure').onclick=()=>{$('dialog').close();choose('closureStart');};
+  if($('tripClosure'))$('tripClosure').onclick=()=>{$('dialog').close();displayed=[];renderTrip();choose('closureStart');};
   $('dialog').querySelectorAll('[data-trip-closure]').forEach(button=>{
    button.onclick=()=>editClosure(routeState.closures[Number(button.dataset.tripClosure)],Number(button.dataset.tripClosure));
   });
-  $('tripClear').onclick=()=>{
+  if($('tripClear'))$('tripClear').onclick=()=>{
    $('dialog').close();
    tripRequest?.abort();tripRequest=null;
    routeState=null;saveTrip();renderTrip();
@@ -262,7 +304,10 @@
  };
  destinationStatus.onclick=()=>destinationButton.click();
  function fitTrip(){
-  const points=routeState.trip?.coordinates||[routeState.start,routeState.end];
+  fitPoints(tripFeatures(routeState).flatMap(feature=>feature.geometry.type==='LineString'?
+   feature.geometry.coordinates.map(([lon,lat])=>({lat,lon})):[]).concat(routeState.end));
+ }
+ function fitPoints(points){
   window.nauticMapFreePan=true;
   if(active&&vector){
    const bounds=new maplibregl.LngLatBounds();
@@ -272,6 +317,115 @@
    map.fitBounds(points.map(p=>[p.lat,p.lon]),{padding:[24,24],maxZoom:16,animate:false});
   }
  }
+ function saveToArchive(){
+  const item=routeState;
+  if(!item?.trip||item.trip.coordinates.length<2)return;
+  modal('Mémoriser le trajet','<form id="saveRouteForm"><label>Nom <input id="savedRouteName" required maxlength="100"></label> '+
+   '<button type="submit">Enregistrer</button><p id="saveRouteError" role="status"></p></form>');
+  $('savedRouteName').value=archive.trips.find(saved=>saved.id===item.savedId)?.name||'Trajet '+(archive.trips.length+1);
+  $('saveRouteForm').onsubmit=event=>{
+   event.preventDefault();
+   const name=$('savedRouteName').value.trim();
+   if(!name)return;
+   const id=item.savedId||String(Date.now());
+   const saved={id,name,start:item.start,end:item.end,trip:item.trip,closures:item.closures};
+   if(!storeArchive({...archive,trips:[...archive.trips.filter(other=>other.id!==id),saved]})){
+    $('saveRouteError').textContent='Impossible d’enregistrer le trajet';return;
+   }
+   item.savedId=id;saveTrip();$('dialog').close();showArchive();
+  };
+ }
+ function currentDeparture(){
+  return latest&&Date.now()-latest.t<30000&&latest.acc<=35?latest:null;
+ }
+ function attachDeparture(){
+  if(!routeState?.awaitingGps)return false;
+  const gps=currentDeparture();
+  const departure=gps&&calc.resume(routeState.trip,gps);
+  if(!departure){
+   const message=gps?'GPS hors du tracé enregistré · rejoins la voie d’eau':'Départ en attente du GPS';
+   if(routeState.gpsMessage===message)return false;
+   routeState.gpsMessage=message;return true;
+  }
+  routeState.awaitingGps=false;
+  routeState.departure={...departure,gps:{lat:gps.lat,lon:gps.lon}};
+  routeState.covered=0;saveTrip();return true;
+ }
+ function reopenTrip(saved){
+  tripRequest?.abort();tripRequest=null;selection=null;displayed=[];
+  routeState={...saved,closures:[...saved.closures],savedId:saved.id,covered:0,awaitingGps:true};
+  attachDeparture();saveTrip();checkNavigationNotices(true);renderTrip();fitTrip();
+ }
+ function showArchive(){
+  modal('Trajets enregistrés','<div id="savedRoutesList"></div><p id="savedRoutesStatus" role="status"></p>'+
+   (archive.trips.length?'<button type="button" id="showSavedRoutes">Afficher les trajets cochés</button>':''));
+  const list=$('savedRoutesList'), checked=new Set(archive.selected);
+  if(!archive.trips.length)list.textContent='Aucun trajet enregistré.';
+  for(const item of archive.trips){
+   const row=document.createElement('p'), label=document.createElement('label'), check=document.createElement('input');
+   const open=document.createElement('button'), remove=document.createElement('button');
+   check.type='checkbox';check.checked=checked.has(item.id);
+   check.onchange=()=>{
+    if(check.checked)checked.add(item.id);else checked.delete(item.id);
+   };
+   label.append(check,' '+item.name+' · '+km(item.trip.total)+' ');
+   open.type='button';open.textContent='Rouvrir';
+   open.onclick=()=>{$('dialog').close();reopenTrip(item);};
+   remove.type='button';remove.textContent='Supprimer';
+   remove.onclick=()=>{
+    if(!window.confirm('Supprimer le trajet « '+item.name+' » ?'))return;
+    const selected=[...checked].filter(id=>id!==item.id);
+    if(!storeArchive({trips:archive.trips.filter(other=>other.id!==item.id),selected})){
+     $('savedRoutesStatus').textContent='Impossible de supprimer le trajet';return;
+    }
+    displayed=displayed.filter(other=>other.id!==item.id);renderTrip();
+    $('dialog').close();showArchive();
+   };
+   row.append(label,open,' ',remove);list.append(row);
+  }
+  if($('showSavedRoutes'))$('showSavedRoutes').onclick=()=>{
+   const items=archive.trips.filter(item=>checked.has(item.id));
+   if(!items.length){$('savedRoutesStatus').textContent='Coche au moins un trajet.';return;}
+   if(!storeArchive({...archive,selected:[...checked]})){
+    $('savedRoutesStatus').textContent='Impossible de mémoriser la sélection';return;
+   }
+   displayed=items;selection=null;$('dialog').close();
+   checkNavigationNotices(true);renderTrip();fitPoints(items.flatMap(item=>item.trip.coordinates));
+  };
+ }
+ let cityRequest=0;
+ function searchCity(){
+  modal('Rechercher une ville','<form id="cityForm"><label>Commune française <input id="cityName" required minlength="2" maxlength="100" type="search"></label> '+
+   '<button type="submit">Rechercher</button></form><p id="cityStatus" role="status"></p><div id="cityResults"></div>');
+  $('cityForm').onsubmit=event=>{
+   event.preventDefault();
+   const name=$('cityName').value.trim();
+   if(name.length<2)return;
+   const request=++cityRequest;
+   $('cityResults').replaceChildren();
+   $('cityStatus').textContent='Recherche en cours…';
+   if(native?.searchMapCity)native.searchMapCity(name,request);
+   else $('cityStatus').textContent='Recherche indisponible sur cet appareil';
+  };
+ }
+ window.nauticCitySearchResult=raw=>{
+  const data=JSON.parse(raw), target=$('cityResults');
+  if(data.request!==cityRequest||!target||!$('dialog').open)return;
+  let count=0;
+  for(const city of data.cities||[]){
+   const [lon,lat]=city?.centre?.coordinates||[];
+   if(!validPoint({lat,lon})||typeof city.nom!=='string')continue;
+   const result=document.createElement('button');
+   result.type='button';result.textContent=city.nom+' ('+city.codeDepartement+')';
+   result.onclick=()=>{
+    $('dialog').close();window.nauticMapFreePan=true;
+    if(map){map.setView([lat,lon],13,{animate:false});rotateMap();}
+    if(active&&vector)vector.jumpTo({center:[lon,lat],zoom:13,padding:{top:0,bottom:0,left:0,right:0}});
+   };
+   target.append(result,' ');count++;
+  }
+  $('cityStatus').textContent=data.failed?'Recherche de ville indisponible':count?'':'Aucune commune trouvée';
+ };
  function editClosure(closure,index=null){
   modal('Fermeture du tronçon','<p>Reporte la date annoncée dans l’avis de navigation si elle est connue.</p>'+
    '<p><a href="https://avisbat.vnf.fr/" target="_blank" rel="noopener">Consulter Avisbat (VNF)</a></p>'+
@@ -316,6 +470,7 @@
  }
 
  async function calculateTrip(start,end,keepExisting=false){
+  displayed=[];
   tripRequest?.abort();
   const controller=new AbortController();
   tripRequest=controller;
@@ -357,7 +512,7 @@
  }
 
  window.nauticTripGpsLeg=metres=>{
-  if(!routeState?.trip)return;
+  if(!routeState?.trip||routeState.awaitingGps)return;
   routeState.covered+=metres;
   renderTripCounters();
   if(Date.now()-lastSave>15000)saveTrip();
@@ -392,6 +547,7 @@
   if(today!==noticeDay){noticeDay=today;renderTrip();}
   else checkNavigationNotices();
  },60000,true);
+ window.nauticEvery(()=>{if(attachDeparture())renderTrip();},1500,true);
  window.nauticEvery(sync,350,true);let routeCount=-1;window.nauticEvery(()=>{if(active&&vector&&points.length!==routeCount){routeCount=points.length;vector.getSource('nautic-route')?.setData(routeData());}updateWorks();},3000,true);
  new ResizeObserver(()=>{vector?.resize();sync();}).observe(wrap);
  function selectedSignature(){return W.categories.filter(([key])=>options.waterwayTypes?.[key]!==false).map(([key])=>key).join(',');}

@@ -157,7 +157,7 @@
   return best;
  }
 
- function sections(trip, closures=[], verifiedEdges=[]) {
+ function sections(trip, closures=[], verifiedEdges=[], startAt=0) {
   const {coordinates}=trip;
   const {offsets,total}=geometry(coordinates);
   const spans=[];
@@ -172,10 +172,13 @@
   const result=[];
   for(let i=1;i<coordinates.length;i++){
    const start=offsets[i-1],end=offsets[i];
-   if(start===end)continue;
+   if(start===end||end<=startAt)continue;
    while(cursor<cuts.length&&cuts[cursor]<=start)cursor++;
-   const stops=[start];
-   while(cursor<cuts.length&&cuts[cursor]<end)stops.push(cuts[cursor++]);
+   const stops=[Math.max(start,startAt)];
+   while(cursor<cuts.length&&cuts[cursor]<end){
+    if(cuts[cursor]>startAt)stops.push(cuts[cursor]);
+    cursor++;
+   }
    stops.push(end);
    const a=coordinates[i-1],b=coordinates[i];
    const at=d=>{
@@ -196,8 +199,15 @@
   return result;
  }
 
+ function resume(trip, gps, tolerance=300) {
+  const hit=gps&&locate(trip.coordinates,gps);
+  if(!hit||hit.distance>tolerance)return null;
+  const length=geometry(trip.coordinates).total;
+  return {offset:hit.offset,total:length?trip.total*(1-hit.offset/length):0};
+ }
+
  const remaining = (totalKm, coveredMetres) => Math.max(0, totalKm - coveredMetres / 1000);
- const api = {create, fromNetwork, locate, sections, remaining};
+ const api = {create, fromNetwork, locate, sections, resume, remaining};
  if (typeof module !== 'undefined') module.exports = api;
  else root.NauticTrip = api;
 })(typeof window !== 'undefined' ? window : globalThis);

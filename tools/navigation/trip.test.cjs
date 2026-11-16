@@ -103,3 +103,16 @@ assert.equal(notices.relevant(localRoute,verified,'2027-01-01').length,1);
 assert.deepEqual(notices.verifyResponse([{...published,state:1}]),{});
 assert.deepEqual(notices.verifyResponse([{...published,limitations:[]}]),{});
 console.log('PASS: French dates, mapped VNF closures, unknown reaches, and confirmed extensions');
+
+const {resume}=require('../../app/src/main/assets/nautic-trip.js');
+const resumed=resume(route,p(.006,.00005));
+assert(resumed.offset>0 && resumed.total<route.total);
+assert.equal(resume(route,p(.1)),null);
+assert.equal(resume(route,null),null);
+const resumedSections=sections(route,[mark],[],resumed.offset);
+assert(Math.abs(resumedSections[0].coordinates[0].lat-.006)<1e-9);
+assert(resumedSections[0].closed);
+assert.deepEqual(resumedSections.at(-1).coordinates.at(-1),route.coordinates.at(-1));
+assert.equal(resume(route,route.coordinates.at(-1)).total,0);
+assert.deepEqual(sections(route,[],[],resume(route,route.coordinates.at(-1)).offset),[]);
+console.log('PASS: reopening uses the GPS projection along the stored route and preserves intersected closures');
