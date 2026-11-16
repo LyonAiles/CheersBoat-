@@ -219,17 +219,25 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 }
 
 #mapWrap {
- --nautic-map-control:rgba(9, 47, 67, .60);
- --nautic-map-control-strong:rgba(9, 47, 67, .76);
+ --nautic-map-control:rgba(9, 47, 67, var(--nautic-ui-opacity, .60));
+ --nautic-map-control-strong:rgba(9, 47, 67, var(--nautic-ui-opacity, .60));
 }
-#mapWrap :is(#mapRecenter,#mapLayers,#compass,#nauticDestination,#nauticWaterwayStatus) {
- background:var(--nautic-map-control);
+#mapWrap :is(#mapRecenter,#mapLayers,#compass,#nauticDestination,#nauticWaterwayStatus,.mapWidget,.mapFoot,button) {
+ background-color:var(--nautic-map-control);
  backdrop-filter:blur(2px);
 }
 #mapWrap #nauticDestination[aria-pressed="true"] {
- background:rgba(20, 91, 99, .78);
+ background:rgba(20, 91, 99, var(--nautic-ui-opacity, .60));
 }
-#mapWrap #nauticDestinationStatus { background:var(--nautic-map-control-strong); }
+#mapWrap :is(#nauticDestinationStatus,.leaflet-popup-content-wrapper,.leaflet-popup-tip,.maplibregl-popup-content) {
+ background:var(--nautic-map-control-strong);
+ color:#edf9ff;
+}
+#mapWrap .maplibregl-popup-close-button {color:#edf9ff}
+#mapWrap .maplibregl-popup-anchor-top .maplibregl-popup-tip {border-bottom-color:var(--nautic-map-control)}
+#mapWrap .maplibregl-popup-anchor-bottom .maplibregl-popup-tip {border-top-color:var(--nautic-map-control)}
+#mapWrap .maplibregl-popup-anchor-left .maplibregl-popup-tip {border-right-color:var(--nautic-map-control)}
+#mapWrap .maplibregl-popup-anchor-right .maplibregl-popup-tip {border-left-color:var(--nautic-map-control)}
 #mapWrap :is(.leaflet-control-zoom,.maplibregl-ctrl-group) {
  background:transparent;
 }
@@ -259,6 +267,6 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 .nautic-access-fields {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .nautic-access-fields input {margin-top:4px;padding:5px}
 
-.nautic-access-opacity {display:block;margin-top:10px}
-.nautic-access-opacity output {font-variant-numeric:tabular-nums}
-.nautic-access-opacity input {display:block;padding:0;margin-top:4px}
+.nautic-map-transparency {display:block;margin-top:10px}
+.nautic-map-transparency output {font-variant-numeric:tabular-nums}
+.nautic-map-transparency input {display:block;padding:0;margin-top:4px}

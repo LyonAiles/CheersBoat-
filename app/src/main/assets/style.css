@@ -351,18 +351,18 @@ body > #clock{width:auto!important;min-width:76px!important;height:32px!importan
 
 #dialog:not(.nautic-full),
 #nauticWeatherPopup {
- background:rgba(11, 41, 62, .76);
+ background:rgba(11, 41, 62, var(--nautic-ui-opacity, .60));
  backdrop-filter:blur(3px);
 }
 #dialog:not(.nautic-full)::backdrop,
 #nauticWeatherPopup::backdrop {
- background:rgba(0, 0, 0, .33);
+ background:rgba(0, 0, 0, calc(var(--nautic-ui-opacity, .60) * .55));
 }
 #dialog:not(.nautic-full) button,
 #nauticWeatherPopup button {
- background-color:rgba(23, 76, 103, .61);
+ background-color:rgba(23, 76, 103, var(--nautic-ui-opacity, .60));
 }
 #dialog .destination-menu #tripClear,
 #dialog .saved-route-actions button:last-child {
- background-color:rgba(24, 45, 64, .62);
+ background-color:rgba(24, 45, 64, var(--nautic-ui-opacity, .60));
 }

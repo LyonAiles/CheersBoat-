@@ -22,7 +22,7 @@
    vector.addSource('nautic-route',{type:'geojson',data:routeData()});vector.addLayer({id:'nautic-route',type:'line',source:'nautic-route',paint:{'line-color':'#20bce9','line-width':4}});
    vector.addSource('nautic-accessible',{type:'geojson',data:accessData});
    vector.addLayer({id:'nautic-accessible',type:'line',source:'nautic-accessible',
-    paint:{'line-color':'#3be577','line-width':5,'line-opacity':accessProfile.opacity/100}});
+    paint:{'line-color':'#3be577','line-width':5,'line-opacity':.65}});
    vector.addSource('nautic-trip', {type:'geojson', data:tripData()});
    vector.addLayer({id:'nautic-trip-line',type:'line',source:'nautic-trip',
     filter:['==','$type','LineString'],paint:{'line-color':['get','color'],'line-width':4}});
@@ -124,65 +124,51 @@
  const accessible=window.NauticAccessible;
  const france=fairways.filter(section=>section.scope.startsWith('FR'));
  const accessKey='nautic-accessible-waterways';
- let accessProfile={enabled:false,draught:150,air:345,width:430,opacity:65};
+ let accessProfile={enabled:false,draught:150,air:345,width:430};
  try{
   const saved=JSON.parse(native?.readSetting(accessKey)||localStorage.getItem(accessKey)||'null');
-  if(saved&&['draught','air','width'].every(key=>Number.isFinite(saved[key])&&saved[key]>0))accessProfile={...accessProfile,...saved,opacity:Number.isFinite(saved.opacity)?Math.min(95,Math.max(20,saved.opacity)):65};
+  if(saved&&['draught','air','width'].every(key=>Number.isFinite(saved[key])&&saved[key]>0))accessProfile={enabled:!!saved.enabled,draught:saved.draught,air:saved.air,width:saved.width};
  }catch(_){}
- let accessData={type:'FeatureCollection',features:[]},lastAccessGps=null,lastAccessStamp=0;
+ let accessData={type:'FeatureCollection',features:[]};
  const accessStatus=document.createElement('div');
  accessStatus.id='nauticAccessibleStatus';accessStatus.hidden=true;accessStatus.setAttribute('role','status');
  wrap.append(accessStatus);
- const legacyAccessible=map?L.geoJSON(null,{style:()=>({color:'#3be577',weight:5,opacity:accessProfile.opacity/100,interactive:false})}).addTo(map):null;
- function updateAccessible(force=false){
-  const gps=accessProfile.enabled?currentDeparture():null;
-  const now=Date.now();
-  if(!force&&!!gps===!!lastAccessGps&&now-lastAccessStamp<60000&&(!gps||W.distance(gps,lastAccessGps)<75))return;
-  lastAccessGps=gps;lastAccessStamp=now;
-  let result={features:[],reason:''};
-  if(accessProfile.enabled&&accessible){
-   result=accessible.reachable(france,window.NauticClearances||{},gps,accessProfile);
-  }
-  const messages={
-   gps:'Voies accessibles · attente GPS',
-   'off-network':'GPS hors du réseau français cartographié',
-   unknown:'Voies accessibles · gabarit inconnu près du GPS',
-   dimensions:'Voies accessibles · gabarit insuffisant près du GPS'
-  };
-  accessStatus.textContent=messages[result.reason]||(result.features.length+' tronçons compatibles avec le gabarit');
+ const legacyAccessible=map?L.geoJSON(null,{style:()=>({color:'#3be577',weight:5,opacity:.65,interactive:false})}).addTo(map):null;
+ function updateAccessible(){
+  const result=accessProfile.enabled
+   ?accessible.compatibleSections(france,window.NauticClearances||{},accessProfile)
+   :{features:[],unknown:0};
+  accessStatus.textContent=result.features.length+' tronçons compatibles en France'+
+   (result.unknown?' · '+result.unknown+' gabarits incomplets':'');
   accessStatus.hidden=!accessProfile.enabled;
   accessData={type:'FeatureCollection',features:result.features};
   legacyAccessible?.clearLayers();legacyAccessible?.addData(accessData);
   vector?.getSource('nautic-accessible')?.setData(accessData);
-  if(vector?.getLayer('nautic-accessible'))vector.setPaintProperty('nautic-accessible','line-opacity',accessProfile.opacity/100);
+ }
+ function saveAccessProfile(){
+  const saved=JSON.stringify(accessProfile);
+  try{localStorage.setItem(accessKey,saved);}catch(_){}
+  try{native?.writeSetting(accessKey,saved);}catch(_){}
  }
  function accessSettings(){
   modal('Voies accessibles','<form id="nauticAccessForm">'+
-   '<label class="nautic-access-choice"><input type="checkbox" id="nauticAccessEnabled"> Afficher en vert depuis le GPS</label>'+
+   '<label class="nautic-access-choice"><input type="checkbox" id="nauticAccessEnabled"> Afficher les voies compatibles en France</label>'+
    '<div class="nautic-access-fields">'+
    '<label>Tirant d’eau (m)<input id="nauticAccessDraught" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Tirant d’air (m)<input id="nauticAccessAir" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Largeur (m)<input id="nauticAccessWidth" type="number" min="0.01" max="100" step="0.01" required></label></div>'+
-   '<label class="nautic-access-opacity">Transparence du tracé <output id="nauticAccessTransparencyValue"></output>'+
-   '<input id="nauticAccessTransparency" type="range" min="5" max="80" step="5"></label>'+
    '<p>France · compatibilité du gabarit selon EuRIS. Les fermetures restent indiquées par les avis du trajet.</p>'+
    '<button type="submit">Appliquer</button></form>');
   const fields={draught:$('nauticAccessDraught'),air:$('nauticAccessAir'),width:$('nauticAccessWidth')};
   const enabled=$('nauticAccessEnabled');
   enabled.checked=accessProfile.enabled;
-  const transparency=$('nauticAccessTransparency');
-  transparency.value=100-accessProfile.opacity;
-  const showTransparency=()=>{$('nauticAccessTransparencyValue').textContent=transparency.value+' %';};
-  transparency.oninput=showTransparency;
-  showTransparency();
   for(const [key,input] of Object.entries(fields))input.value=accessProfile[key]/100;
   $('nauticAccessForm').onsubmit=event=>{
    event.preventDefault();
-   accessProfile={enabled:enabled.checked,opacity:100-Number(transparency.value)};
+   accessProfile={enabled:enabled.checked};
    for(const [key,input] of Object.entries(fields))accessProfile[key]=Math.round(input.valueAsNumber*100);
-   const saved=JSON.stringify(accessProfile);
-   try{localStorage.setItem(accessKey,saved);native?.writeSetting(accessKey,saved);}catch(_){}
-   $('dialog').close();updateAccessible(true);
+   saveAccessProfile();
+   $('dialog').close();updateAccessible();
   };
  }
  const impactCacheKey='nautic-euris-route-impacts';
@@ -479,6 +465,7 @@
    '<button type="button" id="tripCity">Rechercher une ville</button> '+
    '<button type="button" id="tripArchive">Trajets enregistrés</button> '+
    '<button type="button" id="tripAccessible">Voies accessibles</button> '+
+   (accessProfile.enabled?'<button type="button" id="tripClearAccessible">Effacer les tracés verts</button> ':'')+
    (displayed.length?'<button type="button" id="tripHideGroup">Masquer les trajets sélectionnés</button> '+
     '<button type="button" id="tripGroupNotices">Avis de navigation</button> ':'')+
    (routeState?
@@ -492,6 +479,11 @@
      (closure.from?'Tronçon '+(i+1):'Parcours entier')+' · '+closureDate(closure)+'</button> ').join('')+
     '<button type="button" id="tripClear">Effacer le trajet</button>':'')+'</div>');
   $('tripAccessible').onclick=()=>{$('dialog').close();accessSettings();};
+  if($('tripClearAccessible'))$('tripClearAccessible').onclick=()=>{
+   accessProfile.enabled=false;
+   saveAccessProfile();
+   $('dialog').close();updateAccessible();
+  };
   $('tripCity').onclick=()=>{$('dialog').close();searchCity();};
   $('tripArchive').onclick=()=>{$('dialog').close();showArchive();};
   if($('tripHideGroup'))$('tripHideGroup').onclick=()=>{$('dialog').close();displayed=[];renderTrip();};
@@ -717,6 +709,7 @@
  window.addEventListener('pagehide',()=>{if(routeState)saveTrip()});
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&routeState)saveTrip()});
  renderTrip();
+ updateAccessible();
  function routeData(){return {type:'FeatureCollection',features:points.length>1?[{type:'Feature',geometry:{type:'LineString',coordinates:points.map(p=>[p.lon,p.lat])},properties:{}}]:[]};}
  function worksData(){return {type:'FeatureCollection',features:(options.waterwayWorks===false?[]:lastList).map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{id:p.id,category:p.category||W.categoryOf(p.type)}}))};}
  function positionBoat(){const boat=$('mapBoat'),p=stableFix||latest;if(!boat||!p)return;if(!window.nauticMapFreePan){boat.style.setProperty('left','50%','important');boat.style.setProperty('top','66.666667%','important');return;}let q;if(active&&vector)q=vector.project([p.lon,p.lat]);else if(map){q=map.latLngToContainerPoint([p.lat,p.lon]);const r=$('map').getBoundingClientRect(),w=wrap.getBoundingClientRect();q={x:q.x+r.left-w.left,y:q.y+r.top-w.top};}if(q){const angle=active&&vector?(heading??0)-vector.getBearing():(heading??0);boat.style.transform=`translate(-50%,-50%) rotate(${angle}deg)`;boat.style.setProperty('left',q.x+'px','important');boat.style.setProperty('top',q.y+'px','important');}}
@@ -745,7 +738,7 @@
   else if(impacts.length)renderTrip();
   else checkNavigationNotices();
  },60000,true);
- window.nauticEvery(()=>{if(attachDeparture())renderTrip();if(accessProfile.enabled)updateAccessible();},1500,true);
+ window.nauticEvery(()=>{if(attachDeparture())renderTrip();},1500,true);
  window.nauticEvery(sync,350,true);let routeCount=-1;window.nauticEvery(()=>{if(active&&vector&&points.length!==routeCount){routeCount=points.length;vector.getSource('nautic-route')?.setData(routeData());}updateWorks();},3000,true);
  new ResizeObserver(()=>{vector?.resize();sync();}).observe(wrap);
  function selectedSignature(){return W.categories.filter(([key])=>options.waterwayTypes?.[key]!==false).map(([key])=>key).join(',');}

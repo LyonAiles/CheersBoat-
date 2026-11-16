@@ -192,13 +192,13 @@ const connected=[
 ];
 const capacities={A:[200,400,500],B:[200,360,500],C:[200,-1,500],D:[200,-1,500]};
 const profile={draught:150,air:345,width:430};
-const visible=(position,dimensions=profile)=>
- access.reachable(connected,capacities,position,dimensions);
-assert.deepEqual(visible(p(.005)).features.map(f=>f.properties.section),['A','B','C']);
-assert.deepEqual(visible(p(.005),{...profile,air:375}).features.map(f=>f.properties.section),['A']);
-assert.equal(visible(p(.005),{...profile,width:550}).reason,'dimensions');
-assert.equal(visible(p(.005),{...profile,draught:210}).reason,'dimensions');
-assert.equal(visible(p(.044)).features[0].properties.section,'D');
-assert.equal(visible(p(.1)).reason,'off-network');
-assert.equal(access.reachable(connected,{...capacities,A:[200,0,500]},p(.005),profile).reason,'unknown');
-console.log('PASS: offline GPS reachability uses dimensions and continuity even on a closed section');
+const visible=(dimensions=profile,limits=capacities)=>access.compatibleSections(connected,limits,dimensions);
+const ids=result=>result.features.map(f=>f.properties.section);
+assert.deepEqual(ids(visible()),['A','B','C','D']);
+assert.deepEqual(ids(visible({...profile,air:375})),['A','C','D']);
+assert.deepEqual(ids(visible({...profile,width:550})),[]);
+assert.deepEqual(ids(visible({...profile,draught:210})),[]);
+const missing=visible(profile,{...capacities,A:[200,0,500]});
+assert.deepEqual(ids(missing),['B','C','D']);
+assert.equal(missing.unknown,1);
+console.log('PASS: France-wide dimensions filter includes disconnected and closed sections without GPS');
