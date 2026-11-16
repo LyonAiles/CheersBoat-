@@ -21,8 +21,10 @@
    for(const layer of vector.getStyle().layers||[])if(layer.type==='symbol'&&layer.layout?.['text-field']){vector.setLayoutProperty(layer.id,'text-rotation-alignment','viewport');vector.setLayoutProperty(layer.id,'text-pitch-alignment','viewport');vector.setLayoutProperty(layer.id,'symbol-placement','point');vector.setLayoutProperty(layer.id,'text-rotate',0);}
    vector.addSource('nautic-route',{type:'geojson',data:routeData()});vector.addLayer({id:'nautic-route',type:'line',source:'nautic-route',paint:{'line-color':'#20bce9','line-width':4}});
    vector.addSource('nautic-accessible',{type:'geojson',data:accessData});
+   vector.addLayer({id:'nautic-accessible-unknown',type:'line',source:'nautic-accessible',
+    filter:['==',['get','status'],'unknown'],paint:{'line-color':'#697788','line-width':3,'line-dasharray':[2,2],'line-opacity':.8}});
    vector.addLayer({id:'nautic-accessible',type:'line',source:'nautic-accessible',
-    paint:{'line-color':'#3be577','line-width':5,'line-opacity':.65}});
+    filter:['==',['get','status'],'compatible'],paint:{'line-color':'#3be577','line-width':5,'line-opacity':.65}});
    vector.addSource('nautic-trip', {type:'geojson', data:tripData()});
    vector.addLayer({id:'nautic-trip-line',type:'line',source:'nautic-trip',
     filter:['==','$type','LineString'],paint:{'line-color':['get','color'],'line-width':4}});
@@ -133,15 +135,18 @@
  const accessStatus=document.createElement('div');
  accessStatus.id='nauticAccessibleStatus';accessStatus.hidden=true;accessStatus.setAttribute('role','status');
  wrap.append(accessStatus);
- const legacyAccessible=map?L.geoJSON(null,{style:()=>({color:'#3be577',weight:5,opacity:.65,interactive:false})}).addTo(map):null;
+ const legacyAccessible=map?L.geoJSON(null,{style:feature=>feature.properties.status==='unknown'
+  ?{color:'#697788',weight:3,opacity:.8,dashArray:'6 6',interactive:false}
+  :{color:'#3be577',weight:5,opacity:.65,interactive:false}}).addTo(map):null;
  function updateAccessible(){
   const result=accessProfile.enabled
    ?accessible.compatibleSections(france,window.NauticClearances||{},accessProfile)
-   :{features:[],unknown:0};
+   :{features:[],unverified:[],insufficient:0};
   accessStatus.textContent=result.features.length+' tronçons compatibles en France'+
-   (result.unknown?' · '+result.unknown+' gabarits incomplets':'');
+   (result.unverified.length?' · '+result.unverified.length+' à vérifier (gris)':'')+
+   (result.insufficient?' · '+result.insufficient+' insuffisants':'');
   accessStatus.hidden=!accessProfile.enabled;
-  accessData={type:'FeatureCollection',features:result.features};
+  accessData={type:'FeatureCollection',features:[...result.unverified,...result.features]};
   legacyAccessible?.clearLayers();legacyAccessible?.addData(accessData);
   vector?.getSource('nautic-accessible')?.setData(accessData);
  }
@@ -157,7 +162,7 @@
    '<label>Tirant d’eau (m)<input id="nauticAccessDraught" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Tirant d’air (m)<input id="nauticAccessAir" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Largeur (m)<input id="nauticAccessWidth" type="number" min="0.01" max="100" step="0.01" required></label></div>'+
-   '<p>France · compatibilité du gabarit selon EuRIS. Les fermetures restent indiquées par les avis du trajet.</p>'+
+   '<p>Vert : gabarit compatible selon les données disponibles. Gris pointillé : gabarit à vérifier. Les fermetures figurent dans les avis du trajet.</p>'+
    '<button type="submit">Appliquer</button></form>');
   const fields={draught:$('nauticAccessDraught'),air:$('nauticAccessAir'),width:$('nauticAccessWidth')};
   const enabled=$('nauticAccessEnabled');

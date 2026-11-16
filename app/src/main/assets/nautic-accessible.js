@@ -1,15 +1,19 @@
 (function(root){
  function compatibleSections(sections,limits,profile){
   const features=[];
-  let unknown=0;
+  const unverified=[];
+  let insufficient=0;
   for(const section of sections){
    const [draught,air,width]=limits[section.sourceId]||[];
-   if(!draught||!air||!width){unknown++;continue;}
-   if(profile.draught>=draught||profile.width>=width||(air!==-1&&profile.air>=air))continue;
-   features.push({type:'Feature',properties:{section:section.sourceId},
-    geometry:{type:'LineString',coordinates:section.geometry.map(point=>[point.lon,point.lat])}});
+   if((draught>0&&profile.draught>=draught)||(width>0&&profile.width>=width)||(air>0&&profile.air>=air)){
+    insufficient++;continue;
+   }
+   const known=draught>0&&width>0&&(air>0||air===-1);
+   const feature={type:'Feature',properties:{section:section.sourceId,status:known?'compatible':'unknown'},
+    geometry:{type:'LineString',coordinates:section.geometry.map(point=>[point.lon,point.lat])}};
+   (known?features:unverified).push(feature);
   }
-  return {features,unknown};
+  return {features,unverified,insufficient};
  }
  const api={compatibleSections};
  if(typeof module!=='undefined')module.exports=api;
