@@ -270,3 +270,81 @@ body > #clock{width:auto!important;min-width:76px!important;height:32px!importan
 #mapWrap .leaflet-control-zoom{margin-top:0!important;margin-right:0!important}
 #mapWrap #compass{right:12px!important;top:10px!important}
 @media(max-width:760px){#mapWrap .leaflet-top.leaflet-right{top:152px!important}#mapWrap #compass{right:10px!important}}
+
+/* Compact dialogs on the dashboard. Camera and other full-screen panels use their own sizing. */
+#dialog:not(.nautic-full) {
+ width: min(460px, calc(100vw - 24px));
+ padding: 12px;
+ font-size: 14px;
+ line-height: 1.35;
+}
+#dialog:not(.nautic-full) .dialogTop {
+ margin-bottom: 10px;
+ padding-bottom: 6px;
+ border-bottom: 1px solid #326079;
+}
+#dialog:not(.nautic-full) .dialogTop h2 { font-size: 17px; }
+#dialog:not(.nautic-full) button {
+ min-height: 38px;
+ padding: 5px 9px;
+ font-size: 13px;
+ line-height: 1.25;
+}
+#dialog:not(.nautic-full) #dialogClose {
+ width: 38px;
+ padding: 0;
+ font-size: 16px;
+}
+.destination-menu {
+ display: grid;
+ grid-template-columns: repeat(2, minmax(0, 1fr));
+ gap: 6px;
+}
+.destination-menu button { text-align: left; overflow-wrap: anywhere; }
+.destination-menu #tripChooseStart,
+.destination-menu [data-trip-closure] { grid-column: 1 / -1; }
+.destination-menu #tripClear,
+.saved-route-actions button:last-child {
+ background: #182d40;
+ border-color: #586879;
+ color: #ffdbd5;
+}
+#savedRoutesList { display: grid; gap: 1px; }
+.saved-route {
+ display: grid;
+ grid-template-columns: minmax(0, 1fr) auto;
+ align-items: center;
+ gap: 8px;
+ padding: 7px 0;
+}
+.saved-route + .saved-route { border-top: 1px solid #326079; }
+.saved-route-choice {
+ display: grid;
+ grid-template-columns: 22px minmax(0, 1fr);
+ align-items: center;
+ gap: 7px;
+ min-height: 38px;
+ cursor: pointer;
+}
+.saved-route-choice input[type="checkbox"] {
+ width: 17px;
+ height: 17px;
+ margin: 0;
+ accent-color: #58c8e0;
+}
+.saved-route-choice strong,
+.saved-route-choice small { display: block; overflow-wrap: anywhere; }
+.saved-route-choice small { color: #a9cbd8; font-size: 12px; }
+.saved-route-actions { display: flex; gap: 5px; }
+.saved-route-footer {
+ display: flex;
+ justify-content: flex-end;
+ margin-top: 7px;
+ padding-top: 8px;
+ border-top: 1px solid #326079;
+}
+#savedRoutesStatus:empty { display: none; }
+@media (max-width: 330px) {
+ .saved-route { grid-template-columns: 1fr; gap: 2px; }
+ .saved-route-actions { padding-left: 29px; }
+}

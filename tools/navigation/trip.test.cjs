@@ -132,3 +132,29 @@ assert(states.some(part=>part.state==='closed') && states.some(part=>part.state=
        states.some(part=>part.state==='unknown'));
 assert.equal(states[0].state,'closed');
 console.log('PASS: connected Châtillon–Avignon itinerary, waterway arrival, and three distinct navigation states');
+
+const euris = require('../../app/src/main/assets/nautic-euris.js');
+const nation = {window:{}};
+vm.runInNewContext(fs.readFileSync(require.resolve('../../app/src/main/assets/nautic-euris-data.js'),'utf8'),nation);
+vm.runInNewContext(fs.readFileSync(require.resolve('../../app/src/main/assets/nautic-euris-seed.js'),'utf8'),nation);
+const nationalNetwork=euris.network(nation.NauticEurisRows);
+const nationalCatalog=euris.catalog(nationalNetwork);
+const seed=nation.window.NauticEurisSeed;
+const impacts=euris.compile(seed,nationalCatalog,{fromNetwork,locate});
+const moment=Date.parse('2026-11-16T09:00:00+01:00');
+assert(impacts.every(item=>item.paths.size>0));
+for(const [destination,min,max] of [[avignon,650,720],[p(48.5833,7.7458),650,750],[p(50.847,4.352),570,650]]){
+ const full=fromNetwork(nationalNetwork,chatillonPort,destination,5000);
+ assert(full?.total>min&&full.total<max);
+ assert(full.arrivalOffset<2500);
+ const blocked=euris.matching(full,impacts,nationalCatalog,{locate},moment);
+ assert(blocked.some(item=>item.closure&&item.active&&item.indices.length));
+ assert(!euris.matching(full,impacts,nationalCatalog,{locate},moment-24*3600*1000).some(item=>item.active));
+ const states=sections(full,[],blocked.flatMap(item=>item.indices));
+ assert(states.some(section=>section.closed)&&states.some(section=>section.state==='unknown'));
+}
+const updated=euris.merge(seed,{scopes:['FR150'],items:[],refs:[]});
+assert.equal(updated.items.length,1);
+assert.match(updated.items[0].ntsNumber,/8405/);
+assert.equal(updated.refs.length,2);
+console.log('PASS: national routes to Avignon, Strasbourg and Brussels and official impact boundaries');

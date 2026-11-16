@@ -181,6 +181,12 @@ public class MainActivity extends Activity {
     }catch(org.json.JSONException ignored){}
    },"nautic-map-city").start();
   }
+  @JavascriptInterface public void checkRouteImpacts(String routes){
+   new Thread(()->{
+    try{if(!isDestroyed())js("nauticRouteImpacts",NauticNotices.lookupImpacts(routes));}
+    catch(Exception e){if(!isDestroyed())js("nauticRouteImpacts","");}
+   },"nautic-euris-impacts").start();
+  }
   @JavascriptInterface public void checkNavigationNotices(){
    new Thread(()->{
     try{if(!isDestroyed())js("nauticNavigationNotices",NauticNotices.lookup());}

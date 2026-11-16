@@ -113,17 +113,62 @@
  }
 
  const arrivalLimit=5000;
+ const fairways=window.NauticEuris?.network(window.NauticEurisRows||[])||[];
+ delete window.NauticEurisRows;
+ const euris=window.NauticEuris;
+ const fairwayCatalog=euris?.catalog(fairways);
+ let impactSnapshot=window.NauticEurisSeed||{},impacts=[],impactPending=false,checkedScopes='',impactCheckedAt=0,eurisStatus='';
+ const impactCacheKey='nautic-euris-route-impacts';
+ try{
+  const snapshot=JSON.parse(native?.readSetting(impactCacheKey)||'null');
+  if(euris&&snapshot){
+   impactSnapshot=euris.merge(impactSnapshot,snapshot);
+   eurisStatus='Derniers avis EuRIS mémorisés';
+  }
+ }catch(_){}
+ if(euris)impacts=euris.compile(impactSnapshot,fairwayCatalog,calc);
+ function routeImpacts(trip){
+  return euris?.matching(trip,impacts,fairwayCatalog,calc)||[];
+ }
+ function verifiedEdges(trip,legacy=applicableNotices(trip)){
+  return [...notices.closedEdges(trip,legacy),...routeImpacts(trip)
+   .filter(item=>item.active&&item.closure).flatMap(item=>item.indices)];
+ }
+ function checkRouteImpacts(force=false){
+  if(!native?.checkRouteImpacts||impactPending||!fairwayCatalog)return;
+  const trips=displayed.length?displayed:[routeState];
+  const scopes=[...new Set(trips.flatMap(item=>(item?.trip?.wayIds||[])
+   .map(id=>fairwayCatalog.sections.get(id)).filter(id=>/^(FR|BE)/.test(id))))].sort();
+  if(!scopes.length)return;
+  const key=scopes.join(',');
+  if(!force&&key===checkedScopes&&Date.now()-impactCheckedAt<20*60*1000)return;
+  checkedScopes=key;impactPending=true;impactCheckedAt=Date.now();
+  eurisStatus='Actualisation EuRIS…';
+  native.checkRouteImpacts(JSON.stringify(scopes));
+ }
+ window.nauticRouteImpacts=raw=>{
+  impactPending=false;
+  try{
+   const feed=JSON.parse(raw);
+   if(!Array.isArray(feed.scopes))throw Error('EuRIS incomplet');
+   impactSnapshot=euris.merge(impactSnapshot,feed);
+   impacts=euris.compile(impactSnapshot,fairwayCatalog,calc);
+   native?.writeSetting(impactCacheKey,JSON.stringify(impactSnapshot));
+   eurisStatus='Avis EuRIS consultés';
+  }catch(_){eurisStatus=impacts.length?'EuRIS indisponible · derniers avis mémorisés':'EuRIS indisponible';}
+  renderTrip();
+ };
  function cachedRoute(start,end){
   let local;
   try{local=JSON.parse(localStorage.getItem(networkKey)||'null');}catch(_){}
   const bundled=window.NauticLocalWaterways||[], regional=window.NauticRegionalWaterways||[];
-  const downloaded=[...(cache?.elements||[]),...(Array.isArray(local)?local:[])];
-  for(const [elements,note] of [
-   [downloaded,'Réseau en cache'],
+  const sources=[
+   [fairways,'Réseau embarqué · EuRIS / Rijkswaterstaat'],
    [bundled,'Voie d’eau embarquée · OpenStreetMap'],
    [regional,'Voie d’eau embarquée · OpenStreetMap'],
-   [[...bundled,...downloaded],'Tracé OpenStreetMap en cache']
-  ]){
+   [[...(cache?.elements||[]),...(Array.isArray(local)?local:[])],'Réseau en cache']
+  ];
+  for(const [elements,note] of sources){
    if(!elements.length)continue;
    try{
     const trip=calc.fromNetwork(elements,start,end,arrivalLimit);
@@ -142,6 +187,7 @@
   return notices.relevant(trip,liveNotices,noticeDay);
  }
  function checkNavigationNotices(force=false){
+  checkRouteImpacts(force);
   const trips=displayed.length?displayed:[routeState];
   if(!native?.checkNavigationNotices||noticePending||(!force&&Date.now()-lastNoticeCheck<20*60*1000)||
     !trips.some(item=>notices.mapped(item?.trip).length))return;
@@ -168,7 +214,7 @@
   if(!trip)return [{type:'Feature',properties:{color:'#bdc5d2',state:'unknown'},
    geometry:{type:'Point',coordinates:[end.lon,end.lat]}}];
   const xy=p=>[p.lon,p.lat];
-  const segments=calc.sections(trip,currentClosures(closures),notices.closedEdges(trip,applicableNotices(trip)),item.departure?.offset);
+  const segments=calc.sections(trip,currentClosures(closures),verifiedEdges(trip),item.departure?.offset);
   const properties=state=>({color:sectionColor(state),state});
   const features=segments.map(segment=>({type:'Feature',properties:properties(segment.state),
    geometry:{type:'LineString',coordinates:segment.coordinates.map(xy)}}));
@@ -209,12 +255,14 @@
   destinationStatus.textContent=message;
   destinationStatus.hidden=!message;
   tripProgress.hidden=!tripRequest;
-  const blocked=routeState?.trip&&(currentClosures(routeState.closures).length>0||routeState.trip.restricted||applicableNotices().some(notice=>notice.active));
+  const blocked=routeState?.trip&&(currentClosures(routeState.closures).length>0||routeState.trip.restricted||
+   applicableNotices().some(notice=>notice.active)||
+   routeImpacts(routeState.trip).some(item=>item.active&&item.closure&&item.indices.length));
   destinationStatus.style.borderLeft=routeState?.trip?'3px solid '+sectionColor(blocked?'closed':'unknown'):'';
  }
  function tripSummary(){
   if(displayed.length)return [displayed.length+' trajets affichés',
-   displayed.some(item=>notices.mapped(item.trip).length)?noticeStatus:'État VNF inconnu'].filter(Boolean).join(' · ');
+   eurisStatus||(displayed.some(item=>notices.mapped(item.trip).length)?noticeStatus:'État VNF inconnu')].filter(Boolean).join(' · ');
   if(!routeState)return '';
   const {trip,closures,note}=routeState;
   if(!trip)return tripRequest?'Calcul du trajet fluvial…':note||'Impossible de calculer le trajet fluvial';
@@ -232,7 +280,10 @@
    const dates=[...new Set(verified.map(notice=>notice.active?'Fermeture VNF en cours':'Fermeture VNF dès le '+noticeDate(notice.start)))];
    parts.push(...dates);
   }
-  if(calc.sections(trip,activeClosures,notices.closedEdges(trip,verified)).some(part=>part.state==='unknown'))parts.push('Gris · état inconnu');
+  const incoming=routeImpacts(trip);
+  if(incoming.some(item=>item.closure&&item.active&&item.indices.length))parts.push('Fermeture EuRIS localisée');
+  else if(incoming.some(item=>item.closure&&item.active))parts.push('Avis à localiser · voir Destination');
+  if(calc.sections(trip,activeClosures,verifiedEdges(trip,verified)).some(part=>part.state==='unknown'))parts.push('Gris · état inconnu');
   if(routeState.awaitingGps)parts.push(routeState.gpsMessage||'Départ en attente du GPS');
   if(note)parts.push(note);
   if(trip.arrivalOffset>150)parts.push('Arrivée sur l’eau à '+km(trip.arrivalOffset/1000)+' du point choisi');
@@ -244,6 +295,12 @@
   return formatDate.format(new Date(value+'T12:00:00'));
  }
  function showNavigationNotices(){
+  const online=displayed.length?displayed.flatMap(item=>routeImpacts(item.trip)):routeImpacts(routeState?.trip);
+  const uniqueOnline=[...new Map(online.map(item=>[item.reference+' '+item.title,item])).values()];
+  const onlineEntries=uniqueOnline.map(item=>'<li>'+esc(item.title)+' · '+esc(item.reference)+' · '+
+   (item.closure?(item.active?'Fermeture en cours':'Fermeture annoncée'):'Avis de navigation')+
+   ' · du '+formatDate.format(item.start)+' au '+formatDate.format(item.end)+
+   (item.indices.length?'':' · tronçon exact à vérifier')+'</li>').join('');
   const relevant=displayed.length?displayed.flatMap(item=>applicableNotices(item.trip)):applicableNotices();
   const entries=[...new Map(relevant.map(item=>[item.number,item])).values()].map(notice=>'<p><strong>'+notice.title+'</strong><br>'+notice.reference+' · '+
    (notice.active?'Fermeture en cours':'Fermeture annoncée')+' du '+noticeDate(notice.start)+' au '+
@@ -254,6 +311,10 @@
    date:item.end,title:item.title,detail:'Fin de fermeture annoncée le '+noticeDate(item.end)+' inclus'+
     (item.tentative&&item.tentative>item.end?' · prolongation probable jusqu’au '+noticeDate(item.tentative):'')
   }));
+  for(const item of uniqueOnline){
+   if(item.closure&&item.indices.length)dates.push({date:notices.dateInFrance(new Date(item.end)),
+    title:item.title,detail:'Fin de fermeture annoncée le '+formatDate.format(item.end)});
+  }
   for(const item of (displayed.length?displayed:routeState?[routeState]:[])){
    item.closures.forEach((closure,index)=>{
     if(closure.date>noticeDay)dates.push({date:closure.date,
@@ -270,7 +331,9 @@
    '<p>Vert · navigation indiquée sur la carte. Gris · état inconnu. Rouge · fermeture ou restriction en cours.</p>'+
    '<p>Actualisation automatique des avis associés aux tronçons répertoriés.</p>'+
    '<p><a href="https://avisbat.vnf.fr/">Consulter les avis officiels VNF</a></p>'+
-   '<small>API/Service Notices to Skippers incorporated from EuRIS (eurisportal.eu)</small>');
+   '<small>API/Service Notices to Skippers incorporated from EuRIS (eurisportal.eu). '+
+   'Réseau adapté du jeu de données de Baart et Turpijn, <a href="https://doi.org/10.5281/zenodo.20793663">CC BY 4.0</a>. '+
+   'Data provided by EuRIS (www.eurisportal.eu) and Rijkswaterstaat.</small>');
  }
  function closureDate(closure){
   const date=closure.date?new Date(closure.date+'T12:00:00'):null;
@@ -291,7 +354,7 @@
   if(selection){selection=null;showDestination(tripSummary());return;}
 
   modal('Destination',
-   '<button type="button" id="tripChange">Nouvelle destination</button> '+
+   '<div class="destination-menu"><button type="button" id="tripChange">Nouvelle destination</button> '+
    '<button type="button" id="tripCity">Rechercher une ville</button> '+
    '<button type="button" id="tripArchive">Trajets enregistrés</button> '+
    (displayed.length?'<button type="button" id="tripHideGroup">Masquer les trajets sélectionnés</button> '+
@@ -305,7 +368,7 @@
      '<button type="button" id="tripClosure">Signaler un tronçon fermé</button> ')+
     routeState.closures.map((closure,i)=>'<button type="button" data-trip-closure="'+i+'">'+
      (closure.from?'Tronçon '+(i+1):'Parcours entier')+' · '+closureDate(closure)+'</button> ').join('')+
-    '<button type="button" id="tripClear">Effacer le trajet</button>':''));
+    '<button type="button" id="tripClear">Effacer le trajet</button>':'')+'</div>');
   $('tripCity').onclick=()=>{$('dialog').close();searchCity();};
   $('tripArchive').onclick=()=>{$('dialog').close();showArchive();};
   if($('tripHideGroup'))$('tripHideGroup').onclick=()=>{$('dialog').close();displayed=[];renderTrip();};
@@ -322,7 +385,7 @@
   });
   if($('tripClear'))$('tripClear').onclick=()=>{
    $('dialog').close();
-   tripRequest?.abort();tripRequest=null;
+   tripRequest=null;
    routeState=null;saveTrip();renderTrip();
   };
  };
@@ -376,23 +439,27 @@
   routeState.covered=0;saveTrip();return true;
  }
  function reopenTrip(saved){
-  tripRequest?.abort();tripRequest=null;selection=null;displayed=[];
+  tripRequest=null;selection=null;displayed=[];
   routeState={...saved,closures:[...saved.closures],savedId:saved.id,covered:0,awaitingGps:true};
   attachDeparture();saveTrip();checkNavigationNotices(true);renderTrip();fitTrip();
  }
  function showArchive(){
   modal('Trajets enregistrés','<div id="savedRoutesList"></div><p id="savedRoutesStatus" role="status"></p>'+
-   (archive.trips.length?'<button type="button" id="showSavedRoutes">Afficher les trajets cochés</button>':''));
+   (archive.trips.length?'<div class="saved-route-footer"><button type="button" id="showSavedRoutes">Afficher les trajets cochés</button></div>':''));
   const list=$('savedRoutesList'), checked=new Set(archive.selected);
   if(!archive.trips.length)list.textContent='Aucun trajet enregistré.';
   for(const item of archive.trips){
-   const row=document.createElement('p'), label=document.createElement('label'), check=document.createElement('input');
+   const row=document.createElement('div'), label=document.createElement('label'), check=document.createElement('input');
+   const details=document.createElement('span'),name=document.createElement('strong'),distance=document.createElement('small');
+   const actions=document.createElement('div');
+   row.className='saved-route';label.className='saved-route-choice';actions.className='saved-route-actions';
    const open=document.createElement('button'), remove=document.createElement('button');
    check.type='checkbox';check.checked=checked.has(item.id);
    check.onchange=()=>{
     if(check.checked)checked.add(item.id);else checked.delete(item.id);
    };
-   label.append(check,' '+item.name+' · '+km(item.trip.total)+' ');
+   name.textContent=item.name;distance.textContent=km(item.trip.total);
+   details.append(name,distance);label.append(check,details);
    open.type='button';open.textContent='Rouvrir';
    open.onclick=()=>{$('dialog').close();reopenTrip(item);};
    remove.type='button';remove.textContent='Supprimer';
@@ -405,7 +472,7 @@
     displayed=displayed.filter(other=>other.id!==item.id);renderTrip();
     $('dialog').close();showArchive();
    };
-   row.append(label,open,' ',remove);list.append(row);
+   actions.append(open,remove);row.append(label,actions);list.append(row);
   }
   if($('showSavedRoutes'))$('showSavedRoutes').onclick=()=>{
    const items=archive.trips.filter(item=>checked.has(item.id));
@@ -502,85 +569,20 @@
   return calculateTrip({lat:departure.lat,lon:departure.lon},chosen);
  }
 
- async function overpassNetwork(_area,query,signal){
-  const response=await fetch('https://overpass-api.de/api/interpreter',{
-   method:'POST',body:new URLSearchParams({data:query}),signal
-  });
-  if(!response.ok)throw Error('OpenStreetMap '+response.status);
-  const result=await response.json();
-  if(result.remark||!Array.isArray(result.elements))throw Error('Réseau incomplet');
-  return result.elements;
- }
- async function regionalNetwork(area,_query,signal){
-  const [south,west,north,east]=area.split(',').map(Number);
-  const endpoint='https://services-eu1.arcgis.com/zci5bUiJ8olAal7N/arcgis/rest/services/OpenStreetMap_Waterways_for_Europe/FeatureServer/0/query';
-  const params=new URLSearchParams({
-   f:'geojson',where:"waterway IN ('canal','fairway') OR (waterway='river' AND (name IS NOT NULL OR boat IS NOT NULL OR lock='yes'))",
-   geometry:[west,south,east,north].join(','),geometryType:'esriGeometryEnvelope',inSR:'4326',outSR:'4326',
-   outFields:'osm_id,name,waterway,boat,access,lock',geometryPrecision:'6',resultRecordCount:'2000',orderByFields:'OBJECTID'
-  });
-  const elements=[];
-  for(let offset=0;offset<20000;offset+=2000){
-   params.set('resultOffset',String(offset));
-   const response=await fetch(endpoint+'?'+params,{signal});
-   if(!response.ok)throw Error('Réseau cartographique '+response.status);
-   const result=await response.json();
-   if(!Array.isArray(result.features))throw Error('Réseau incomplet');
-   for(const {geometry,properties} of result.features){
-    if(!geometry||!properties?.osm_id)continue;
-    const {osm_id,name,waterway,boat,access,lock}=properties;
-    const lines=geometry.type==='LineString'?[geometry.coordinates]:geometry.coordinates;
-    lines.forEach((line,index)=>elements.push({type:'way',id:index?osm_id+'-'+index:Number(osm_id),sourceId:Number(osm_id),
-     tags:{name,waterway,boat,access,lock},geometry:line.map(([lon,lat])=>({lat,lon}))}));
-   }
-   if(result.features.length<2000)break;
-  }
-  return elements;
- }
- async function calculateTrip(start,end,keepExisting=false){
+ function calculateTrip(start,end,keepExisting=false){
   displayed=[];
-  tripRequest?.abort();
-  const controller=new AbortController();
-  tripRequest=controller;
-  const cached=cachedRoute(start,end);
+  const request={};
+  tripRequest=request;
   if(!keepExisting)routeState={start,end,trip:null,closures:[],covered:0};
-  routeState.trip=cached?.trip||routeState.trip;
-  routeState.note=cached?.note||'Impossible de calculer le trajet fluvial';
-  saveTrip();renderTrip();
-  if(cached&&W.distance(start,end)>120000){tripRequest=null;renderTrip();return;}
-  const timeout=setTimeout(()=>controller.abort(),70000);
-  try{
-   const distance=W.distance(start,end);
-   const margin=Math.max(.07,distance/111000*.55);
-   const lonMargin=margin/Math.max(.15,Math.cos((start.lat+end.lat)*Math.PI/360));
-   const area=[Math.min(start.lat,end.lat)-margin,Math.min(start.lon,end.lon)-lonMargin,
-    Math.max(start.lat,end.lat)+margin,Math.max(start.lon,end.lon)+lonMargin].map(n=>n.toFixed(5)).join(',');
-   const query='[out:json][timeout:40];(way[waterway~"^(canal|river|fairway)$"]('+area+
-    ');node["seamark:distance_mark:distance"]('+area+'););out geom;';
-   const builders=distance>120000?[regionalNetwork,overpassNetwork]:[overpassNetwork,regionalNetwork];
-   let planned=null, elements=null;
-   for(const load of builders){
-    if(controller.signal.aborted)break;
-    try{
-     const network=await load(area,query,controller.signal);
-     if(tripRequest!==controller)return;
-     const candidate=calc.fromNetwork(network,start,end,arrivalLimit);
-     if(candidate){planned=candidate;elements=network;break;}
-    }catch(_){}
-   }
-   if(planned){
-    routeState.trip=planned;routeState.note='';
-    try{const json=JSON.stringify(elements);if(json.length<1800000)localStorage.setItem(networkKey,json);}catch(_){}
-   }else if(!routeState.trip)routeState.note='Aucune liaison fluviale trouvée dans le réseau disponible';
-  }catch(_){
-   if(tripRequest===controller&&!routeState.trip)routeState.note='Impossible de calculer · réseau fluvial indisponible';
-  }finally{
-   clearTimeout(timeout);
-   if(tripRequest===controller){
-    tripRequest=null;
-    saveTrip();renderTrip();
-   }
-  }
+  renderTrip();
+  setTimeout(()=>{
+   if(tripRequest!==request)return;
+   const cached=cachedRoute(start,end);
+   if(cached)Object.assign(routeState,cached);
+   else if(!routeState.trip)routeState.note='Aucune liaison trouvée dans le réseau fluvial embarqué';
+   tripRequest=null;
+   saveTrip();renderTrip();
+  },0);
  }
 
  window.nauticTripGpsLeg=metres=>{
@@ -617,6 +619,7 @@
  window.nauticEvery(()=>{
   const today=notices.dateInFrance();
   if(today!==noticeDay){noticeDay=today;renderTrip();}
+  else if(impacts.length)renderTrip();
   else checkNavigationNotices();
  },60000,true);
  window.nauticEvery(()=>{if(attachDeparture())renderTrip();},1500,true);

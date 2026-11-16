@@ -179,7 +179,7 @@
   let best=null;
   for(let i=1;i<coordinates.length;i++){
    const hit=W.project(position,coordinates[i-1],coordinates[i]);
-   if(!best||hit.d<best.distance)best={point:point(hit),distance:hit.d,offset:offsets[i-1]+hit.t*(offsets[i]-offsets[i-1])};
+   if(!best||hit.d<best.distance)best={edgeIndex:i-1,point:point(hit),distance:hit.d,offset:offsets[i-1]+hit.t*(offsets[i]-offsets[i-1])};
   }
   return best;
  }
