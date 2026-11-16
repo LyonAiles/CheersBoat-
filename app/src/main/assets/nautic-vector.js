@@ -47,7 +47,12 @@
    vector.on('click',e=>{
     if(e.defaultPrevented||e.originalEvent?.target?.closest('.maplibregl-marker,.maplibregl-ctrl'))return;
     const layers=['nautic-works','nautic-work-backings','nautic-work-clusters'];
-    if(!vector.queryRenderedFeatures(e.point,{layers}).length)selectWorkPoint(e.lngLat);
+    if(vector.queryRenderedFeatures(e.point,{layers}).length)return;
+    const {x,y}=e.point;
+    const red=vector.queryRenderedFeatures([[x-7,y-7],[x+7,y+7]],{layers:['nautic-accessible']})
+     .find(feature=>feature.properties.status==='insufficient');
+    if(red&&showAccessLimit(red.properties.section))return;
+    selectWorkPoint(e.lngLat);
    });
    sync();
   });
@@ -139,9 +144,41 @@
  accessStatus.id='nauticAccessibleStatus';accessStatus.hidden=true;accessStatus.title='Masquer le bilan des gabarits';
  accessStatus.onclick=()=>{accessStatus.hidden=true;};
  wrap.append(accessStatus);
- const legacyAccessible=map?L.geoJSON(null,{style:feature=>feature.properties.status==='unknown'
-  ?{color:'#697788',weight:3,opacity:.85,interactive:false}
-  :{color:feature.properties.status==='insufficient'?'#ef4742':'#3be577',weight:5,opacity:feature.properties.status==='insufficient'?.85:.65,interactive:false}}).addTo(map):null;
+ const fairwayNames=new Map(france.map(section=>[section.sourceId,section.tags.name]));
+ function showAccessLimit(section){
+  if(selection||$('dialog').open)return false;
+  const limits=accessible.exceeded(window.NauticClearances?.[section],accessProfile);
+  if(!limits.length)return false;
+  const labels={draught:'Tirant d’eau',air:'Tirant d’air',width:'Largeur'};
+  const metres=cm=>(cm/100).toLocaleString('fr-FR',{maximumFractionDigits:2})+' m';
+  modal('Hors gabarit',
+   '<p><strong>'+esc(fairwayNames.get(section)||section)+'</strong><br><small>Section EuRIS '+esc(section)+'</small></p><ul>'+
+   limits.map(({key,value,limit})=>{
+    const source=window.NauticClearanceSources?.[section]?.[key];
+    const origin=source?'Ouvrage associé : '+esc(source[0])+' · '+esc(source[1]):'Limite de la section EuRIS';
+    return '<li><strong>'+labels[key]+'</strong> · bateau '+metres(value)+
+     ' · limite '+metres(limit)+' · '+(value===limit?'aucune marge':'dépassement de '+metres(value-limit))+
+     '<br><small>'+origin+'</small></li>';
+   }).join('')+
+   '</ul><small>Gabarit de référence EuRIS</small>'+
+   (limits.some(item=>window.NauticClearanceSources?.[section]?.[item.key]?.[1]==='FRXXXVE128BRGA100012')
+    ?'<p>Pont levant de Frontignan : la VNF indique 0,95 m en position normale et 4,75 m en position haute. Le passage peut nécessiter une levée.</p>':''));
+
+  return true;
+ }
+ const legacyAccessible=map?L.geoJSON(null,{
+  style:feature=>{
+   const status=feature.properties.status;
+   return {color:status==='insufficient'?'#ef4742':status==='unknown'?'#697788':'#3be577',
+    weight:status==='unknown'?3:5,opacity:status==='compatible'?.65:.85,interactive:status==='insufficient'};
+  },
+  onEachFeature:(feature,layer)=>{
+   if(feature.properties.status!=='insufficient')return;
+   layer.on('click',event=>{
+    if(showAccessLimit(feature.properties.section))L.DomEvent.stopPropagation(event);
+   });
+  }
+ }).addTo(map):null;
  function updateAccessible(){
   const result=accessProfile.enabled
    ?accessible.compatibleSections(france,window.NauticClearances||{},accessProfile)
@@ -166,7 +203,7 @@
    '<label>Tirant d’eau (m)<input id="nauticAccessDraught" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Tirant d’air (m)<input id="nauticAccessAir" type="number" min="0.01" max="50" step="0.01" required></label>'+
    '<label>Largeur (m)<input id="nauticAccessWidth" type="number" min="0.01" max="100" step="0.01" required></label></div>'+
-   '<p>Vert : gabarit compatible selon les données disponibles. Gris : gabarit à vérifier. Rouge : gabarit insuffisant. Les fermetures figurent dans les avis du trajet.</p>'+
+   '<p>Vert : gabarit compatible selon les données disponibles. Gris : gabarit à vérifier. Rouge : touche le tronçon pour consulter ses limites. Les fermetures figurent dans les avis du trajet.</p>'+
    '<button type="submit">Appliquer</button></form>');
   const fields={draught:$('nauticAccessDraught'),air:$('nauticAccessAir'),width:$('nauticAccessWidth')};
   const enabled=$('nauticAccessEnabled');

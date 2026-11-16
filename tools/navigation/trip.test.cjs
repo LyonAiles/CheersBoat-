@@ -207,3 +207,9 @@ assert.equal(tooWide.insufficient.length,4);
 assert(tooWide.insufficient.every(item=>item.properties.status==='insufficient'));
 assert.equal(tooWide.unverified.length,0);
 console.log('PASS: France-wide dimensions filter includes disconnected and closed sections without GPS');
+assert.deepEqual(access.exceeded([100,180,230],{draught:100,air:200,width:200}),[
+ {key:'draught',limit:100,value:100},{key:'air',limit:180,value:200}
+]);
+assert.deepEqual(access.exceeded([0,-1,200],{draught:100,air:200,width:210}),[
+ {key:'width',limit:200,value:210}
+]);

@@ -36,6 +36,7 @@ def main():
     args = cli.parse_args()
     sections = collections.defaultdict(list)
     limits = {}
+    constraints = collections.defaultdict(dict)
     for f in json.loads(args.edges.read_text())['features']:
         p = f['properties']
         if p.get('cntrycode') != 'FR' or not p.get('fw_code') or not p.get('code'):
@@ -82,18 +83,36 @@ def main():
                     continue
                 previous = limits[code][1]
                 limits[code][1] = height if previous is None else min(height, previous)
-                if width:
-                    limits[code][2] = min(limits[code][2], width)
+                name = b.get('objectname')
+                if height and (previous is None or height < previous) and name:
+                    constraints[code]['air'] = [name, b['locode']]
+                if width and width < limits[code][2]:
+                    limits[code][2] = width
+                    if name:
+                        constraints[code]['width'] = [name, b['locode']]
     for key, values in sections.items():
         for code, _ in values:
             if limits[code][1] is None:
                 limits[code][1] = -1 if key in indexed and key not in missing else 0
             elif key in missing:
                 limits[code][1] = 0
+    # EuRIS groups the open Thau crossing (Sète–Les Onglous) under Canal du Midi.
+    # Its 140 cm value is the Midi's reference value; the crossing needs its own.
+    if 'FRVN11400017' in limits:
+        limits['FRVN11400017'][0] = 0
+    provenance = {code: {key: origin for key, origin in fields.items()
+                         if key != 'air' or limits[code][1] > 0}
+                  for code, fields in constraints.items()}
+    # EuRIS groups the open Thau crossing (Sète–Les Onglous) under Canal du Midi.
+    # Its 140 cm value is the Midi's reference value; the crossing needs its own.
+    if 'FRVN11400017' in limits:
+        limits['FRVN11400017'][0] = 0
+    provenance = {code: fields for code, fields in provenance.items() if fields}
     args.output.write_text(
         '// EuRIS Bridges / VNF RIS Index (2026-04-29), FIS-EURIS graph (CC BY 4.0).\n'
         '// Dimensions in cm. Air: -1 = no bridge in indexed section; 0 = unverified.\n'
-        'globalThis.NauticClearances=' + json.dumps(limits, separators=(',', ':')) + ';\n'
+        'globalThis.NauticClearances=' + json.dumps(limits, separators=(',', ':')) + ';\n' +
+        'globalThis.NauticClearanceSources=' + json.dumps(provenance, ensure_ascii=False, separators=(',', ':')) + ';\n'
     )
     counts = collections.Counter('unknown' if row[1] == 0 else 'no indexed bridge' if row[1] == -1 else 'height' for row in limits.values())
     print(len(limits), dict(counts))

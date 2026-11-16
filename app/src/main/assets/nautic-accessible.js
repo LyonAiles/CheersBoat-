@@ -1,11 +1,17 @@
 (function(root){
+ function exceeded(limits,profile){
+  const [draught,air,width]=limits||[];
+  return Object.entries({draught,air,width})
+   .filter(([key,limit])=>limit>0&&profile[key]>=limit)
+   .map(([key,limit])=>({key,limit,value:profile[key]}));
+ }
  function compatibleSections(sections,limits,profile){
   const features=[];
   const unverified=[];
   const insufficient=[];
   for(const section of sections){
    const [draught,air,width]=limits[section.sourceId]||[];
-   const tooSmall=(draught>0&&profile.draught>=draught)||(width>0&&profile.width>=width)||(air>0&&profile.air>=air);
+   const tooSmall=exceeded([draught,air,width],profile).length>0;
    const known=draught>0&&width>0&&(air>0||air===-1);
    const status=tooSmall?'insufficient':known?'compatible':'unknown';
    const feature={type:'Feature',properties:{section:section.sourceId,status},
@@ -14,7 +20,7 @@
   }
   return {features,unverified,insufficient};
  }
- const api={compatibleSections};
+ const api={compatibleSections,exceeded};
  if(typeof module!=='undefined')module.exports=api;
  else root.NauticAccessible=api;
 })(typeof window!=='undefined'?window:globalThis);
