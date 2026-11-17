@@ -907,68 +907,96 @@
   if(busy||now-lastQuery<(selectedWorkPoint?15000:120000))return;busy=true;lastQuery=now;notice('Recherche des ouvrages…');
   try{const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),55000);let response;try{response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(query(p,radius+1500)),signal:controller.signal});}finally{clearTimeout(timeout);}if(!response.ok)throw Error('HTTP '+response.status);await window.nauticMapIdle?.();const json=await response.json();await window.nauticMapIdle?.();if(!Array.isArray(json.elements)||json.remark)throw Error('Réponse incomplète');cache={center:{lat:p.lat,lon:p.lon},radius,signature,time:Date.now(),elements:json.elements};data=W.parse(cache.elements);try{localStorage.setItem('nautic-waterways-cache',JSON.stringify(cache));}catch(_){}lastList=visibleWorks(workArea());lastRender='';renderWorks();notice('Ouvrages · '+lastList.length);
   }catch(e){notice(data?'Ouvrages · cache · réseau indisponible':'Ouvrages indisponibles · réessai automatique');}finally{busy=false;}}
- const signCacheKey='nautic-sign-cache-v1';
- let signCache=null,signs=[],signRequest=null,lastSignAttempt=null;
+ const signCacheKey='nautic-sign-cache-v2';
+ let signCache=[],signs=[],signRequest=null,lastSignAttempt=null,signStatus='idle',signError='';
  try{
   const cached=JSON.parse(localStorage.getItem(signCacheKey)||'null');
-  if(cached?.center&&Array.isArray(cached.items))signCache=cached;
+  if(Array.isArray(cached))signCache=cached.filter(entry=>entry?.bounds&&Array.isArray(entry.items));
  }catch(_){}
  function mapWorks(){
   return [...(options.waterwayWorks===false?[]:lastList),...(signButton.hidden?[]:signs)];
  }
  function signArea(){
-  const center=active&&vector?vector.getCenter():map?.getCenter();
-  return center?{lat:center.lat,lon:center.lng}:null;
+  const bounds=(active&&vector?vector:map)?.getBounds();
+  if(!bounds)return null;
+  const area={south:bounds.getSouth(),west:bounds.getWest(),north:bounds.getNorth(),east:bounds.getEast()};
+  return Object.values(area).every(Number.isFinite)?area:null;
  }
- function signsNear(items,center,radius){
-  return items.map(item=>({...item,distance:W.distance(center,item)}))
-   .filter(item=>item.distance<=radius).sort((a,b)=>a.distance-b.distance);
+ function containsSignArea(outer,inner){
+  return outer.south<=inner.south&&outer.west<=inner.west&&outer.north>=inner.north&&outer.east>=inner.east;
  }
- async function updateSigns(force=false){
-  const center=signArea();
-  if(signButton.hidden||!center)return;
-  const radius=Math.min(10000,Math.max(1000,Number(options.waterwayRadius)||5000));
-  const now=Date.now();
-  const covered=signCache&&W.distance(center,signCache.center)+radius<=signCache.radius;
-  signs=covered?signsNear(signCache.items,center,radius):[];
+ function displaySigns(entry,area){
+  const center={lat:(area.south+area.north)/2,lon:(area.west+area.east)/2};
+  signs=(entry?.items||[]).filter(item=>containsSignArea(area,{
+   south:item.lat,north:item.lat,west:item.lon,east:item.lon
+  })).map(item=>({...item,distance:W.distance(center,item)})).sort((a,b)=>a.distance-b.distance);
   renderWorks();
-  if(covered&&now-signCache.time<86400000&&!force){
-   signButton.textContent='Panneaux · '+signs.length;return;
+ }
+ async function fetchSigns(bounds){
+  const area=`(${bounds.south},${bounds.west},${bounds.north},${bounds.east})`;
+  const query=`[out:json][timeout:15];(nwr["seamark:type"="notice"]${area};nwr["seamark:notice:category"]${area};);out center;`;
+  const errors=[];
+  for(const service of ['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter']){
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),18000);
+   try{
+    const response=await fetch(service+'?data='+encodeURIComponent(query),{signal:controller.signal});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const data=await response.json();
+    if(!Array.isArray(data.elements)||data.remark)throw Error('réponse incomplète');
+    return W.parse(data.elements).items.filter(item=>item.category==='notice');
+   }catch(error){
+    errors.push(error.name==='AbortError'?'délai dépassé':error instanceof TypeError?'connexion réseau':error.message);
+   }finally{clearTimeout(timer);}
   }
-  if(signRequest||(!force&&lastSignAttempt&&now-lastSignAttempt.time<90000&&
-   W.distance(center,lastSignAttempt.center)<radius/2))return;
-  lastSignAttempt={time:now,center};
-  signButton.textContent='Panneaux · recherche…';
-  const fetchRadius=radius+1500;
-  const area=`(around:${fetchRadius},${center.lat},${center.lon})`;
-  const query=`[out:json][timeout:20];(nwr["seamark:type"="notice"]${area};nwr["seamark:notice:category"]${area};);out center;`;
-  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),25000);
-  signRequest=controller;
-  try{
-   const response=await fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(query),{signal:controller.signal});
-   if(!response.ok)throw Error('HTTP '+response.status);
-   const data=await response.json();
-   if(!Array.isArray(data.elements)||data.remark)throw Error('Réponse incomplète');
-   signCache={center,radius:fetchRadius,time:Date.now(),items:W.parse(data.elements).items.filter(item=>item.category==='notice')};
+  throw Error([...new Set(errors)].join(' / '));
+ }
+ function updateSigns(force=false){
+  const area=signArea();
+  if(signButton.hidden||!area)return;
+  const entry=signCache.find(row=>containsSignArea(row.bounds,area));
+  if(area.north-area.south>1||area.east-area.west>1.5){
+   displaySigns(null,area);signStatus='zoom';signButton.textContent='Panneaux · zoomer';return;
+  }
+  displaySigns(entry,area);
+  const now=Date.now();
+  if(entry&&now-entry.time<86400000&&!force){
+   signStatus='ready';signButton.textContent='Panneaux · '+signs.length;return;
+  }
+  if(signRequest){
+   signStatus='loading';signButton.textContent='Panneaux · recherche…';return signRequest;
+  }
+  if(!force&&lastSignAttempt&&now-lastSignAttempt.time<60000&&containsSignArea(lastSignAttempt.bounds,area)){
+   signStatus='error';signButton.textContent=entry?'Panneaux · cache':'Panneaux · indisponibles';return;
+  }
+  const latPad=(area.north-area.south)*.2,lonPad=(area.east-area.west)*.2;
+  const bounds={south:Math.max(-90,area.south-latPad),north:Math.min(90,area.north+latPad),
+   west:Math.max(-180,area.west-lonPad),east:Math.min(180,area.east+lonPad)};
+  signStatus='loading';signButton.textContent='Panneaux · recherche…';
+  signRequest=fetchSigns(bounds).then(items=>{
+   signCache=[{bounds,time:Date.now(),items},...signCache.filter(row=>!containsSignArea(bounds,row.bounds))].slice(0,12);
    try{localStorage.setItem(signCacheKey,JSON.stringify(signCache));}catch(_){}
+   lastSignAttempt=null;
+  },error=>{
+   lastSignAttempt={bounds,time:Date.now()};
+   signError=error.message;
+  }).finally(()=>{
+   signRequest=null;
    const current=signArea();
-   signs=current&&W.distance(current,center)+radius<=fetchRadius?signsNear(signCache.items,current,radius):[];
-   signButton.textContent='Panneaux · '+signs.length;
-  }catch(_){
-   signButton.textContent=covered?'Panneaux · cache':'Panneaux · indisponibles';
-  }finally{clearTimeout(timeout);signRequest=null;renderWorks();}
+   if(current&&(containsSignArea(bounds,current)||!lastSignAttempt))updateSigns();
+  });
+  return signRequest;
  }
  signButton.onclick=async()=>{
-  const current=signArea();
-  if(!current)return;
-  if(!signs.length&&!signRequest)await updateSigns(true);
+  if(!signArea())return;
+  await updateSigns(signStatus==='error');
   if($('dialog').open)return;
   const locations=signs.map(item=>'<button type="button" data-sign="'+esc(item.id)+'">'+
-   esc(signDescription(item))+' · '+km(item.distance/1000)+'</button>').join(' ');
-  modal('Panneaux de navigation',locations||
-   '<p>'+esc(signRequest?'Recherche des panneaux en cours.':signButton.textContent.includes('indisponibles')?
-    'La recherche OpenStreetMap a échoué. Réessaie en touchant Panneaux.':
-    'Aucun panneau recensé dans OpenStreetMap autour de la carte.')+'</p>');
+   esc(signDescription(item))+' · '+km(item.distance/1000)+' du centre</button>').join(' ');
+  const message=signStatus==='zoom'?'Zoome sur le secteur à consulter.':signStatus==='loading'?
+   'Recherche des panneaux en cours.':signStatus==='error'?
+   'Recherche OpenStreetMap impossible ('+signError+'). Touche Panneaux pour réessayer.':
+   'Aucun panneau recensé dans cette zone par OpenStreetMap.';
+  modal('Panneaux de navigation',locations||'<p>'+esc(message)+'</p>');
   $('dialogContent').querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>{
    $('dialog').close();
    showItem(button.dataset.sign);
