@@ -1029,6 +1029,7 @@
   await updateSigns(signStatus==='error');
   if($('dialog').open)return;
   const locations=signs.slice(0,100).map(item=>'<button type="button" data-sign="'+esc(item.id)+'">'+
+   signImage(item.notice.find(code=>window.NauticSignImages?.[code]))+
    esc(signDescription(item))+' · '+km(item.distance/1000)+' du centre</button>').join(' ');
   const message=signStatus==='idf'?'Aucun panneau recensé dans cette zone dans l’extrait Île-de-France.':signStatus==='zoom'?'Zoome sur le secteur à consulter.':signStatus==='loading'?
    'Recherche des panneaux en cours.':signStatus==='error'?
@@ -1052,16 +1053,23 @@
 
  const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
  function info(p){return `<b>${esc(p.name)}</b> · ${esc(p.type)}<br>${(p.distance/1000).toFixed(2)} km · ${p.mode==='réseau'?'par le réseau d’eau (branche à confirmer)':'à vol d’oiseau'}${p.clearance?'<br>Hauteur déclarée OSM : '+esc(p.clearance):''}${p.width?'<br>Largeur déclarée : '+esc(p.width):''}${p.length?'<br>Longueur déclarée : '+esc(p.length):''}${p.opening?'<br>Horaires déclarés : '+esc(p.opening):''}`;}
+ function signImage(code){
+  const image=code&&Object.hasOwn(window.NauticSignImages||{},code)&&window.NauticSignImages[code];
+  return image?'<img class="nautic-sign-pictogram" src="'+esc(image)+
+   '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true">':'';
+ }
  function signDescription(item){
   const code=item.notice[0];
   return item.name!=='Panneau'?item.name:W.noticeDefinitions[code]||code||item.name;
  }
  function showItem(id){const p=mapWorks().find(x=>x.id===id);if(!p)return;
   if(p.category==='notice'){
-   const details=p.notice.map(mark=>'<li>'+esc(W.noticeDefinitions[mark]||('Code OSM : '+mark))+'</li>').join('');
+   const details=p.notice.map(mark=>'<li>'+signImage(mark)+esc(W.noticeDefinitions[mark]||('Code OSM : '+mark))+'</li>').join('');
    modal('Panneau de navigation','<p><strong>'+esc(p.name)+'</strong></p>'+
     (details?'<ul>'+details+'</ul>':'<p>Signification non renseignée dans OpenStreetMap.</p>')+
     (p.noticeText?'<p>'+esc(p.noticeText)+'</p>':'')+
+    (p.notice.some(code=>Object.hasOwn(window.NauticSignImages||{},code))?
+     '<p class="muted">Illustrations de référence · <a href="https://wiki.openstreetmap.org/wiki/Seamarks/CEVNI_Notice_Marks">Catalogue CEVNI</a></p>':'')+
     '<small>Source : © contributeurs OpenStreetMap'+(options.objectNumbers!==false?' · Objet 583':'')+'</small>');
    return;
   }

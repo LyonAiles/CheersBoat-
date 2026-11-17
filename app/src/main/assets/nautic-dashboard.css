@@ -303,3 +303,6 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 
 #nauticSignButton {position:absolute;z-index:740;left:8px;top:69px;font-size:11px;padding:5px 8px}
 #mapWrap:has(#nauticDestinationStatus:not([hidden])) #nauticSignButton {top:auto;bottom:8px}
+
+.nautic-sign-pictogram {width:2.2em;height:1.65em;object-fit:contain;vertical-align:middle;margin-inline-end:.5em}
+#dialogContent li > .nautic-sign-pictogram {width:3.4em;height:2.6em}
