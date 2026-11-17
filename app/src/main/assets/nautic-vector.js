@@ -909,6 +909,20 @@
   }catch(e){notice(data?'Ouvrages · cache · réseau indisponible':'Ouvrages indisponibles · réessai automatique');}finally{busy=false;}}
  const signCacheKey='nautic-sign-cache-v2';
  let signCache=[],signs=[],signRequest=null,lastSignAttempt=null,signStatus='idle',signError='';
+ const regionalSigns=window.NauticSignsIdf;
+ const regionEntry=regionalSigns?{items:W.parse(regionalSigns.elements).items}:null;
+ function isIdfView(area){
+  if(!regionalSigns)return false;
+  const x=(area.west+area.east)/2,y=(area.south+area.north)/2;
+  return regionalSigns.rings.reduce((inside,ring)=>{
+   for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const [ax,ay]=ring[i],[bx,by]=ring[j];
+    if((ay>y)!==(by>y)&&x<(bx-ax)*(y-ay)/(by-ay)+ax)inside=!inside;
+   }
+   return inside;
+  },false);
+ }
+
  try{
   const cached=JSON.parse(localStorage.getItem(signCacheKey)||'null');
   if(Array.isArray(cached))signCache=cached.filter(entry=>entry?.bounds&&Array.isArray(entry.items));
@@ -973,6 +987,10 @@
  function updateSigns(force=false){
   const area=signArea();
   if(signButton.hidden||!area)return;
+  if(isIdfView(area)){
+   displaySigns(regionEntry,area);
+   signStatus='idf';signButton.textContent='Panneaux IDF · '+signs.length;return;
+  }
   const entry=signCache.find(row=>containsSignArea(row.bounds,area));
   if(area.north-area.south>1||area.east-area.west>1.5){
    displaySigns(null,area);signStatus='zoom';signButton.textContent='Panneaux · zoomer';return;
@@ -1010,13 +1028,17 @@
   if(!signArea())return;
   await updateSigns(signStatus==='error');
   if($('dialog').open)return;
-  const locations=signs.map(item=>'<button type="button" data-sign="'+esc(item.id)+'">'+
+  const locations=signs.slice(0,100).map(item=>'<button type="button" data-sign="'+esc(item.id)+'">'+
    esc(signDescription(item))+' · '+km(item.distance/1000)+' du centre</button>').join(' ');
-  const message=signStatus==='zoom'?'Zoome sur le secteur à consulter.':signStatus==='loading'?
+  const message=signStatus==='idf'?'Aucun panneau recensé dans cette zone dans l’extrait Île-de-France.':signStatus==='zoom'?'Zoome sur le secteur à consulter.':signStatus==='loading'?
    'Recherche des panneaux en cours.':signStatus==='error'?
    'Recherche OpenStreetMap impossible ('+signError+'). Touche Panneaux pour réessayer.':
    'Aucun panneau recensé dans cette zone par OpenStreetMap.';
-  modal('Panneaux de navigation',locations||'<p>'+esc(message)+'</p>');
+  const attribution=signStatus==='idf'?
+   '<p class="muted">Île-de-France · extrait Geofabrik '+esc(regionalSigns.date)+
+   ' · <a href="https://www.openstreetmap.org/copyright">© contributeurs OpenStreetMap (ODbL)</a></p>':'';
+  const grouped=signs.length>100?'<p>100 panneaux les plus proches du centre sur '+signs.length+'. Zoome pour affiner.</p>':'';
+  modal('Panneaux de navigation',attribution+grouped+(locations||'<p>'+esc(message)+'</p>'));
   $('dialogContent').querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>{
    $('dialog').close();
    showItem(button.dataset.sign);

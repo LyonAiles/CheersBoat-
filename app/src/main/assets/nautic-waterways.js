@@ -11,7 +11,15 @@
   no_passing:'A4 · Croisement interdit',no_convoy_passing:'A4.1 · Croisement interdit entre convois',
   no_berthing:'A5 · Stationnement interdit',no_anchoring:'A6 · Ancrage interdit',
   no_mooring:'A7 · Amarrage interdit',no_turning:'A8 · Demi-tour interdit',no_wash:'A9 · Éviter les remous',
+  no_passage_left:'A10a · Passage interdit à gauche',no_passage_right:'A10b · Passage interdit à droite',
   no_motor_craft:'A12 · Navigation motorisée interdite',
+  move_to_left:'B1a · Direction obligatoire à gauche',move_to_right:'B1b · Direction obligatoire à droite',
+  move_to_port:'B2a · Se diriger vers bâbord',move_to_starboard:'B2b · Se diriger vers tribord',
+  channel_distance_left:'C5a · Écart du chenal par rapport à la rive gauche',
+  channel_distance_right:'C5b · Écart du chenal par rapport à la rive droite',
+  channel_two_way:'Chenal à double sens',channel_one_way:'Chenal à sens unique',
+  motor_craft_permitted:'Navigation motorisée autorisée',sailing_craft_permitted:'Navigation à voile autorisée',
+  berthing_permitted:'Stationnement autorisé',
   keep_to_port:'B3a · Tenir bâbord',keep_to_starboard:'B3b · Tenir tribord',
   stop:'B5 · Arrêt obligatoire',speed_limit:'B6 · Vitesse limitée',sound_horn:'B7 · Signal sonore obligatoire',
   keep_lookout:'B8 · Vigilance particulière',make_radio_contact:'B11 · Contact radio obligatoire',
@@ -28,7 +36,9 @@
   const point=g=>({lat:g.lat,lon:g.lon});
   for(const e of elements){const t=e.tags||{};if(e.type==='way'&&/^(canal|river|fairway)$/.test(t.waterway||'')&&e.geometry){for(let i=1;i<e.geometry.length;i++){const a=point(e.geometry[i-1]),b=point(e.geometry[i]),from=String(e.nodes?.[i-1]??`${a.lat},${a.lon}`),to=String(e.nodes?.[i]??`${b.lat},${b.lon}`);nodes.set(from,a);nodes.set(to,b);edges.push({from,to,a,b,length:distance(a,b),waterway:t.name||"way/"+e.id,wayId:e.sourceId??e.id,restricted:restrictedAccess(t),chartedOpen:/^(yes|designated)$/.test(t.motorboat??t.boat??'')});}}
   }
-  for(const e of elements){const t=e.tags||{};const notice=(t['seamark:notice:category']||'').split(';').map(value=>value.trim()).filter(Boolean);
+  for(const e of elements){const t=e.tags||{};const notice=[...new Set(Object.entries(t)
+    .filter(([key])=>/^seamark:notice:(?:\d+:)?category$/.test(key))
+    .flatMap(([,value])=>value.split(';').map(mark=>mark.trim()).filter(Boolean)))];
    const isNotice=t['seamark:type']==='notice'||notice.length>0;
    let type=isNotice?'Panneau':t.waterway==='lock_gate'||t.lock==='yes'?'Écluse':t.waterway==='dam'?'Barrage':t.waterway==='weir'?'Seuil':t.bridge&&t.bridge!=='no'?'Pont':t.tunnel&&t.tunnel!=='no'&&t.waterway?'Tunnel':t.leisure==='marina'||t.harbour==='yes'||t.harbour==='marina'||t.industrial==='port'||t['seamark:type']==='harbour'?'Port':t.mooring&& !['no','private'].includes(t.mooring)?'Halte':t.leisure==='slipway'?'Cale':null;if(!type)continue;
    const g=e.geometry||[],p=e.lat!==undefined?point(e):e.center?point(e.center):g.length?point(g[Math.floor(g.length/2)]):null;if(!p)continue;
@@ -41,7 +51,7 @@
    const name=t.name||t['ref:vnf']||t.ref||type;
    // Gate pairs form one lock; do not display one entry per door.
    if(type==='Écluse'&&items.some(x=>x.type===type&&distance(x,candidate)<70&&(x.name===name||x.name===type||name===type)))continue;
-   items.push({id:e.type+'/'+e.id,type,category:categoryOf(type),name,lat:candidate.lat,lon:candidate.lon,near:near&&near.d<120?near:null,clearance:t.maxheight||null,length:t.maxlength||null,width:t.maxwidth||null,opening:t.opening_hours||null,notice,noticeText:t['seamark:notice:information']||null});
+   items.push({id:e.type+'/'+e.id,type,category:categoryOf(type),name,lat:candidate.lat,lon:candidate.lon,near:near&&near.d<120?near:null,clearance:t.maxheight||null,length:t.maxlength||null,width:t.maxwidth||null,opening:t.opening_hours||null,notice,noticeText:Object.entries(t).filter(([key])=>/^seamark:notice:(?:\d+:)?information$/.test(key)).map(([,value])=>value).join(' · ')||null});
   }
   return {edges,nodes,items};
  }
