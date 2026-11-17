@@ -22,6 +22,12 @@ final class TrematageSession {
  void restoreBaseName()throws Exception{synchronized(TrematageSession.class){
   String token=new BasePresetRepair(camera,profile).restore(store.backup());store.save(token,false);
  }}
+ boolean hasWatchPositions()throws Exception{
+  List<Element> list=presets();
+  if(destination(list).isEmpty())return false;
+  for(Element e:list)if("BASE".equalsIgnoreCase(OnvifCamera.value(e,"Name").trim()))return true;
+  return false;
+ }
  void activate()throws Exception{synchronized(TrematageSession.class){
   if(store.armed())return; // Never replace the original return position on repeated activation.
   List<Element> list=presets();String target=destination(list);
@@ -29,11 +35,7 @@ final class TrematageSession {
   String base="";for(Element e:list)if("BASE".equalsIgnoreCase(OnvifCamera.value(e,"Name").trim())){base=e.getAttribute("token");break;}
   if(base.isEmpty())throw new IOException("Position BASE introuvable : la mémoriser dans la caméra avant d’activer Trématage");
   store.save(base,true);
-  try{go(target);}
-  catch(Exception error){
-   try{store.save(base,false);}catch(Exception rollback){error.addSuppressed(rollback);}
-   throw error;
-  }
+  go(target);
  }}
  void deactivate()throws Exception{synchronized(TrematageSession.class){
   if(!store.armed())return;

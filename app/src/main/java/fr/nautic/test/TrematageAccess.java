@@ -28,37 +28,28 @@ final class TrematageAccess {
   Element profile=TrematageProfiles.select(camera.profiles,host,preferred,prefs(c).getAll());
   if(profile==null)throw new java.io.IOException("Objectif mobile non accessible par ONVIF");
   String key=host+"|"+profile.getAttribute("token");
-  TrematageSession.Store current=store(c,key);
-  if(current.armed()){
-   new TrematageSession(camera,profile,current).deactivate();
-   TrematageService.stop(c,key);
-   return "Trématage désactivé · retour BASE demandé";
-  }
-  String other=prefs(c).getString("watchKey","");
-  if(!other.isEmpty()&&!TrematageProfiles.sameCamera(other,key)&&prefs(c).getBoolean(other+".active",false))
-   throw new java.io.IOException("Une position de retour est encore conservée pour "+other.substring(0,other.indexOf('|'))+" ; revenir depuis ses commandes");
-
-  java.util.List<Element> candidates=new java.util.ArrayList<>();
-  candidates.add(profile);
-  for(Element alternate:camera.profiles)
-   if(alternate!=profile&&!OnvifCamera.elements(alternate,"PTZConfiguration").isEmpty())candidates.add(alternate);
-  Exception failure=null;
-  for(Element candidate:candidates){
-   String token=candidate.getAttribute("token"),candidateKey=host+"|"+token;
-   TrematageSession.Store candidateStore=store(c,candidateKey);
-   try{new TrematageSession(camera,candidate,candidateStore).activate();}
-   catch(Exception error){
-    if(failure==null)failure=error;
-    if(candidateStore.armed())throw error;
-    continue;
+  TrematageSession.Store store=store(c,key);
+  TrematageSession session=new TrematageSession(camera,profile,store);
+  if(!store.armed()){
+   boolean ready=false;
+   try{ready=session.hasWatchPositions();}catch(Exception ignored){}
+   if(!ready)for(Element alternate:camera.profiles){
+    if(alternate==profile||OnvifCamera.elements(alternate,"PTZConfiguration").isEmpty())continue;
+    String candidateKey=host+"|"+alternate.getAttribute("token");
+    TrematageSession.Store candidateStore=store(c,candidateKey);
+    TrematageSession candidate=new TrematageSession(camera,alternate,candidateStore);
+    try{
+     if(!candidate.hasWatchPositions())continue;
+     profile=alternate;key=candidateKey;store=candidateStore;session=candidate;break;
+    }catch(Exception ignored){}
    }
-   prefs(c).edit().putString("shortcutKey",candidateKey).putString("shortcutProfile",token).apply();
-   TrematageFeedback.activated(c);
-   TrematageService.start(c,host,index,candidateKey);
-   return "Trématage activé";
   }
-  if(failure!=null)throw failure;
-  throw new java.io.IOException("Aucun profil motorisé disponible");
+  prefs(c).edit().putString("shortcutKey",key).putString("shortcutProfile",profile.getAttribute("token")).apply();
+  if(store.armed()){session.deactivate();TrematageService.stop(c,key);return "Trématage désactivé · retour BASE demandé";}
+  String other=prefs(c).getString("watchKey","");
+  if(!other.isEmpty()&&!TrematageProfiles.sameCamera(other,key)&&prefs(c).getBoolean(other+".active",false))throw new java.io.IOException("Une position de retour est encore conservée pour "+other.substring(0,other.indexOf('|'))+" ; revenir depuis ses commandes");
+  session.activate();prefs(c).edit().putString("shortcutKey",key).putString("shortcutProfile",profile.getAttribute("token")).apply();
+  TrematageFeedback.activated(c);TrematageService.start(c,host,index,key);return "Trématage activé";
  }
  static String status(Context c){try{
   android.content.SharedPreferences p=prefs(c);String key=p.getString("shortcutKey",p.getString("watchKey",""));
