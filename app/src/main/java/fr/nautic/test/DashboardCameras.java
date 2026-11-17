@@ -25,6 +25,7 @@ final class DashboardCameras {
  TextView qualityButton,medallionButton;
  boolean adjustingMapAlpha;
  static boolean isMapView(String id){return id.startsWith("mapCamera");}
+ static boolean isMedallion(String id){return id.equals("mapCameraPort")||id.equals("mapCameraStarboard");}
  void setMapAlpha(float value){
   mapAlpha=value;
   for(Tile tile:tiles.values())if(isMapView(tile.id))tile.frame.setAlpha(value);
@@ -80,15 +81,20 @@ final class DashboardCameras {
    footer=overlay(10);footer.setMaxLines(2);frame.addView(footer,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));footer.setVisibility(View.GONE);
    beacon=overlay(42);beacon.setText("⚠");beacon.setBackgroundColor(0xe6e00000);beacon.setVisibility(View.GONE);frame.addView(beacon,new FrameLayout.LayoutParams(dp(70),dp(66),Gravity.CENTER));
    if(isMapView(id)){
-    if(!id.equals("mapCameraPreview")){
+    if(isMedallion(id)){
      frame.setOutlineProvider(new ViewOutlineProvider(){
       @Override public void getOutline(View view,Outline outline){outline.setOval(0,0,view.getWidth(),view.getHeight());}
      });
      View sheen=new View(activity);
      android.graphics.drawable.GradientDrawable finish=new android.graphics.drawable.GradientDrawable(
        android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-       new int[]{0x5cffffff,Color.TRANSPARENT,Color.TRANSPARENT,0x8c000000});
-     sheen.setBackground(finish);
+       new int[]{0x99ffffff,0x16ffffff,Color.TRANSPARENT,0xa6000000});
+     android.graphics.drawable.GradientDrawable rim=new android.graphics.drawable.GradientDrawable();
+     rim.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+     rim.setColor(Color.TRANSPARENT);
+     rim.setStroke(dp(1),0x88c9edff);
+     sheen.setBackground(new android.graphics.drawable.LayerDrawable(
+       new android.graphics.drawable.Drawable[]{finish,rim}));
      // Above the video and snapshots, below the camera labels and status.
      frame.addView(sheen,1,new FrameLayout.LayoutParams(-1,-1));
      installCropGesture();
@@ -114,15 +120,16 @@ final class DashboardCameras {
    int width=frame.getWidth(),height=frame.getHeight();
    if(width<=0||height<=0)return;
    CameraCrop crop=CameraCrop.supported(cropCamera)?crops[cropCamera]:CameraCrop.CENTER;
+   float zoom=isMedallion(id)?1.15f:1f;
    if(source!=null){
     float ratio=source.videoRatio/((float)width/height);
-    float sx=Math.max(1,ratio),sy=Math.max(1,1/ratio);
+    float sx=Math.max(1,ratio)*zoom,sy=Math.max(1,1/ratio)*zoom;
     source.texture.setScaleX(sx);source.texture.setScaleY(sy);
     source.texture.setTranslationX(crop.translateX(width*(sx-1)));
     source.texture.setTranslationY(crop.translateY(height*(sy-1)));
    }
    if(snapshot!=null){
-    float scale=Math.max((float)width/snapshot.getWidth(),(float)height/snapshot.getHeight());
+    float scale=Math.max((float)width/snapshot.getWidth(),(float)height/snapshot.getHeight())*zoom;
     float extraX=snapshot.getWidth()*scale-width,extraY=snapshot.getHeight()*scale-height;
     Matrix matrix=new Matrix();
     matrix.setScale(scale,scale);

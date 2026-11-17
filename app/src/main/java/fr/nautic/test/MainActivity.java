@@ -181,6 +181,16 @@ public class MainActivity extends Activity {
     }catch(org.json.JSONException ignored){}
    },"nautic-map-city").start();
   }
+  @JavascriptInterface public void searchMapSigns(int request,double south,double west,double north,double east){
+   new Thread(()->{
+    try{
+     org.json.JSONObject result=new org.json.JSONObject().put("request",request);
+     try{result.put("elements",NauticSigns.lookup(south,west,north,east));}
+     catch(java.io.IOException error){result.put("error",error.getMessage());}
+     if(!isDestroyed())js("nauticMapSignsResult",result.toString());
+    }catch(org.json.JSONException ignored){}
+   },"nautic-map-signs").start();
+  }
   @JavascriptInterface public void checkRouteImpacts(String routes){
    new Thread(()->{
     try{if(!isDestroyed())js("nauticRouteImpacts",NauticNotices.lookupImpacts(routes));}

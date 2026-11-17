@@ -932,7 +932,27 @@
   })).map(item=>({...item,distance:W.distance(center,item)})).sort((a,b)=>a.distance-b.distance);
   renderWorks();
  }
+ let nativeSigns=null,nativeSignSequence=0;
+ window.nauticMapSignsResult=raw=>{
+  if(!nativeSigns)return;
+  const result=JSON.parse(raw);
+  if(result.request!==nativeSigns.request)return;
+  const pending=nativeSigns;
+  nativeSigns=null;
+  if(result.error)pending.reject(Error(result.error));
+  else pending.resolve(result.elements);
+ };
  async function fetchSigns(bounds){
+  if(native?.searchMapSigns){
+   const elements=await new Promise((resolve,reject)=>{
+    const request=++nativeSignSequence;
+    nativeSigns={request,resolve,reject};
+    try{native.searchMapSigns(request,bounds.south,bounds.west,bounds.north,bounds.east);}
+    catch(error){nativeSigns=null;reject(error);}
+   });
+   return W.parse(elements).items.filter(item=>item.category==='notice');
+  }
+
   const area=`(${bounds.south},${bounds.west},${bounds.north},${bounds.east})`;
   const query=`[out:json][timeout:15];(nwr["seamark:type"="notice"]${area};nwr["seamark:notice:category"]${area};);out center;`;
   const errors=[];
