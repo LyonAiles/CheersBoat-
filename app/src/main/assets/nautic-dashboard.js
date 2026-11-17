@@ -96,7 +96,7 @@
   trematage.title=(s.active?'Trématage actif':'Trématage inactif')+' · '+(s.status||'appui long pour régler');
  }catch(e){}}
  trematage.onclick=()=>{if(pending)return;if(!bridge){$('trematageState').textContent='Application Android requise';return;}pending=true;refresh();call('toggleTrematage');};
- trematage.oncontextmenu=e=>{e.preventDefault();call('openTrematageCamera');};
+ trematage.oncontextmenu=e=>e.preventDefault();
  trematage.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();trematage.click();}};
  window.nauticTrematageResult=message=>{pending=false;resultText=message||'';resultUntil=Date.now()+7000;refresh();previews();};
  window.nauticTrematageAlert=()=>{alarmUntil=Date.now()+30000;refresh();};
@@ -273,7 +273,7 @@
   if(settings)new MutationObserver(previews).observe(settings,{attributes:true,attributeFilter:['hidden']});
  });
  window.nauticDashboardClick=id=>{if(id===qualityTool.id||id===medallionTool.id||id===axisTool.id||id===captureTool.id)$(id).click();else if(id===centerView)switchMapCamera();else if(mapViews.includes(id))activateMapView(id);else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
- window.nauticDashboardHold=id=>{if(id===centerView)openAxisMenu();else if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
+ window.nauticDashboardHold=id=>{if(id===centerView)openAxisMenu();else if(id==='trematagePreview')return;else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
  const clampCrop=value=>Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
  const cropKey=camera=>'nautic-camera-crop-'+camera;
  const liveCrops=new Map();

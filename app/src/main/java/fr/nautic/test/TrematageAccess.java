@@ -27,12 +27,27 @@ final class TrematageAccess {
   camera.discover();String preferred=prefs(c).getString("shortcutProfile","");
   Element profile=TrematageProfiles.select(camera.profiles,host,preferred,prefs(c).getAll());
   if(profile==null)throw new java.io.IOException("Objectif mobile non accessible par ONVIF");
-  String key=host+"|"+profile.getAttribute("token");TrematageSession.Store store=store(c,key);TrematageSession session=new TrematageSession(camera,profile,store);
+  String key=host+"|"+profile.getAttribute("token");
+  TrematageSession.Store store=store(c,key);
+  TrematageSession session=new TrematageSession(camera,profile,store);
+  if(!store.armed()){
+   boolean ready=false;
+   try{ready=session.hasWatchPositions();}catch(Exception ignored){}
+   if(!ready)for(Element alternate:camera.profiles){
+    if(alternate==profile||OnvifCamera.elements(alternate,"PTZConfiguration").isEmpty())continue;
+    String candidateKey=host+"|"+alternate.getAttribute("token");
+    TrematageSession.Store candidateStore=store(c,candidateKey);
+    TrematageSession candidate=new TrematageSession(camera,alternate,candidateStore);
+    try{
+     if(!candidate.hasWatchPositions())continue;
+     profile=alternate;key=candidateKey;store=candidateStore;session=candidate;break;
+    }catch(Exception ignored){}
+   }
+  }
   prefs(c).edit().putString("shortcutKey",key).putString("shortcutProfile",profile.getAttribute("token")).apply();
   if(store.armed()){session.deactivate();TrematageService.stop(c,key);return "Trématage désactivé · retour BASE demandé";}
   String other=prefs(c).getString("watchKey","");
   if(!other.isEmpty()&&!TrematageProfiles.sameCamera(other,key)&&prefs(c).getBoolean(other+".active",false))throw new java.io.IOException("Une position de retour est encore conservée pour "+other.substring(0,other.indexOf('|'))+" ; revenir depuis ses commandes");
-  if(CameraAxis.hasReturn(c,host))throw new java.io.IOException("Reviens à l’orientation précédente sur la vue 46 avant d’activer Trématage");
   session.activate();prefs(c).edit().putString("shortcutKey",key).putString("shortcutProfile",profile.getAttribute("token")).apply();
   TrematageService.start(c,host,index,key);TrematageFeedback.activated(c);return "Trématage activé";
  }

@@ -120,7 +120,10 @@ final class DashboardCameras {
     return;
    }
    refresh=overlay(20);refresh.setText("↻");refresh.setContentDescription("Rafraîchir cette caméra");frame.addView(refresh,new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.TOP|Gravity.RIGHT));refresh.setOnClickListener(v->{refreshTile(id);activity.refreshDashboardVideos();});
-   frame.setOnClickListener(v->activity.dashboardClick(id,false));frame.setOnLongClickListener(v->{activity.dashboardClick(id,true);return true;});layer.addView(frame);
+   frame.setOnClickListener(v->activity.dashboardClick(id,false));
+   if(!"trematagePreview".equals(id))
+    frame.setOnLongClickListener(v->{activity.dashboardClick(id,true);return true;});
+   layer.addView(frame);
   }
   void setSnapshot(Bitmap bitmap){
    snapshot=bitmap;

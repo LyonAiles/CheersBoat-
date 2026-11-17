@@ -135,9 +135,9 @@ public class MainActivity extends Activity {
   int padding=Math.round(12*getResources().getDisplayMetrics().density);
   menu.setPadding(padding,padding,padding,padding);
   AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Orientation de la caméra").setView(menu).create();
-  addOrientationRow(menu,dialog,index,new String[]{"▲"},new String[]{"PROUE"});
-  addOrientationRow(menu,dialog,index,new String[]{"◀","▶"},new String[]{"BÂBORD","TRIBORD"});
-  addOrientationRow(menu,dialog,index,new String[]{"BASE","▼"},new String[]{"BASE","TREMATAGE"});
+  addOrientationRow(menu,dialog,index,new String[]{"","▲",""},new String[]{"","PROUE",""});
+  addOrientationRow(menu,dialog,index,new String[]{"◀","BASE","▶"},new String[]{"BÂBORD","BASE","TRIBORD"});
+  addOrientationRow(menu,dialog,index,new String[]{"","▼",""},new String[]{"","TREMATAGE",""});
   try{
    if(CameraAxis.hasReturn(this,index))addOrientationRow(menu,dialog,index,
      new String[]{"Retour précédent"},new String[]{"RETOUR"});
@@ -147,9 +147,13 @@ public class MainActivity extends Activity {
  private void addOrientationRow(android.widget.LinearLayout menu,AlertDialog dialog,int index,String[] labels,String[] directions){
   android.widget.LinearLayout row=new android.widget.LinearLayout(this);
   for(int i=0;i<labels.length;i++){
+   String direction=directions[i];
+   if(direction.isEmpty()){
+    row.addView(new android.widget.Space(this),new android.widget.LinearLayout.LayoutParams(0,0,1));
+    continue;
+   }
    android.widget.Button button=new android.widget.Button(this);
    button.setText(labels[i]);
-   String direction=directions[i];
    button.setContentDescription(direction.equals("TREMATAGE")?"Trématage":direction);
    button.setOnClickListener(view->{dialog.dismiss();requestCameraOrientation(index,direction);});
    row.addView(button,new android.widget.LinearLayout.LayoutParams(0,-2,1));
