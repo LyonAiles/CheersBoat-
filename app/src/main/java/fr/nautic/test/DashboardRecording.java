@@ -1,6 +1,12 @@
 package fr.nautic.test;
 
-import android.app.AlertDialog;
+import android.app.Dialog;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -26,7 +32,8 @@ final class DashboardRecording {
  private final Paint paint=new Paint(Paint.FILTER_BITMAP_FLAG);
  private final Runnable tick=this::recordFrame;
  private MediaRecorder recorder;
- private AlertDialog prompt;
+ private Dialog prompt;
+ private TextView elapsed;
  private Surface encoder;
  private TextureView texture;
  private Bitmap bitmap;
@@ -92,14 +99,42 @@ final class DashboardRecording {
    recorder.start();
    frames=0;
    started=SystemClock.elapsedRealtime();
-   prompt=new AlertDialog.Builder(activity).setTitle("Enregistrement vidéo · 151")
-    .setMessage("En cours · 00:00").setCancelable(false)
-    .setPositiveButton("Arrêter",(dialog,which)->stop(true,null)).create();
-   prompt.setCanceledOnTouchOutside(false);
-   prompt.show();
-   if(prompt.getWindow()!=null)prompt.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+   showPrompt();
    handler.post(tick);
   }catch(Exception error){stop(false,"Impossible de démarrer l’enregistrement");}
+ }
+ private void showPrompt(){
+  prompt=new Dialog(activity);
+  prompt.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+  prompt.setCancelable(false);
+  prompt.setCanceledOnTouchOutside(false);
+  LinearLayout strip=new LinearLayout(activity);
+  strip.setGravity(Gravity.CENTER_VERTICAL);
+  int gap=Math.round(8*activity.getResources().getDisplayMetrics().density);
+  strip.setPadding(gap*2,gap,gap,gap);
+  GradientDrawable background=new GradientDrawable();
+  background.setColor(0xff092f43);
+  background.setCornerRadius(gap*1.5f);
+  strip.setBackground(background);
+  elapsed=new TextView(activity);
+  elapsed.setTextColor(Color.WHITE);
+  elapsed.setText("● REC  00:00");
+  elapsed.setPadding(0,0,gap,0);
+  strip.addView(elapsed);
+  Button stop=new Button(activity);
+  stop.setText("Arrêter");
+  stop.setOnClickListener(view->stop(true,null));
+  strip.addView(stop);
+  prompt.setContentView(strip);
+  android.view.Window window=prompt.getWindow();
+  if(window!=null){
+   window.setBackgroundDrawableResource(android.R.color.transparent);
+   window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|WindowManager.LayoutParams.FLAG_FULLSCREEN);
+   window.setGravity(Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);
+  }
+  prompt.show();
+  if(window!=null)window.setLayout(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);
  }
  private void recordFrame(){
   if(!active())return;
@@ -112,7 +147,7 @@ final class DashboardRecording {
    }finally{encoder.unlockCanvasAndPost(canvas);}
    frames++;
    long seconds=(SystemClock.elapsedRealtime()-started)/1000;
-   prompt.setMessage(String.format(Locale.FRANCE,"En cours · %02d:%02d",seconds/60,seconds%60));
+   elapsed.setText(String.format(Locale.FRANCE,"● REC  %02d:%02d",seconds/60,seconds%60));
    handler.postDelayed(tick,83);
   }catch(RuntimeException error){stop(true,"Capture du flux interrompue");}
  }
@@ -127,7 +162,7 @@ final class DashboardRecording {
   if(encoder!=null){encoder.release();encoder=null;}
   if(bitmap!=null){bitmap.recycle();bitmap=null;}
   texture=null;live=null;
-  if(prompt!=null){prompt.dismiss();prompt=null;}
+  if(prompt!=null){prompt.dismiss();prompt=null;elapsed=null;}
   boolean kept=completed&&pending!=null&&pending.length()>0&&pending.renameTo(output);
   if(pending!=null&&!kept)pending.delete();
   pending=null;output=null;frames=0;

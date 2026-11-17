@@ -2,6 +2,7 @@ package fr.nautic.test;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
@@ -107,6 +108,40 @@ public class MainActivity extends Activity {
  private void js(String name,String value){
   String escaped=org.json.JSONObject.quote(value==null?"":value);
   runOnUiThread(()->web.evaluateJavascript("window."+name+" && window."+name+"("+escaped+")",null));
+ }
+ private void requestCameraAxis(int index,boolean restore,boolean calibrate){
+  dashboardCommands.execute(()->{
+   try{
+    CameraAxis.move(this,index,restore,calibrate);
+    if(!isDestroyed())toast(calibrate?"Axe 46 mémorisé":restore?"Retour à l’orientation précédente demandé":"Alignement demandé à la caméra");
+   }catch(CameraAxis.MissingAxis missing){
+    runOnUiThread(()->{
+     if(isDestroyed()||isFinishing())return;
+     new AlertDialog.Builder(this).setTitle("Position Axe 46 introuvable")
+      .setMessage("Place l’objectif motorisé dans l’axe de l’objectif fixe, puis mémorise cette orientation ici.")
+      .setPositiveButton("Mémoriser l’axe actuel",(dialog,which)->requestCameraAxis(index,false,true))
+      .setNeutralButton("Orienter la caméra",(dialog,which)->openAxisControls(index))
+      .setNegativeButton("Fermer",null).show();
+    });
+   }catch(Exception failure){
+    runOnUiThread(()->{
+     if(isDestroyed()||isFinishing())return;
+     new AlertDialog.Builder(this).setTitle("Commande axe 46")
+      .setMessage(failure.getMessage()==null?"Commande ONVIF impossible.":failure.getMessage())
+      .setPositiveButton("Fermer",null).show();
+    });
+   }finally{if(!isDestroyed())js("nauticCameraAxisResult","");}
+  });
+ }
+ private void openAxisControls(int index){
+  try{
+   String address=TrematageAccess.address(this,index);
+   if(!address.startsWith("rtsp://")){toast("Configure la caméra RTSP dans Paramètres");return;}
+   Intent intent=new Intent(this,CameraActivity.class);
+   intent.putExtra("url",address);intent.putExtra("cameraIndex",index);
+   intent.putExtra("mobileOnly",true);intent.putExtra("autoControls",true);
+   startActivity(intent);
+  }catch(Exception error){toast("Commandes de la caméra indisponibles");}
  }
  private void composeSondeurMail(String recipient, String subject, String body, Bitmap image) {
   js("nauticSondeurCaptureDone", "");
@@ -221,15 +256,7 @@ public class MainActivity extends Activity {
   }
   @JavascriptInterface public void moveCameraAxis(int index,boolean restore){
    if(index<1||index>3)return;
-   dashboardCommands.execute(()->{
-    String error="";
-    try{CameraAxis.move(MainActivity.this,index,restore);}
-    catch(Exception failure){error=failure.getMessage()==null?"Commande caméra impossible":failure.getMessage();}
-    if(!isDestroyed()){
-     if(!error.isEmpty())toast(error);
-     js("nauticCameraAxisResult",error);
-    }
-   });
+   requestCameraAxis(index,restore,false);
   }
   @JavascriptInterface public void toggleTrematage(){
    if(!trematageBusy.compareAndSet(false,true))return;

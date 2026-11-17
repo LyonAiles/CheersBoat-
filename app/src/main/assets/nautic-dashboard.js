@@ -32,7 +32,7 @@
  window.nauticCamera42Result=message=>{pending42=false;if(camera42)camera42.title=message||'';refresh();previews();};
  let pending=false,lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
  let extraNumbers={};try{extraNumbers=JSON.parse(call('readSetting','nautic-control-numbers')||localStorage.getItem('nautic-control-numbers')||'{}');}catch(_){}
- const fixedNumbers={clock:10,clockDate:11,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,nativeNotesCarry:391,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapCameraPort:45,mapCameraPreview:46,mapCameraStarboard:47,mapCameraQuality:146,mapCameraAxis:148,mapCameraPhoto:149,mapCameraRecord:150,mapCameraLastVideo:152,mapCameraMedallionToggle:147,nauticSignButton:583,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,nauticDestinationStatus:58,nauticAccessibleStatus:59,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
+ const fixedNumbers={clock:10,clockDate:11,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,nativeNotesCarry:391,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapCameraPort:45,mapCameraPreview:46,mapCameraStarboard:47,mapCameraQuality:146,mapCameraAxis:148,mapCameraCaptureMenu:149,mapCameraMedallionToggle:147,nauticSignButton:583,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,nauticDestinationStatus:58,nauticAccessibleStatus:59,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
  const reservedNumbers=new Set(Object.values(fixedNumbers));
  const controls='button,[role=button],input:not([type=hidden]),select,textarea,summary,.leaflet-bar a';
  function numberButtons(){
@@ -148,20 +148,14 @@
  axisTool.type='button';axisTool.id='mapCameraAxis';axisTool.hidden=true;
  let axisBusy=false;
  axisTool.onclick=()=>{const feed=feeds[centerView];moveAxis(!!call('cameraAxisAligned',feed.camera));};
- const captureTools=[
-  ['mapCameraPhoto','Photo','photo'],
-  ['mapCameraRecord','Vidéo','record'],
-  ['mapCameraLastVideo','Dernière vidéo','play']
- ].map(([id,label,action])=>{
-  const tool=document.createElement('button');
-  tool.id=id;tool.type='button';tool.hidden=true;tool.textContent=label;
-  tool.onclick=()=>call('cameraCapture',action);
-  return tool;
- });
- $('mapWrap').append(mapCamera,qualityTool,medallionTool,axisTool,...captureTools);
+ const captureTool=document.createElement('button');
+ captureTool.id='mapCameraCaptureMenu';captureTool.type='button';captureTool.hidden=true;
+ captureTool.textContent='📷';captureTool.setAttribute('aria-label','Photo, vidéo et dernière vidéo');
+ captureTool.onclick=()=>call('cameraCapture','menu');
+ $('mapWrap').append(mapCamera,qualityTool,medallionTool,axisTool,captureTool);
  function refreshAxis(){
   const feed=feeds[centerView],back=bridge?.cameraAxisAligned&&call('cameraAxisAligned',feed.camera);
-  axisTool.hidden=!bridge?.moveCameraAxis||!currentLens(feed)||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
+  axisTool.hidden=!bridge?.moveCameraAxis||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
   axisTool.textContent=axisBusy?'…':back?'Retour axe':'Axe';
   axisTool.setAttribute('aria-pressed',String(!!back));
   axisTool.setAttribute('aria-label',back?'Rétablir l’orientation précédente':'Aligner l’objectif mobile');
@@ -169,7 +163,7 @@
  function moveAxis(restore){
   if(axisBusy||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden'))return;
   const feed=feeds[centerView];
-  if(!bridge?.moveCameraAxis||!currentLens(feed))return;
+  if(!bridge?.moveCameraAxis)return;
   axisBusy=true;refreshAxis();previews(true);
   call('moveCameraAxis',feed.camera,restore);
  }
@@ -287,7 +281,7 @@
   const settings=$('sondeurSettings');
   if(settings)new MutationObserver(previews).observe(settings,{attributes:true,attributeFilter:['hidden']});
  });
- window.nauticDashboardClick=id=>{if(id===qualityTool.id||id===medallionTool.id||id===axisTool.id||captureTools.some(tool=>tool.id===id))$(id).click();else if(id===centerView)switchMapCamera();else if(mapViews.includes(id))activateMapView(id);else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
+ window.nauticDashboardClick=id=>{if(id===qualityTool.id||id===medallionTool.id||id===axisTool.id||id===captureTool.id)$(id).click();else if(id===centerView)switchMapCamera();else if(mapViews.includes(id))activateMapView(id);else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
  window.nauticDashboardHold=id=>{if(id===centerView)moveAxis(false);else if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
  const clampCrop=value=>Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
  const cropKey=camera=>'nautic-camera-crop-'+camera;
@@ -399,9 +393,7 @@
   if(hidden)axisTool.hidden=true;
   const centralUrl=cameraConfig()['cam'+feeds[centerView].camera]||'';
   const captureHidden=!!hidden||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden')||!bridge?.cameraCapture;
-  const lastVideo=captureHidden?false:call('hasLatestCameraVideo');
-  for(const tool of captureTools)tool.hidden=captureHidden||
-   (tool.id==='mapCameraLastVideo'?!lastVideo:/^https?:/i.test(centralUrl));
+  captureTool.hidden=captureHidden||(/^https?:/i.test(centralUrl)&&!call('hasLatestCameraVideo'));
   if(!hidden&&window.nauticQuietMode&&force!==true)return;
   const tiles=[];
   const config=cameraConfig();
@@ -442,7 +434,7 @@
   };
   call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapHd,tiles,
    qualityButton:controlBounds(qualityTool),medallionButton:controlBounds(medallionTool),axisButton:controlBounds(axisTool),
-   ...Object.fromEntries(captureTools.map(tool=>[tool.id,controlBounds(tool)]))}));
+   captureButton:controlBounds(captureTool)}));
  }
  window.nauticEvery(()=>{numberButtons();refresh();previews();},800);
  window.nauticDashboardResume=()=>{if(window.nauticQuietMode){previews();return;}refresh();previews();};

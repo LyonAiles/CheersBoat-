@@ -313,10 +313,8 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 #mapCameraAxis {position:absolute;z-index:852;left:8px;bottom:56px;min-height:44px;padding:3px 8px;font-size:11px;color:#fff}
 #mapCameraAxis[hidden],#app.hide-mapCameraAxis #mapCameraAxis {display:none!important}
 
-#mapWrap :is(#mapCameraPhoto,#mapCameraRecord,#mapCameraLastVideo) {
- position:absolute;z-index:852;right:8px;min-height:36px;padding:3px 8px;font-size:11px;color:#fff;
+#mapWrap #mapCameraCaptureMenu {
+ position:absolute;z-index:852;right:8px;top:calc(var(--sondeur-toolbar-height, 36px) + 8px);
+ min-width:44px;min-height:36px;padding:3px 8px;font-size:16px;color:#fff;
 }
-#mapCameraPhoto {top:calc(var(--sondeur-toolbar-height, 36px) + 8px)}
-#mapCameraRecord {top:calc(var(--sondeur-toolbar-height, 36px) + 48px)}
-#mapCameraLastVideo {top:calc(var(--sondeur-toolbar-height, 36px) + 88px)}
-#mapWrap :is(#mapCameraPhoto,#mapCameraRecord,#mapCameraLastVideo)[hidden] {display:none!important}
+#mapWrap #mapCameraCaptureMenu[hidden] {display:none!important}

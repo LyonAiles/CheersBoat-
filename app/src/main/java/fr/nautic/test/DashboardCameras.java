@@ -24,7 +24,7 @@ final class DashboardCameras {
  float mapAlpha=1;
  TextView qualityButton,medallionButton,axisButton;
  private final DashboardRecording recording;
- private final Map<String,TextView> captureButtons=new LinkedHashMap<>();
+ private TextView captureButton;
  private FrameLayout playback;
  private ExoPlayer playbackPlayer;
 
@@ -369,9 +369,8 @@ final class DashboardCameras {
      "mapCameraMedallionToggle","Afficher ou masquer les médaillons");
    axisButton=updateMapButton(axisButton,data.optJSONObject("axisButton"),scale,
      "mapCameraAxis","Aligner ou rétablir l’orientation de l’objectif mobile");
-   updateCaptureButton(data,scale,"mapCameraPhoto","Prendre une photo");
-   updateCaptureButton(data,scale,"mapCameraRecord","Enregistrer une vidéo");
-   updateCaptureButton(data,scale,"mapCameraLastVideo","Lire la dernière vidéo");
+   captureButton=updateMapButton(captureButton,data.optJSONObject("captureButton"),scale,
+     "mapCameraCaptureMenu","Photo, vidéo et dernière vidéo");
    if(playback!=null){
     Tile central=tiles.get("mapCameraPreview");
     if(central==null||central.frame.getVisibility()!=View.VISIBLE)dismissPlayback();
@@ -403,11 +402,22 @@ final class DashboardCameras {
    }
   }catch(Exception ignored){}
  }
- private void updateCaptureButton(JSONObject data,double scale,String id,String label){
-  TextView button=updateMapButton(captureButtons.get(id),data.optJSONObject(id),scale,id,label);
-  if(button!=null)captureButtons.put(id,button);
+ private void openCaptureMenu(){
+  if(captureButton==null||!captureButton.isShown()||recording.active()||playback!=null)return;
+  android.widget.PopupMenu menu=new android.widget.PopupMenu(activity,captureButton,Gravity.END);
+  menu.getMenu().add(0,149,0,"Photo");
+  menu.getMenu().add(0,150,1,"Vidéo");
+  menu.getMenu().add(0,152,2,"Dernière vidéo").setEnabled(DashboardRecording.latest(activity)!=null);
+  menu.setOnMenuItemClickListener(item->{
+   menu.dismiss();
+   String action=item.getItemId()==149?"photo":item.getItemId()==150?"record":"play";
+   captureButton.post(()->captureAction(action));
+   return true;
+  });
+  menu.show();
  }
  void captureAction(String action){
+  if("menu".equals(action)){openCaptureMenu();return;}
   Tile central=tiles.get("mapCameraPreview");
   if(central==null||central.frame.getVisibility()!=View.VISIBLE)return;
   if("play".equals(action)){showLatestVideo(central);return;}
@@ -430,6 +440,7 @@ final class DashboardCameras {
   playback=new FrameLayout(activity);
   playback.setBackgroundColor(Color.BLACK);
   androidx.media3.ui.PlayerView view=new androidx.media3.ui.PlayerView(activity);
+  view.setUseController(false);
   playback.addView(view,new FrameLayout.LayoutParams(-1,-1));
   android.widget.Button close=new android.widget.Button(activity);
   close.setText("Retour direct");
@@ -471,7 +482,7 @@ final class DashboardCameras {
   button.setText(number.isEmpty()?label:label+" · "+number);
   button.setContentDescription(id.equals("mapCameraMedallionToggle")?
     (pressed?"Masquer les médaillons":"Afficher les médaillons"):description);
-  button.setTextSize(id.equals("mapCameraQuality")&&number.isEmpty()?14:11);
+  button.setTextSize(id.equals("mapCameraCaptureMenu")?16:id.equals("mapCameraQuality")&&number.isEmpty()?14:11);
   android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
   background.setColor(pressed?0xed1b6257:0xed092f43);
   background.setCornerRadius(8*activity.getResources().getDisplayMetrics().density);
