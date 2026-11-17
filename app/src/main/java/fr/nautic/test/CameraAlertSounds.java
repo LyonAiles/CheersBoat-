@@ -15,7 +15,7 @@ final class CameraAlertSounds {
   try{JSONObject all=new JSONObject(c.getSharedPreferences("nautic_settings",Context.MODE_PRIVATE).getString("nautic-extensions","{}"));JSONObject sounds=all.optJSONObject("alertSounds");return sounds==null?fallback:sounds.optString(watch,fallback);}catch(Exception e){return fallback;}
  }
  static int resource(String sound){
-  switch(sound){case "bell":return R.raw.alert_bell;case "warning":return R.raw.alert_warning;case "ding":return R.raw.camera42_ding;case "dingding":return R.raw.alert_dingding;case "horn":return R.raw.trematage_horn;default:return R.raw.camera42_ding;}
+  switch(sound){case "bell":return R.raw.alert_bell;case "double-bell":return R.raw.alert_double_bell;case "warning":return R.raw.alert_warning;case "ding":return R.raw.camera42_ding;case "dingding":return R.raw.alert_dingding;case "horn":return R.raw.trematage_horn;default:return R.raw.camera42_ding;}
  }
  private static void release(MediaPlayer current){if(player==current)player=null;try{current.release();}catch(Exception ignored){}}
  static void play(Context context,String watch,String preview){

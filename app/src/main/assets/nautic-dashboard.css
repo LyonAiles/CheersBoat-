@@ -20,7 +20,7 @@
 #app .camCard .camBody{position:relative;flex:1!important;min-height:0!important;width:100%;height:auto!important;border-radius:5px!important;overflow:hidden!important}
 #app .camCard .camBody>span{font-size:18px}
 #app #trematageCard{border-color:#658398!important}
-#app #trematageCard.trematage-active{border-color:#4be0b0!important}
+#app :is(#trematageCard,#cam2Card).trematage-active{border-color:#4be0b0!important}
 #app #trematageCard.trematage-alert{border-color:#ff2929!important;box-shadow:inset 0 0 0 2px #ff2929,0 0 8px #ff2929!important}
 #app #trematageState{flex:none;max-height:24px;overflow:hidden;font-size:10px;line-height:12px;text-align:center}
 @media(orientation:portrait){

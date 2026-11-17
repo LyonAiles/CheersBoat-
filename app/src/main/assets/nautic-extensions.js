@@ -24,6 +24,15 @@ const persist=()=>{try{
  try{localStorage.setItem('nautic-extensions',value)}catch(_){}
  return true;
 }catch(e){alert('Échec de mémorisation des paramètres : '+e.message);return false}};
+if(state.vehicleAlertsForBothWatches!==true){
+ state.alertTypes={
+  ...state.alertTypes,
+  '42':{...state.alertTypes?.['42'],vehicle:true},
+  '44':{...state.alertTypes?.['44'],vehicle:true},
+ };
+ state.vehicleAlertsForBothWatches=true;
+ persist();
+}
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const dialog=get('dialog');
 const css=document.createElement('style');css.textContent=`

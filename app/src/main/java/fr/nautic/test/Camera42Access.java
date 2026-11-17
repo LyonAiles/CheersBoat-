@@ -18,7 +18,7 @@ final class Camera42Access {
   if(host==null)throw new java.io.IOException("Configurer la caméra 42 dans Paramètres");
   p.edit().putBoolean("active",true).putLong("activationTime",System.currentTimeMillis()).remove("lastAlertTime").apply();
   try{Camera42Service.start(c,host,2,host+"|watch42");}catch(Exception e){p.edit().putBoolean("active",false).apply();throw e;}
-  ding(c);return "Veille activée";
+  CameraAlertSounds.play(c,"42","bell");return "Veille activée";
  }
  static String status(Context c){try{SharedPreferences p=prefs(c);return new JSONObject().put("active",p.getBoolean("active",false)).put("status",p.getString("watchStatus","")).toString();}catch(Exception e){return "{}";}}
 }
