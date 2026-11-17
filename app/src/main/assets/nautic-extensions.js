@@ -294,7 +294,7 @@ const dashboardButtons = [
  ['compass', '52 · Boussole'], ['mapLayers', '53 · Fond de carte'], ['mapRecenter', '54 · Recentrer'],
  ['mapZoomIn', '56 · Zoom avant'], ['mapZoomOut', '57 · Zoom arrière'],
  ['mapCameraOverlay', 'Caméras sur la carte'], ['mapCameraMedallions', '45 et 47 · Médaillons de la vue caméra centrale'],
- ['mapCameraQuality', 'Qualité vidéo sur la carte'],
+ ['mapCameraQuality', 'Qualité vidéo sur la carte'], ['mapCameraAxis', '148 · Alignement de la caméra centrale'],
  ['nauticWaterwayStatus', 'Ouvrages fluviaux'], ['nauticDestination', 'Destination'],
  ['sondeurReplay', '294 · Relecture du sondeur'], ['sondeurToggle', '297 · Sondeur'],
  ['sondeurPlay', 'Simulation du sondeur'], ['sondeurOptions', '299 · Réglages du sondeur']

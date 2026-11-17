@@ -32,6 +32,7 @@ final class TrematageAccess {
   if(store.armed()){session.deactivate();TrematageService.stop(c,key);return "Trématage désactivé · retour BASE demandé";}
   String other=prefs(c).getString("watchKey","");
   if(!other.isEmpty()&&!TrematageProfiles.sameCamera(other,key)&&prefs(c).getBoolean(other+".active",false))throw new java.io.IOException("Une position de retour est encore conservée pour "+other.substring(0,other.indexOf('|'))+" ; revenir depuis ses commandes");
+  if(CameraAxis.hasReturn(c,host))throw new java.io.IOException("Reviens à l’orientation précédente sur la vue 46 avant d’activer Trématage");
   session.activate();prefs(c).edit().putString("shortcutKey",key).putString("shortcutProfile",profile.getAttribute("token")).apply();
   TrematageService.start(c,host,index,key);TrematageFeedback.activated(c);return "Trématage activé";
  }

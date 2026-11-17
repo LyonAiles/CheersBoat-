@@ -38,7 +38,7 @@
    const iconScale=I.expression(Number(options.waterwayIconSize)||120);
    vector.addSource('nautic-works',{type:'geojson',data:worksData(),cluster:true,clusterRadius:48,clusterMaxZoom:13});
    vector.addLayer({id:'nautic-work-backings',type:'circle',source:'nautic-works',filter:['!', ['has','point_count']],paint:{'circle-radius':4,'circle-color':'#17608c','circle-stroke-color':'white','circle-stroke-width':1}});
-   vector.addLayer({id:'nautic-works',type:'symbol',source:'nautic-works',filter:['!', ['has','point_count']],layout:{'icon-image':['concat','nautic-',['get','category']],'icon-size':iconScale,'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport'}});
+   vector.addLayer({id:'nautic-works',type:'symbol',source:'nautic-works',filter:['!', ['has','point_count']],layout:{'icon-image':['get','icon'],'icon-size':iconScale,'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport'}});
    vector.addLayer({id:'nautic-work-clusters',type:'circle',source:'nautic-works',filter:['has','point_count'],paint:{'circle-radius':12,'circle-color':'#285b7b','circle-stroke-color':'white','circle-stroke-width':2}});
    vector.addLayer({id:'nautic-work-counts',type:'symbol',source:'nautic-works',filter:['has','point_count'],layout:{'text-field':['get','point_count_abbreviated'],'text-size':11,'text-allow-overlap':true,'text-rotation-alignment':'viewport'},paint:{'text-color':'white','text-halo-color':'#285b7b','text-halo-width':1}});
    vector.on('click','nautic-work-backings',e=>{if(!e.defaultPrevented)showItem(e.features?.[0]?.properties?.id);});
@@ -835,7 +835,44 @@
  renderTrip();
  updateAccessible();
  function routeData(){return {type:'FeatureCollection',features:points.length>1?[{type:'Feature',geometry:{type:'LineString',coordinates:points.map(p=>[p.lon,p.lat])},properties:{}}]:[]};}
- function worksData(){return {type:'FeatureCollection',features:mapWorks().map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{id:p.id,category:p.category||W.categoryOf(p.type)}}))};}
+ const pendingSignIcons=new WeakMap();
+ function signIconCode(item){
+  return item.category==='notice'&&item.notice.find(code=>Object.hasOwn(window.NauticSignImages||{},code));
+ }
+ function prepareVectorSignIcon(engine,code,id){
+  if(!engine)return;
+  let attempted=pendingSignIcons.get(engine);
+  if(!attempted){attempted=new Set();pendingSignIcons.set(engine,attempted);}
+  if(attempted.has(code))return;
+  attempted.add(code);
+  const image=new Image();
+  image.crossOrigin='anonymous';
+  image.onload=()=>{
+   if(vector!==engine||!engine.getSource('nautic-works'))return;
+   try{
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=80;
+    const context=canvas.getContext('2d');
+    const scale=76/Math.max(image.naturalWidth,image.naturalHeight);
+    const w=image.naturalWidth*scale,h=image.naturalHeight*scale;
+    context.drawImage(image,(80-w)/2,(80-h)/2,w,h);
+    engine.addImage(id,context.getImageData(0,0,80,80),{pixelRatio:2});
+    engine.getSource('nautic-works').setData(worksData());
+   }catch(_){/* Keep the generic marker if the image cannot be read. */}
+  };
+  image.src=window.NauticSignImages[code];
+ }
+ function worksData(){
+  return {type:'FeatureCollection',features:mapWorks().map(p=>{
+   const category=p.category||W.categoryOf(p.type),code=signIconCode(p);
+   let icon='nautic-'+category;
+   if(code){
+    const id='nautic-cevni-'+code;
+    if(vector?.hasImage(id))icon=id;
+    else prepareVectorSignIcon(vector,code,id);
+   }
+   return {type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{id:p.id,icon}};
+  })};
+ }
  function positionBoat(){const boat=$('mapBoat'),p=stableFix||latest;if(!boat||!p)return;if(!window.nauticMapFreePan){boat.style.setProperty('left','50%','important');boat.style.setProperty('top','66.666667%','important');return;}let q;if(active&&vector)q=vector.project([p.lon,p.lat]);else if(map){q=map.latLngToContainerPoint([p.lat,p.lon]);const r=$('map').getBoundingClientRect(),w=wrap.getBoundingClientRect();q={x:q.x+r.left-w.left,y:q.y+r.top-w.top};}if(q){const angle=active&&vector?(heading??0)-vector.getBearing():(heading??0);boat.style.transform=`translate(-50%,-50%) rotate(${angle}deg)`;boat.style.setProperty('left',q.x+'px','important');boat.style.setProperty('top',q.y+'px','important');}}
  window.nauticPositionBoat=positionBoat;window.addEventListener('nauticmapfollow',()=>{selectedWorkPoint=null;lastWorksCompute=0;lastCamera=null;sync();updateWorks();});
  window.nauticPreviewWorkSize=percent=>{options={...options,waterwayIconSize:percent};if(active&&vector?.getLayer('nautic-works'))vector.setLayoutProperty('nautic-works','icon-size',I.expression(percent));lastRender='';renderWorks();};
@@ -1047,7 +1084,7 @@
  };
  let legacyLayer=null;
  function classicMarkers(){const groups=new Map(),bounds=map.getBounds();for(const p of mapWorks()){if(!bounds.contains([p.lat,p.lon]))continue;const pixel=map.project([p.lat,p.lon],map.getZoom()),key=Math.floor(pixel.x/45)+','+Math.floor(pixel.y/45);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p);}
-  return [...groups.values()].map(group=>{const lat=group.reduce((s,p)=>s+p.lat,0)/group.length,lon=group.reduce((s,p)=>s+p.lon,0)/group.length,size=I.size(map.getZoom(),Number(options.waterwayIconSize)||120),type=group.length>1?'group':group[0].category||W.categoryOf(group[0].type);const icon=L.divIcon({className:'nautic-work-marker',html:I.svg(type)+(group.length>1?'<span>'+group.length+'</span>':''),iconSize:[size,size],iconAnchor:[size/2,size/2]});return L.marker([lat,lon],{icon}).on('click',()=>{if(group.length===1)showItem(group[0].id);else showList(group);});});
+  return [...groups.values()].map(group=>{const lat=group.reduce((s,p)=>s+p.lat,0)/group.length,lon=group.reduce((s,p)=>s+p.lon,0)/group.length,size=I.size(map.getZoom(),Number(options.waterwayIconSize)||120),type=group.length>1?'group':group[0].category||W.categoryOf(group[0].type);const code=group.length===1&&signIconCode(group[0]);const illustration=code?'<img class="nautic-work-sign" src="'+esc(window.NauticSignImages[code])+'" alt="" referrerpolicy="no-referrer" onload="this.previousElementSibling.hidden=true" onerror="this.hidden=true">':'';const icon=L.divIcon({className:'nautic-work-marker',html:I.svg(type)+illustration+(group.length>1?'<span>'+group.length+'</span>':''),iconSize:[size,size],iconAnchor:[size/2,size/2]});return L.marker([lat,lon],{icon}).on('click',()=>{if(group.length===1)showItem(group[0].id);else showList(group);});});
  }
  function renderWorks(){const key=JSON.stringify([active,options.waterwayWorks,options.waterwayIconSize,!active&&map?map.getBounds().toBBoxString():'',mapWorks().map(x=>x.id).sort()]);if(key===lastRender)return;lastRender=key;vector?.getSource('nautic-works')?.setData(worksData());if(legacyLayer&&map){map.removeLayer(legacyLayer);legacyLayer=null;}if(!active&&window.L&&map&&mapWorks().length)legacyLayer=L.layerGroup(classicMarkers()).addTo(map);}
 

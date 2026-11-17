@@ -22,7 +22,12 @@ final class DashboardCameras {
  final Map<String,Long> retryAt=new HashMap<>();
  int decoderBudget=4;
  float mapAlpha=1;
- TextView qualityButton,medallionButton;
+ TextView qualityButton,medallionButton,axisButton;
+ private final DashboardRecording recording;
+ private final Map<String,TextView> captureButtons=new LinkedHashMap<>();
+ private FrameLayout playback;
+ private ExoPlayer playbackPlayer;
+
  boolean adjustingMapAlpha;
  static boolean isMapView(String id){return id.startsWith("mapCamera");}
  static boolean isMedallion(String id){return id.equals("mapCameraPort")||id.equals("mapCameraStarboard");}
@@ -34,6 +39,8 @@ final class DashboardCameras {
  void suspend(){
   if(stopped||suspended)return;
   suspended=true;
+  if(recording.active())recording.stop(true,null);
+  dismissPlayback();
   freezeSources();
   for(Tile tile:tiles.values()){
    tile.garland.setPaused(true);
@@ -180,31 +187,40 @@ final class DashboardCameras {
   }
   void installTransparencyGesture(){
    frame.setOnTouchListener(new View.OnTouchListener(){
-    float startY,startAlpha;
-    boolean center,dragged;
+    float startX,startY,startAlpha;
+    boolean center,dragged,held;
+    final Runnable align=()->{
+     if(!frame.isShown())return;
+     held=true;
+     activity.dashboardClick(id,true);
+    };
     @Override public boolean onTouch(View view,MotionEvent event){
      switch(event.getActionMasked()){
       case MotionEvent.ACTION_DOWN:
        center=Math.abs(event.getX()-view.getWidth()/2f)<=view.getWidth()/6f;
+       startX=event.getRawX();
        startY=event.getRawY();
        startAlpha=mapAlpha;
        dragged=false;
+       held=false;
+       view.removeCallbacks(align);
+       view.postDelayed(align,600);
        return true;
       case MotionEvent.ACTION_MOVE:
+       if(held)return true;
        float delta=event.getRawY()-startY;
-       if(center&&(dragged||Math.abs(delta)>ViewConfiguration.get(activity).getScaledTouchSlop())){
+       int slop=ViewConfiguration.get(activity).getScaledTouchSlop();
+       if(Math.hypot(event.getRawX()-startX,delta)>slop)view.removeCallbacks(align);
+       if(center&&(dragged||Math.abs(delta)>slop)){
         dragged=true;
         adjustingMapAlpha=true;
         setMapAlpha(Math.max(.15f,Math.min(1f,startAlpha+delta/view.getHeight())));
        }
        return true;
       case MotionEvent.ACTION_UP:
-       if(!dragged)view.performClick();
-       // Keep the native and web previews at the same opacity.
-       if(dragged)activity.updateMapCameraAlpha(mapAlpha);
-       adjustingMapAlpha=false;
-       return true;
       case MotionEvent.ACTION_CANCEL:
+       view.removeCallbacks(align);
+       if(event.getActionMasked()==MotionEvent.ACTION_UP&&!dragged&&!held)view.performClick();
        if(dragged)activity.updateMapCameraAlpha(mapAlpha);
        adjustingMapAlpha=false;
        return true;
@@ -289,7 +305,7 @@ final class DashboardCameras {
   }
  }
  DashboardCameras(MainActivity activity,FrameLayout layer){
-  this.activity=activity;this.layer=layer;
+  this.activity=activity;this.layer=layer;recording=new DashboardRecording(activity);
   settings=activity.getSharedPreferences("nautic_settings",MainActivity.MODE_PRIVATE);
   for(int camera=1;camera<=3;camera++)crops[camera]=CameraCrop.read(settings.getString(CameraCrop.key(camera),""));
  }
@@ -298,7 +314,7 @@ final class DashboardCameras {
   for(Tile tile:tiles.values())if(tile.cropCamera==camera)tile.applyCrop();
  }
  void update(String json){
-  if(stopped||mapPaused||suspended)return;
+  if(stopped||mapPaused||suspended||recording.active())return;
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
    for(int camera=1;camera<=3;camera++)if(camera!=draggingCamera){
@@ -351,6 +367,17 @@ final class DashboardCameras {
      "mapCameraQuality","Qualité vidéo commune aux objectifs");
    medallionButton=updateMapButton(medallionButton,data.optJSONObject("medallionButton"),scale,
      "mapCameraMedallionToggle","Afficher ou masquer les médaillons");
+   axisButton=updateMapButton(axisButton,data.optJSONObject("axisButton"),scale,
+     "mapCameraAxis","Aligner ou rétablir l’orientation de l’objectif mobile");
+   updateCaptureButton(data,scale,"mapCameraPhoto","Prendre une photo");
+   updateCaptureButton(data,scale,"mapCameraRecord","Enregistrer une vidéo");
+   updateCaptureButton(data,scale,"mapCameraLastVideo","Lire la dernière vidéo");
+   if(playback!=null){
+    Tile central=tiles.get("mapCameraPreview");
+    if(central==null||central.frame.getVisibility()!=View.VISIBLE)dismissPlayback();
+    else{playback.setLayoutParams(new FrameLayout.LayoutParams((FrameLayout.LayoutParams)central.frame.getLayoutParams()));playback.bringToFront();}
+   }
+
 
    long now=System.currentTimeMillis();
    List<String> eligible=new ArrayList<>();String priority=null;
@@ -375,6 +402,57 @@ final class DashboardCameras {
     source.mirrors.clear();for(Tile t:e.getValue())if(t!=source.owner)source.mirrors.add(t);source.copy();
    }
   }catch(Exception ignored){}
+ }
+ private void updateCaptureButton(JSONObject data,double scale,String id,String label){
+  TextView button=updateMapButton(captureButtons.get(id),data.optJSONObject(id),scale,id,label);
+  if(button!=null)captureButtons.put(id,button);
+ }
+ void captureAction(String action){
+  Tile central=tiles.get("mapCameraPreview");
+  if(central==null||central.frame.getVisibility()!=View.VISIBLE)return;
+  if("play".equals(action)){showLatestVideo(central);return;}
+  if(playback!=null||recording.active())return;
+  Source source=central.source;
+  if(source==null)for(Source candidate:sources.values())if(candidate.mirrors.contains(central)){source=candidate;break;}
+  if(source==null||source.lastFrame==0||System.currentTimeMillis()-source.lastFrame>2500||!source.texture.isAvailable()){
+   Toast.makeText(activity,"Attends l’image en direct de la caméra",Toast.LENGTH_SHORT).show();return;
+  }
+  if("photo".equals(action))recording.photo(source.texture,source.videoRatio);
+  else if("record".equals(action)){
+   Source selected=source;
+   recording.start(selected.texture,selected.videoRatio,()->!selected.failed&&System.currentTimeMillis()-selected.lastFrame<3000);
+  }
+ }
+ private void showLatestVideo(Tile central){
+  java.io.File file=DashboardRecording.latest(activity);
+  if(file==null||recording.active())return;
+  dismissPlayback();
+  playback=new FrameLayout(activity);
+  playback.setBackgroundColor(Color.BLACK);
+  androidx.media3.ui.PlayerView view=new androidx.media3.ui.PlayerView(activity);
+  playback.addView(view,new FrameLayout.LayoutParams(-1,-1));
+  android.widget.Button close=new android.widget.Button(activity);
+  close.setText("Retour direct");
+  close.setOnClickListener(v->dismissPlayback());
+  playback.addView(close,new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT));
+  layer.addView(playback,new FrameLayout.LayoutParams((FrameLayout.LayoutParams)central.frame.getLayoutParams()));
+  playbackPlayer=new ExoPlayer.Builder(activity).build();
+  view.setPlayer(playbackPlayer);
+  playbackPlayer.addListener(new Player.Listener(){
+   @Override public void onPlayerError(PlaybackException error){
+    Toast.makeText(activity,"Lecture de la dernière vidéo impossible",Toast.LENGTH_SHORT).show();
+    dismissPlayback();
+   }
+  });
+  playbackPlayer.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)));
+  playbackPlayer.prepare();
+  playbackPlayer.play();
+ }
+ boolean dismissPlayback(){
+  if(playback==null)return false;
+  if(playbackPlayer!=null){playbackPlayer.release();playbackPlayer=null;}
+  layer.removeView(playback);playback=null;
+  return true;
  }
  TextView updateMapButton(TextView button,JSONObject bounds,double scale,String id,String description){
   if(bounds==null){
@@ -408,5 +486,5 @@ final class DashboardCameras {
   return button;
  }
  void refreshTile(String id){Iterator<Map.Entry<String,Source>> entries=sources.entrySet().iterator();while(entries.hasNext()){Map.Entry<String,Source> e=entries.next();Source source=e.getValue();boolean matches=source.owner.id.equals(id);for(Tile t:source.mirrors)matches|=t.id.equals(id);if(matches){source.close();entries.remove();retryAt.remove(e.getKey());}}}
- void close(){stopped=true;for(Source s:sources.values())s.close();sources.clear();layer.removeAllViews();tiles.clear();}
+ void close(){stopped=true;if(recording.active())recording.stop(true,null);dismissPlayback();for(Source s:sources.values())s.close();sources.clear();layer.removeAllViews();tiles.clear();}
 }

@@ -211,6 +211,26 @@ public class MainActivity extends Activity {
   @JavascriptInterface public String camera42Status(){return Camera42Access.status(MainActivity.this);}
   @JavascriptInterface public void toggleCamera42(){runOnUiThread(()->{try{js("nauticCamera42Result",Camera42Access.toggle(MainActivity.this));}catch(Exception e){js("nauticCamera42Result",e.getMessage());}});}
   @JavascriptInterface public String trematageStatus(){return TrematageAccess.status(MainActivity.this);}
+  @JavascriptInterface public boolean hasLatestCameraVideo(){return DashboardRecording.latest(MainActivity.this)!=null;}
+  @JavascriptInterface public void cameraCapture(String action){
+   runOnUiThread(()->{if(dashboardVisible&&dashboardCameras!=null)dashboardCameras.captureAction(action);});
+  }
+  @JavascriptInterface public boolean cameraAxisAligned(int index){
+   try{return index>=1&&index<=3&&CameraAxis.hasReturn(MainActivity.this,index);}
+   catch(Exception ignored){return false;}
+  }
+  @JavascriptInterface public void moveCameraAxis(int index,boolean restore){
+   if(index<1||index>3)return;
+   dashboardCommands.execute(()->{
+    String error="";
+    try{CameraAxis.move(MainActivity.this,index,restore);}
+    catch(Exception failure){error=failure.getMessage()==null?"Commande caméra impossible":failure.getMessage();}
+    if(!isDestroyed()){
+     if(!error.isEmpty())toast(error);
+     js("nauticCameraAxisResult",error);
+    }
+   });
+  }
   @JavascriptInterface public void toggleTrematage(){
    if(!trematageBusy.compareAndSet(false,true))return;
    dashboardCommands.execute(()->{try{String message=TrematageAccess.toggle(MainActivity.this);js("nauticTrematageResult",message);}catch(Exception e){js("nauticTrematageResult",e.getMessage());}finally{trematageBusy.set(false);}});
@@ -398,6 +418,6 @@ public class MainActivity extends Activity {
    if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)
     r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});else r.deny();}
  }
- @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
+ @Override public void onBackPressed(){if(dashboardCameras!=null&&dashboardCameras.dismissPlayback())return;if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
  @Override protected void onDestroy(){if(notesPad!=null)notesPad.destroy();dashboardCommands.shutdown();if(dashboardCameras!=null)dashboardCameras.close();if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
 }
