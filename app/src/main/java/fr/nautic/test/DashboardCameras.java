@@ -377,7 +377,7 @@ final class DashboardCameras {
    axisButton=updateMapButton(axisButton,data.optJSONObject("axisButton"),scale,
      "mapCameraAxis","Aligner ou rétablir l’orientation de l’objectif mobile");
    captureButton=updateMapButton(captureButton,data.optJSONObject("captureButton"),scale,
-     "mapCameraCaptureMenu","Photo, vidéo et dernière vidéo");
+     "mapCameraCaptureMenu","Photo, vidéo et captures");
    if(playback!=null){
     Tile central=tiles.get("mapCameraPreview");
     if(central==null||central.frame.getVisibility()!=View.VISIBLE)dismissPlayback();
@@ -415,9 +415,10 @@ final class DashboardCameras {
   menu.getMenu().add(0,149,0,"Photo");
   menu.getMenu().add(0,150,1,"Vidéo");
   menu.getMenu().add(0,152,2,"Dernière vidéo").setEnabled(DashboardRecording.latest(activity)!=null);
+  menu.getMenu().add(0,154,3,"Dossier des captures");
   menu.setOnMenuItemClickListener(item->{
    menu.dismiss();
-   String action=item.getItemId()==149?"photo":item.getItemId()==150?"record":"play";
+   String action=item.getItemId()==149?"photo":item.getItemId()==150?"record":item.getItemId()==154?"captures":"play";
    captureButton.post(()->captureAction(action));
    return true;
   });
@@ -427,6 +428,7 @@ final class DashboardCameras {
   if("menu".equals(action)){openCaptureMenu();return;}
   Tile central=tiles.get("mapCameraPreview");
   if(central==null||central.frame.getVisibility()!=View.VISIBLE)return;
+  if("captures".equals(action)){showCaptures(central);return;}
   if("play".equals(action)){showLatestVideo(central);return;}
   if(playback!=null||recording.active()||captureWait!=null)return;
   if(!"photo".equals(action)&&!"record".equals(action))return;
@@ -491,6 +493,61 @@ final class DashboardCameras {
   new android.app.AlertDialog.Builder(activity).setTitle("Dernier enregistrement")
    .setItems(new String[]{"Objectif fixe","Objectif mobile"},(dialog,index)->playVideo(central,files[index])).show();
  }
+ private void showCaptures(Tile central){
+  java.io.File[] files=DashboardRecording.captures(activity);
+  android.app.AlertDialog.Builder dialog=new android.app.AlertDialog.Builder(activity)
+   .setTitle("Dossier des captures").setNegativeButton("Fermer",null);
+  if(files.length==0){dialog.setMessage("Aucune photo ni vidéo enregistrée.").show();return;}
+  java.text.DateFormat date=java.text.DateFormat.getDateTimeInstance(
+   java.text.DateFormat.SHORT,java.text.DateFormat.MEDIUM,Locale.FRANCE);
+  String[] labels=new String[files.length];
+  for(int i=0;i<files.length;i++){
+   String name=files[i].getName();
+   String type=name.endsWith(".jpg")?"Photo":"Vidéo";
+   String lens=name.contains("-fixe.")?" · Fixe":name.contains("-mobile.")?" · Mobile":"";
+   labels[i]=type+lens+" · "+date.format(new Date(files[i].lastModified()));
+  }
+  dialog.setItems(labels,(opened,index)->{
+   showCaptureActions(central,files[index],labels[index]);
+  }).show();
+ }
+ private void showCaptureActions(Tile central,java.io.File file,String label){
+  new android.app.AlertDialog.Builder(activity).setTitle(label)
+   .setItems(new String[]{"Ouvrir","Déplacer","Supprimer"},(dialog,action)->{
+    switch(action){
+     case 0:
+      if(file.getName().endsWith(".mp4"))playVideo(central,file);
+      else showCapturePhoto(file,label);
+      break;
+     case 1:
+      activity.chooseCaptureDestination(file.getName());
+      break;
+     case 2:
+      new android.app.AlertDialog.Builder(activity).setTitle("Supprimer cette capture ?")
+       .setMessage(label).setNegativeButton("Annuler",(confirmation,button)->showCaptures(central))
+       .setPositiveButton("Supprimer",(confirmation,button)->{
+        if(!file.delete())Toast.makeText(activity,"Suppression impossible",Toast.LENGTH_SHORT).show();
+        showCaptures(central);
+       }).show();
+      break;
+    }
+   }).setNegativeButton("Retour",(dialog,button)->showCaptures(central)).show();
+ }
+ private void showCapturePhoto(java.io.File file,String title){
+  Bitmap photo=BitmapFactory.decodeFile(file.getAbsolutePath());
+  if(photo==null){
+   Toast.makeText(activity,"Ouverture de la photo impossible",Toast.LENGTH_SHORT).show();
+   return;
+  }
+  ImageView view=new ImageView(activity);
+  view.setAdjustViewBounds(true);
+  view.setScaleType(ImageView.ScaleType.FIT_CENTER);
+  view.setImageBitmap(photo);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(activity).setTitle(title)
+   .setView(view).setPositiveButton("Fermer",null).create();
+  dialog.setOnDismissListener(closed->{view.setImageDrawable(null);});
+  dialog.show();
+ }
  private void playVideo(Tile central,java.io.File file){
   dismissPlayback();
   playback=new FrameLayout(activity);
@@ -507,7 +564,7 @@ final class DashboardCameras {
   view.setPlayer(playbackPlayer);
   playbackPlayer.addListener(new Player.Listener(){
    @Override public void onPlayerError(PlaybackException error){
-    Toast.makeText(activity,"Lecture de la dernière vidéo impossible",Toast.LENGTH_SHORT).show();
+    Toast.makeText(activity,"Lecture de la vidéo impossible",Toast.LENGTH_SHORT).show();
     dismissPlayback();
    }
   });

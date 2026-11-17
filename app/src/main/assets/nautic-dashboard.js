@@ -151,7 +151,7 @@
  axisTool.onclick=openAxisMenu;
  const captureTool=document.createElement('button');
  captureTool.id='mapCameraCaptureMenu';captureTool.type='button';captureTool.hidden=true;
- captureTool.textContent='📷';captureTool.setAttribute('aria-label','Photo, vidéo et dernière vidéo');
+ captureTool.textContent='📷';captureTool.setAttribute('aria-label','Photo, vidéo et captures');
  captureTool.onclick=()=>call('cameraCapture','menu');
  $('mapWrap').append(mapCamera,qualityTool,medallionTool,axisTool,captureTool);
  function refreshAxis(){

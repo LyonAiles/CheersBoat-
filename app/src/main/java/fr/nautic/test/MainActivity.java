@@ -38,7 +38,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
 public class MainActivity extends Activity {
- private static final int PICK_PHONE=201, PICK_IMAGE=202, GPS=100, CAMERA=101, CALLS=103;
+ private static final int PICK_PHONE=201, PICK_IMAGE=202, MOVE_CAPTURE=203, GPS=100, CAMERA=101, CALLS=103;
+ private String captureToMove;
  private WebView web;
  private android.widget.FrameLayout dashboardLayer;
  private DashboardCameras dashboardCameras;
@@ -58,6 +59,7 @@ public class MainActivity extends Activity {
  @Override protected void onStop(){dashboardVisible=false;if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
+  if(state!=null)captureToMove=state.getString("captureToMove");
   if(RemoteTwinService.prefs(this).getBoolean("enabled",false))RemoteTwinService.apply(this);
   notesPad=new NotesPad(this,()->{dashboardVisible=true;js("nauticDashboardResume","");});
   getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -425,8 +427,52 @@ public class MainActivity extends Activity {
   }catch(Exception e){toast("Historique des appels inaccessible");}
   js("nauticPhoneCallHistory",out.toString());
  }
+ void chooseCaptureDestination(String name){
+  Intent picker=new Intent(Intent.ACTION_CREATE_DOCUMENT)
+   .addCategory(Intent.CATEGORY_OPENABLE)
+   .setType(name.endsWith(".jpg")?"image/jpeg":"video/mp4")
+   .putExtra(Intent.EXTRA_TITLE,name);
+  captureToMove=name;
+  try{startActivityForResult(picker,MOVE_CAPTURE);}
+  catch(ActivityNotFoundException e){captureToMove=null;toast("Sélecteur de fichiers indisponible");}
+ }
+ @Override protected void onSaveInstanceState(Bundle state){
+  super.onSaveInstanceState(state);
+  state.putString("captureToMove",captureToMove);
+ }
+ private void moveCapture(String name,Uri destination){
+  java.io.File source=DashboardRecording.findCapture(this,name);
+  if(source==null){toast("Capture introuvable");return;}
+  try{
+   try(InputStream input=new java.io.FileInputStream(source);
+       java.io.OutputStream output=getContentResolver().openOutputStream(destination,"wt")){
+    if(output==null)throw new java.io.IOException("Destination inaccessible");
+    byte[] buffer=new byte[65536];
+    long copied=0;
+    int read;
+    while((read=input.read(buffer))!=-1){output.write(buffer,0,read);copied+=read;}
+    if(copied!=source.length()||copied==0)throw new java.io.IOException("Copie incomplète");
+   }
+  }catch(java.io.IOException|RuntimeException e){
+   try{android.provider.DocumentsContract.deleteDocument(getContentResolver(),destination);}
+   catch(Exception ignored){}
+   toast("Déplacement impossible · original conservé");
+   return;
+  }
+  boolean moved=source.delete();
+  toast(moved?"Capture déplacée":"Capture copiée · original conservé");
+ }
  @Override protected void onActivityResult(int request,int result,Intent data){
   super.onActivityResult(request,result,data);
+  if(request==MOVE_CAPTURE){
+   String name=captureToMove;
+   captureToMove=null;
+   if(name!=null&&result==RESULT_OK&&data!=null&&data.getData()!=null){
+    Uri destination=data.getData();
+    dashboardCommands.execute(()->moveCapture(name,destination));
+   }
+   return;
+  }
   if(notesPad!=null&&notesPad.result(request,result,data))return;
   if(result!=RESULT_OK||data==null||data.getData()==null)return;
   if(request==PICK_PHONE){
