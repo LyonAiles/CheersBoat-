@@ -31,77 +31,114 @@ final class DashboardRecording {
  private final Handler handler=new Handler(Looper.getMainLooper());
  private final Paint paint=new Paint(Paint.FILTER_BITMAP_FLAG);
  private final Runnable tick=this::recordFrame;
- private MediaRecorder recorder;
+ private final Runnable finished;
+ private final java.util.List<Track> tracks=new java.util.ArrayList<>();
  private Dialog prompt;
  private TextView elapsed;
- private Surface encoder;
- private TextureView texture;
- private Bitmap bitmap;
- private File pending,output;
- private Rect frame;
  private long started;
- private int frames;
- private LiveFrame live;
 
- DashboardRecording(MainActivity activity){this.activity=activity;}
- boolean active(){return recorder!=null;}
+ DashboardRecording(MainActivity activity,Runnable finished){this.activity=activity;this.finished=finished;}
+ boolean active(){return !tracks.isEmpty();}
+ interface LiveFrame {boolean available();}
+ static final class Lens {
+  final String name;
+  final TextureView texture;
+  final float ratio;
+  final LiveFrame live;
+  Lens(String name,TextureView texture,float ratio,LiveFrame live){
+   this.name=name;this.texture=texture;this.ratio=ratio;this.live=live;
+  }
+ }
+ private static final class Track {
+  Lens lens;
+  MediaRecorder recorder;
+  Surface encoder;
+  Bitmap bitmap;
+  File pending,output;
+  Rect frame;
+  int frames;
+  boolean started;
+ }
 
  private static File directory(MainActivity activity){
   File dir=activity.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
   return dir==null?new File(activity.getFilesDir(),"captures"):dir;
  }
- static File latest(MainActivity activity){
-  File[] candidates=directory(activity).listFiles((dir,name)->name.startsWith("Nautic-")&&name.endsWith(".mp4"));
-  File latest=null;
-  if(candidates!=null)for(File file:candidates)
-   if(file.length()>0&&(latest==null||file.getName().compareTo(latest.getName())>0))latest=file;
-  return latest;
+ static File[] latestPair(MainActivity activity){
+  File[] files=directory(activity).listFiles((dir,name)->name.matches("Nautic-[0-9]+(?:-(?:fixe|mobile))?\\.mp4"));
+  if(files==null)return new File[0];
+  String latest="";
+  for(File file:files)if(file.length()>0&&session(file).compareTo(latest)>0)latest=session(file);
+  java.util.List<File> result=new java.util.ArrayList<>(2);
+  for(File file:files)if(file.length()>0&&session(file).equals(latest))result.add(file);
+  java.util.Collections.sort(result,(a,b)->a.getName().compareTo(b.getName()));
+  return result.toArray(new File[0]);
  }
- void photo(TextureView view,float ratio){
-  Bitmap image=null;
+ private static String session(File file){return file.getName().replaceFirst("(?:-fixe|-mobile)?\\.mp4$","");}
+ static File latest(MainActivity activity){
+  File[] files=latestPair(activity);
+  return files.length==0?null:files[0];
+ }
+ void photo(Lens... lenses){
+  java.util.List<File> written=new java.util.ArrayList<>();
+  java.util.List<Bitmap> images=new java.util.ArrayList<>();
   try{
    File dir=directory(activity);if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("Stockage indisponible");
-   int width=Math.max(2,Math.round(1280*Math.min(1,ratio)));
-   int height=Math.max(2,Math.round(1280*Math.min(1,1/ratio)));
-   image=view.getBitmap(width,height);
-   if(image==null)throw new IOException("Image indisponible");
-   File file=new File(dir,"Nautic-"+System.currentTimeMillis()+".jpg");
-   try(FileOutputStream stream=new FileOutputStream(file)){
-    if(!image.compress(Bitmap.CompressFormat.JPEG,94,stream))throw new IOException("Photo non enregistrée");
+   String prefix="Nautic-"+System.currentTimeMillis();
+   for(Lens lens:lenses){
+    if(!lens.live.available())throw new IOException("Flux "+lens.name+" indisponible");
+    int width=Math.max(2,Math.round(1280*Math.min(1,lens.ratio)));
+    int height=Math.max(2,Math.round(1280*Math.min(1,1/lens.ratio)));
+    Bitmap image=lens.texture.getBitmap(width,height);
+    if(image==null)throw new IOException("Image "+lens.name+" indisponible");
+    images.add(image);
    }
-   message("Photo enregistrée sur cet appareil");
-  }catch(Exception error){message(error.getMessage()==null?"Photo non enregistrée":error.getMessage());}
-  finally{if(image!=null)image.recycle();}
+   for(int i=0;i<lenses.length;i++){
+    File file=new File(dir,prefix+"-"+lenses[i].name+".jpg");
+    written.add(file);
+    try(FileOutputStream stream=new FileOutputStream(file)){
+     if(!images.get(i).compress(Bitmap.CompressFormat.JPEG,94,stream))throw new IOException("Photo non enregistrée");
+    }
+   }
+   message("Deux photos enregistrées · fixe et mobile");
+  }catch(Exception error){
+   for(File file:written)file.delete();
+   message(error.getMessage()==null?"Photos non enregistrées":error.getMessage());
+  }finally{for(Bitmap image:images)image.recycle();finished.run();}
  }
- interface LiveFrame {boolean available();}
- void start(TextureView view,float ratio,LiveFrame live){
+ void start(Lens... lenses){
   if(active())return;
   try{
    File dir=directory(activity);if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("Stockage indisponible");
-   output=new File(dir,"Nautic-"+System.currentTimeMillis()+".mp4");
-   pending=File.createTempFile("nautic-video-",".pending",dir);
-   texture=view;this.live=live;
-   int width=Math.max(16,Math.round(720*Math.min(1,ratio)/16)*16);
-   int height=Math.max(16,Math.round(720*Math.min(1,1/ratio)/16)*16);
-   frame=new Rect(0,0,width,height);
-   bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);
-   recorder=new MediaRecorder();
-   recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
-   recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-   recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-   recorder.setVideoSize(width,height);
-   recorder.setVideoFrameRate(12);
-   recorder.setVideoEncodingBitRate(2_000_000);
-   recorder.setOutputFile(pending.getAbsolutePath());
-   recorder.setOnErrorListener((r,what,extra)->{if(r==recorder)stop(false,"Erreur d’enregistrement vidéo");});
-   recorder.prepare();
-   encoder=recorder.getSurface();
-   recorder.start();
-   frames=0;
+   String prefix="Nautic-"+System.currentTimeMillis();
+   for(Lens lens:lenses){
+    Track track=new Track();
+    track.lens=lens;tracks.add(track);
+    track.output=new File(dir,prefix+"-"+lens.name+".mp4");
+    track.pending=File.createTempFile("nautic-video-",".pending",dir);
+    int width=Math.max(16,Math.round(720*Math.min(1,lens.ratio)/16)*16);
+    int height=Math.max(16,Math.round(720*Math.min(1,1/lens.ratio)/16)*16);
+    track.frame=new Rect(0,0,width,height);
+    track.bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);
+    track.recorder=new MediaRecorder();
+    track.recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+    track.recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+    track.recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+    track.recorder.setVideoSize(width,height);
+    track.recorder.setVideoFrameRate(12);
+    track.recorder.setVideoEncodingBitRate(2_000_000);
+    track.recorder.setOutputFile(track.pending.getAbsolutePath());
+    track.recorder.setOnErrorListener((r,what,extra)->{
+     if(tracks.contains(track))stop(true,"Erreur sur le flux "+track.lens.name);
+    });
+    track.recorder.prepare();
+    track.encoder=track.recorder.getSurface();
+   }
+   for(Track track:tracks){track.recorder.start();track.started=true;}
    started=SystemClock.elapsedRealtime();
    showPrompt();
    handler.post(tick);
-  }catch(Exception error){stop(false,"Impossible de démarrer l’enregistrement");}
+  }catch(Exception error){stop(false,"Impossible de démarrer les deux enregistrements");}
  }
  private void showPrompt(){
   prompt=new Dialog(activity);
@@ -113,12 +150,13 @@ final class DashboardRecording {
   int gap=Math.round(8*activity.getResources().getDisplayMetrics().density);
   strip.setPadding(gap*2,gap,gap,gap);
   GradientDrawable background=new GradientDrawable();
-  background.setColor(0xff092f43);
+  background.setColor(0xffb80f23);
   background.setCornerRadius(gap*1.5f);
   strip.setBackground(background);
   elapsed=new TextView(activity);
   elapsed.setTextColor(Color.WHITE);
-  elapsed.setText("● REC  00:00");
+  elapsed.setTypeface(null,android.graphics.Typeface.BOLD);
+  elapsed.setText("● REC ×2  00:00");
   elapsed.setPadding(0,0,gap,0);
   strip.addView(elapsed);
   Button stop=new Button(activity);
@@ -139,36 +177,46 @@ final class DashboardRecording {
  private void recordFrame(){
   if(!active())return;
   try{
-   if(!live.available()||!texture.isAvailable()||texture.getBitmap(bitmap)==null){stop(true,"Flux caméra interrompu");return;}
-   Canvas canvas=encoder.lockHardwareCanvas();
-   try{
-    canvas.drawColor(Color.BLACK);
-    canvas.drawBitmap(bitmap,null,frame,paint);
-   }finally{encoder.unlockCanvasAndPost(canvas);}
-   frames++;
+   for(Track track:tracks){
+    Lens lens=track.lens;
+    if(!lens.live.available()||!lens.texture.isAvailable()||lens.texture.getBitmap(track.bitmap)==null){
+     stop(true,"Flux "+lens.name+" interrompu");return;
+    }
+    Canvas canvas=track.encoder.lockHardwareCanvas();
+    try{
+     canvas.drawColor(Color.BLACK);
+     canvas.drawBitmap(track.bitmap,null,track.frame,paint);
+    }finally{track.encoder.unlockCanvasAndPost(canvas);}
+    track.frames++;
+   }
    long seconds=(SystemClock.elapsedRealtime()-started)/1000;
-   elapsed.setText(String.format(Locale.FRANCE,"● REC  %02d:%02d",seconds/60,seconds%60));
+   elapsed.setText(String.format(Locale.FRANCE,"● REC ×2  %02d:%02d",seconds/60,seconds%60));
    handler.postDelayed(tick,83);
-  }catch(RuntimeException error){stop(true,"Capture du flux interrompue");}
+  }catch(RuntimeException error){stop(true,"Capture interrompue");}
  }
  void stop(boolean save,String status){
   handler.removeCallbacks(tick);
-  boolean completed=false;
-  if(recorder!=null){
-   try{recorder.stop();completed=save&&frames>0;}
-   catch(RuntimeException ignored){}
-   finally{recorder.release();recorder=null;}
+  int kept=0;
+  for(Track track:tracks){
+   boolean completed=false;
+   if(track.recorder!=null){
+    try{if(track.started){track.recorder.stop();completed=save&&track.frames>0;}}
+    catch(RuntimeException ignored){}
+    finally{track.recorder.release();}
+   }
+   if(track.encoder!=null)track.encoder.release();
+   if(track.bitmap!=null)track.bitmap.recycle();
+   if(track.pending!=null){
+    if(completed&&track.pending.length()>0&&track.pending.renameTo(track.output))kept++;
+    else track.pending.delete();
+   }
   }
-  if(encoder!=null){encoder.release();encoder=null;}
-  if(bitmap!=null){bitmap.recycle();bitmap=null;}
-  texture=null;live=null;
+  tracks.clear();
   if(prompt!=null){prompt.dismiss();prompt=null;elapsed=null;}
-  boolean kept=completed&&pending!=null&&pending.length()>0&&pending.renameTo(output);
-  if(pending!=null&&!kept)pending.delete();
-  pending=null;output=null;frames=0;
-  if(status!=null)message(kept?status+" · vidéo enregistrée":status);
-  else if(save)message(kept?"Vidéo enregistrée sur cet appareil":"Vidéo trop courte ou indisponible");
-  activity.refreshDashboardVideos();
+  String result=kept==2?"Deux vidéos enregistrées · fixe et mobile":kept==1?"Une seule vidéo récupérée":"Aucune vidéo enregistrée";
+  if(status!=null)message(status+(save?" · "+result:""));
+  else if(save)message(result);
+  finished.run();
  }
  private void message(String text){Toast.makeText(activity,text,Toast.LENGTH_LONG).show();}
 }

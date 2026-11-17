@@ -1,6 +1,13 @@
 package fr.nautic.test;
 
 final class CameraStreamPolicy {
+ static String otherLens(String path){
+  if("/stream1".equals(path))return "/stream6";
+  if("/stream2".equals(path))return "/stream7";
+  if("/stream6".equals(path))return "/stream1";
+  if("/stream7".equals(path))return "/stream2";
+  return null;
+ }
  static boolean hasTapoQualityPair(String path){
   return "/stream1".equals(path)||"/stream2".equals(path)||"/stream6".equals(path)||"/stream7".equals(path);
  }

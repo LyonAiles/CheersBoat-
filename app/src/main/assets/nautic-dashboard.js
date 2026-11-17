@@ -146,30 +146,21 @@
  medallionTool.onclick=()=>window.nauticToggleMapMedallions();
  const axisTool=document.createElement('button');
  axisTool.type='button';axisTool.id='mapCameraAxis';axisTool.hidden=true;
- let axisBusy=false;
- axisTool.onclick=()=>{const feed=feeds[centerView];moveAxis(!!call('cameraAxisAligned',feed.camera));};
+ axisTool.textContent='Axe';
+ axisTool.setAttribute('aria-label','Positions de l’objectif mobile');
+ axisTool.onclick=openAxisMenu;
  const captureTool=document.createElement('button');
  captureTool.id='mapCameraCaptureMenu';captureTool.type='button';captureTool.hidden=true;
  captureTool.textContent='📷';captureTool.setAttribute('aria-label','Photo, vidéo et dernière vidéo');
  captureTool.onclick=()=>call('cameraCapture','menu');
  $('mapWrap').append(mapCamera,qualityTool,medallionTool,axisTool,captureTool);
  function refreshAxis(){
-  const feed=feeds[centerView],back=bridge?.cameraAxisAligned&&call('cameraAxisAligned',feed.camera);
-  axisTool.hidden=!bridge?.moveCameraAxis||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
-  axisTool.textContent=axisBusy?'…':back?'Retour axe':'Axe';
-  axisTool.setAttribute('aria-pressed',String(!!back));
-  axisTool.setAttribute('aria-label',back?'Rétablir l’orientation précédente':'Aligner l’objectif mobile');
+  axisTool.hidden=!bridge?.openCameraOrientations||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
  }
- function moveAxis(restore){
-  if(axisBusy||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden'))return;
-  const feed=feeds[centerView];
-  if(!bridge?.moveCameraAxis)return;
-  axisBusy=true;refreshAxis();previews(true);
-  call('moveCameraAxis',feed.camera,restore);
+ function openAxisMenu(){
+  if(!mapCamera.hidden&&!mapCamera.classList.contains('nautic-hidden'))
+   call('openCameraOrientations',feeds[centerView].camera);
  }
- window.nauticCameraAxisResult=()=>{
-  axisBusy=false;refreshAxis();previews(true);
- };
  let mapCameraAlpha=1;
  function cameraConfig(){
   try{return JSON.parse(call('readSetting','nautic-v04')||localStorage.getItem('nautic-v04')||'{}');}
@@ -253,7 +244,7 @@
    center:Math.abs(e.clientX-bounds.left-bounds.width/2)<=bounds.width/6};
   center.setPointerCapture(e.pointerId);
   cancelAxisHold();
-  axisHold=setTimeout(()=>{axisPressed=true;moveAxis(false);},600);
+  axisHold=setTimeout(()=>{axisPressed=true;openAxisMenu();},600);
  };
  center.onpointermove=e=>{
   if(drag?.id!==e.pointerId||axisPressed)return;
@@ -282,7 +273,7 @@
   if(settings)new MutationObserver(previews).observe(settings,{attributes:true,attributeFilter:['hidden']});
  });
  window.nauticDashboardClick=id=>{if(id===qualityTool.id||id===medallionTool.id||id===axisTool.id||id===captureTool.id)$(id).click();else if(id===centerView)switchMapCamera();else if(mapViews.includes(id))activateMapView(id);else if(id==='trematagePreview')trematage.click();else $(id.replace('Body','Card'))?.click();};
- window.nauticDashboardHold=id=>{if(id===centerView)moveAxis(false);else if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
+ window.nauticDashboardHold=id=>{if(id===centerView)openAxisMenu();else if(id==='trematagePreview')call('openTrematageCamera');else $(id.replace('Body','Card'))?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));};
  const clampCrop=value=>Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
  const cropKey=camera=>'nautic-camera-crop-'+camera;
  const liveCrops=new Map();

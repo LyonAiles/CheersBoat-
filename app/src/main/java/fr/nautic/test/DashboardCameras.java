@@ -27,6 +27,9 @@ final class DashboardCameras {
  private TextView captureButton;
  private FrameLayout playback;
  private ExoPlayer playbackPlayer;
+ private Source captureAuxiliary;
+ private Runnable captureWait;
+
 
  boolean adjustingMapAlpha;
  static boolean isMapView(String id){return id.startsWith("mapCamera");}
@@ -40,6 +43,7 @@ final class DashboardCameras {
   if(stopped||suspended)return;
   suspended=true;
   if(recording.active())recording.stop(true,null);
+  else clearCaptureAuxiliary();
   dismissPlayback();
   freezeSources();
   for(Tile tile:tiles.values()){
@@ -63,7 +67,7 @@ final class DashboardCameras {
  }
  void pauseForMap(boolean paused){
   if(mapPaused==paused)return;mapPaused=paused;
-  if(paused){freezeSources();for(Tile tile:tiles.values())if(tile.snapshot==null)tile.message.setText("Image figée · carte");}
+  if(paused){if(recording.active())recording.stop(true,"Flux mis en pause");else clearCaptureAuxiliary();freezeSources();for(Tile tile:tiles.values())if(tile.snapshot==null)tile.message.setText("Image figée · carte");}
   for(Tile tile:tiles.values()){tile.garland.setPaused(paused);if(paused)tile.beacon.clearAnimation();else if(tile.alarm)tile.alarm=false;}
  }
 
@@ -247,12 +251,12 @@ final class DashboardCameras {
   }
  }
  class Source{
-  final ExoPlayer player;final TextureView texture;final Tile owner;final List<Tile> mirrors=new ArrayList<>();
+  final String uri;final ExoPlayer player;final TextureView texture;final Tile owner;final List<Tile> mirrors=new ArrayList<>();
   float videoRatio=16f/9f;
   volatile long lastFrame=0;
   final long created=System.currentTimeMillis();
   boolean failed=false;
-  Source(String uri,Tile owner){this.owner=owner;texture=new TextureView(activity);owner.frame.addView(texture,0,new FrameLayout.LayoutParams(-1,-1));
+  Source(String uri,Tile owner){this.uri=uri;this.owner=owner;texture=new TextureView(activity);owner.frame.addView(texture,0,new FrameLayout.LayoutParams(-1,-1));
    owner.source=this;owner.applyCrop();
    player=new ExoPlayer.Builder(activity,new DefaultRenderersFactory(activity).setEnableDecoderFallback(true)).build();player.setVolume(0);player.setVideoTextureView(texture);
    player.setVideoFrameMetadataListener((presentationTimeUs,releaseTimeNs,format,mediaFormat)->lastFrame=System.currentTimeMillis());
@@ -305,7 +309,7 @@ final class DashboardCameras {
   }
  }
  DashboardCameras(MainActivity activity,FrameLayout layer){
-  this.activity=activity;this.layer=layer;recording=new DashboardRecording(activity);
+  this.activity=activity;this.layer=layer;recording=new DashboardRecording(activity,()->{clearCaptureAuxiliary();activity.refreshDashboardVideos();});
   settings=activity.getSharedPreferences("nautic_settings",MainActivity.MODE_PRIVATE);
   for(int camera=1;camera<=3;camera++)crops[camera]=CameraCrop.read(settings.getString(CameraCrop.key(camera),""));
  }
@@ -314,7 +318,7 @@ final class DashboardCameras {
   for(Tile tile:tiles.values())if(tile.cropCamera==camera)tile.applyCrop();
  }
  void update(String json){
-  if(stopped||mapPaused||suspended||recording.active())return;
+  if(stopped||mapPaused||suspended||recording.active()||captureWait!=null)return;
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
    for(int camera=1;camera<=3;camera++)if(camera!=draggingCamera){
@@ -403,7 +407,7 @@ final class DashboardCameras {
   }catch(Exception ignored){}
  }
  private void openCaptureMenu(){
-  if(captureButton==null||!captureButton.isShown()||recording.active()||playback!=null)return;
+  if(captureButton==null||!captureButton.isShown()||recording.active()||captureWait!=null||playback!=null)return;
   android.widget.PopupMenu menu=new android.widget.PopupMenu(activity,captureButton,Gravity.END);
   menu.getMenu().add(0,149,0,"Photo");
   menu.getMenu().add(0,150,1,"Vidéo");
@@ -421,21 +425,70 @@ final class DashboardCameras {
   Tile central=tiles.get("mapCameraPreview");
   if(central==null||central.frame.getVisibility()!=View.VISIBLE)return;
   if("play".equals(action)){showLatestVideo(central);return;}
-  if(playback!=null||recording.active())return;
+  if(playback!=null||recording.active()||captureWait!=null)return;
+  if(!"photo".equals(action)&&!"record".equals(action))return;
   Source source=central.source;
   if(source==null)for(Source candidate:sources.values())if(candidate.mirrors.contains(central)){source=candidate;break;}
-  if(source==null||source.lastFrame==0||System.currentTimeMillis()-source.lastFrame>2500||!source.texture.isAvailable()){
+  if(!live(source)){
    Toast.makeText(activity,"Attends l’image en direct de la caméra",Toast.LENGTH_SHORT).show();return;
   }
-  if("photo".equals(action))recording.photo(source.texture,source.videoRatio);
-  else if("record".equals(action)){
-   Source selected=source;
-   recording.start(selected.texture,selected.videoRatio,()->!selected.failed&&System.currentTimeMillis()-selected.lastFrame<3000);
+  String path=Uri.parse(source.uri).getPath();
+  String secondPath=CameraStreamPolicy.otherLens(path);
+  if(secondPath==null){
+   Toast.makeText(activity,"La capture double nécessite les deux flux RTSP de la Tapo",Toast.LENGTH_LONG).show();return;
+  }
+  String otherUri=source.uri.substring(0,source.uri.length()-path.length())+secondPath;
+  Source other=sources.get(otherUri);
+  if(other==null||other.failed){
+   Tile auxiliary=new Tile("mapCameraCaptureAux");
+   FrameLayout.LayoutParams bounds=new FrameLayout.LayoutParams(320,180);
+   bounds.leftMargin=central.frame.getLeft();bounds.topMargin=central.frame.getTop();
+   layer.removeView(auxiliary.frame);
+   layer.addView(auxiliary.frame,0,bounds);
+   auxiliary.frame.setAlpha(.01f);
+   try{other=captureAuxiliary=new Source(otherUri,auxiliary);}
+   catch(RuntimeException failure){layer.removeView(auxiliary.frame);Toast.makeText(activity,"Second objectif indisponible",Toast.LENGTH_LONG).show();return;}
+  }
+  boolean mobile=path.equals("/stream6")||path.equals("/stream7");
+  Source fixed=mobile?other:source,moving=mobile?source:other;
+  long timeout=android.os.SystemClock.elapsedRealtime()+12000;
+  captureWait=new Runnable(){
+   @Override public void run(){
+    if(live(fixed)&&live(moving)){
+     captureWait=null;
+     DashboardRecording.Lens first=new DashboardRecording.Lens("fixe",fixed.texture,fixed.videoRatio,()->live(fixed));
+     DashboardRecording.Lens second=new DashboardRecording.Lens("mobile",moving.texture,moving.videoRatio,()->live(moving));
+     if("photo".equals(action))recording.photo(first,second);
+     else recording.start(first,second);
+     return;
+    }
+    if(fixed.failed||moving.failed||android.os.SystemClock.elapsedRealtime()>=timeout){
+     clearCaptureAuxiliary();
+     Toast.makeText(activity,"Capture annulée · les deux objectifs doivent être en direct",Toast.LENGTH_LONG).show();
+    }else layer.postDelayed(this,100);
+   }
+  };
+  if(!live(other))Toast.makeText(activity,"Ouverture du second objectif…",Toast.LENGTH_SHORT).show();
+  captureWait.run();
+ }
+ private boolean live(Source source){
+  return source!=null&&!source.failed&&source.lastFrame>0&&System.currentTimeMillis()-source.lastFrame<3000&&source.texture.isAvailable();
+ }
+ private void clearCaptureAuxiliary(){
+  if(captureWait!=null){layer.removeCallbacks(captureWait);captureWait=null;}
+  if(captureAuxiliary!=null){
+   Source auxiliary=captureAuxiliary;captureAuxiliary=null;
+   auxiliary.close();layer.removeView(auxiliary.owner.frame);
   }
  }
  private void showLatestVideo(Tile central){
-  java.io.File file=DashboardRecording.latest(activity);
-  if(file==null||recording.active())return;
+  java.io.File[] files=DashboardRecording.latestPair(activity);
+  if(files.length==0||recording.active()||captureWait!=null)return;
+  if(files.length==1){playVideo(central,files[0]);return;}
+  new android.app.AlertDialog.Builder(activity).setTitle("Dernier enregistrement")
+   .setItems(new String[]{"Objectif fixe","Objectif mobile"},(dialog,index)->playVideo(central,files[index])).show();
+ }
+ private void playVideo(Tile central,java.io.File file){
   dismissPlayback();
   playback=new FrameLayout(activity);
   playback.setBackgroundColor(Color.BLACK);
@@ -497,5 +550,5 @@ final class DashboardCameras {
   return button;
  }
  void refreshTile(String id){Iterator<Map.Entry<String,Source>> entries=sources.entrySet().iterator();while(entries.hasNext()){Map.Entry<String,Source> e=entries.next();Source source=e.getValue();boolean matches=source.owner.id.equals(id);for(Tile t:source.mirrors)matches|=t.id.equals(id);if(matches){source.close();entries.remove();retryAt.remove(e.getKey());}}}
- void close(){stopped=true;if(recording.active())recording.stop(true,null);dismissPlayback();for(Source s:sources.values())s.close();sources.clear();layer.removeAllViews();tiles.clear();}
+ void close(){stopped=true;if(recording.active())recording.stop(true,null);else clearCaptureAuxiliary();dismissPlayback();for(Source s:sources.values())s.close();sources.clear();layer.removeAllViews();tiles.clear();}
 }

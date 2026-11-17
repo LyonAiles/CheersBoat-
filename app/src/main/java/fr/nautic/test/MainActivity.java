@@ -109,39 +109,52 @@ public class MainActivity extends Activity {
   String escaped=org.json.JSONObject.quote(value==null?"":value);
   runOnUiThread(()->web.evaluateJavascript("window."+name+" && window."+name+"("+escaped+")",null));
  }
- private void requestCameraAxis(int index,boolean restore,boolean calibrate){
+ private boolean cameraOrientationPending;
+ private void requestCameraOrientation(int index,String direction){
+  if(cameraOrientationPending)return;
+  cameraOrientationPending=true;
+  toast("Orientation · "+direction+"…");
   dashboardCommands.execute(()->{
-   try{
-    CameraAxis.move(this,index,restore,calibrate);
-    if(!isDestroyed())toast(calibrate?"Axe 46 mémorisé":restore?"Retour à l’orientation précédente demandé":"Alignement demandé à la caméra");
-   }catch(CameraAxis.MissingAxis missing){
-    runOnUiThread(()->{
-     if(isDestroyed()||isFinishing())return;
-     new AlertDialog.Builder(this).setTitle("Position Axe 46 introuvable")
-      .setMessage("Place l’objectif motorisé dans l’axe de l’objectif fixe, puis mémorise cette orientation ici.")
-      .setPositiveButton("Mémoriser l’axe actuel",(dialog,which)->requestCameraAxis(index,false,true))
-      .setNeutralButton("Orienter la caméra",(dialog,which)->openAxisControls(index))
-      .setNegativeButton("Fermer",null).show();
-    });
-   }catch(Exception failure){
-    runOnUiThread(()->{
-     if(isDestroyed()||isFinishing())return;
-     new AlertDialog.Builder(this).setTitle("Commande axe 46")
-      .setMessage(failure.getMessage()==null?"Commande ONVIF impossible.":failure.getMessage())
-      .setPositiveButton("Fermer",null).show();
-    });
-   }finally{if(!isDestroyed())js("nauticCameraAxisResult","");}
+   String failure=null;
+   try{CameraAxis.move(this,index,direction);}
+   catch(Exception error){failure=error.getMessage()==null?"Commande ONVIF impossible.":error.getMessage();}
+   String result=failure;
+   runOnUiThread(()->{
+    cameraOrientationPending=false;
+    if(isDestroyed()||isFinishing())return;
+    if(result==null)toast("Position demandée · "+direction);
+    else new AlertDialog.Builder(this).setTitle("Orientation de la caméra")
+      .setMessage(result).setPositiveButton("Fermer",null).show();
+   });
   });
  }
- private void openAxisControls(int index){
+ private void showCameraOrientations(int index){
+  if(cameraOrientationPending||isFinishing())return;
+  android.widget.LinearLayout menu=new android.widget.LinearLayout(this);
+  menu.setOrientation(android.widget.LinearLayout.VERTICAL);
+  int padding=Math.round(12*getResources().getDisplayMetrics().density);
+  menu.setPadding(padding,padding,padding,padding);
+  AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Orientation de la caméra").setView(menu).create();
+  addOrientationRow(menu,dialog,index,new String[]{"▲"},new String[]{"PROUE"});
+  addOrientationRow(menu,dialog,index,new String[]{"◀","▶"},new String[]{"BÂBORD","TRIBORD"});
+  addOrientationRow(menu,dialog,index,new String[]{"BASE","▼"},new String[]{"BASE","TREMATAGE"});
   try{
-   String address=TrematageAccess.address(this,index);
-   if(!address.startsWith("rtsp://")){toast("Configure la caméra RTSP dans Paramètres");return;}
-   Intent intent=new Intent(this,CameraActivity.class);
-   intent.putExtra("url",address);intent.putExtra("cameraIndex",index);
-   intent.putExtra("mobileOnly",true);intent.putExtra("autoControls",true);
-   startActivity(intent);
-  }catch(Exception error){toast("Commandes de la caméra indisponibles");}
+   if(CameraAxis.hasReturn(this,index))addOrientationRow(menu,dialog,index,
+     new String[]{"Retour précédent"},new String[]{"RETOUR"});
+  }catch(Exception ignored){}
+  dialog.show();
+ }
+ private void addOrientationRow(android.widget.LinearLayout menu,AlertDialog dialog,int index,String[] labels,String[] directions){
+  android.widget.LinearLayout row=new android.widget.LinearLayout(this);
+  for(int i=0;i<labels.length;i++){
+   android.widget.Button button=new android.widget.Button(this);
+   button.setText(labels[i]);
+   String direction=directions[i];
+   button.setContentDescription(direction.equals("TREMATAGE")?"Trématage":direction);
+   button.setOnClickListener(view->{dialog.dismiss();requestCameraOrientation(index,direction);});
+   row.addView(button,new android.widget.LinearLayout.LayoutParams(0,-2,1));
+  }
+  menu.addView(row);
  }
  private void composeSondeurMail(String recipient, String subject, String body, Bitmap image) {
   js("nauticSondeurCaptureDone", "");
@@ -250,13 +263,8 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void cameraCapture(String action){
    runOnUiThread(()->{if(dashboardVisible&&dashboardCameras!=null)dashboardCameras.captureAction(action);});
   }
-  @JavascriptInterface public boolean cameraAxisAligned(int index){
-   try{return index>=1&&index<=3&&CameraAxis.hasReturn(MainActivity.this,index);}
-   catch(Exception ignored){return false;}
-  }
-  @JavascriptInterface public void moveCameraAxis(int index,boolean restore){
-   if(index<1||index>3)return;
-   requestCameraAxis(index,restore,false);
+  @JavascriptInterface public void openCameraOrientations(int index){
+   if(index>=1&&index<=3)runOnUiThread(()->showCameraOrientations(index));
   }
   @JavascriptInterface public void toggleTrematage(){
    if(!trematageBusy.compareAndSet(false,true))return;
