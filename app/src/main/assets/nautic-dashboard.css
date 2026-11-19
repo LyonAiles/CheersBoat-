@@ -318,3 +318,6 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
  min-width:44px;min-height:36px;padding:3px 8px;font-size:16px;color:#fff;
 }
 #mapWrap #mapCameraCaptureMenu[hidden] {display:none!important}
+
+/* The wind widget describes the GPS boat location, not the explored map area. */
+html.nautic-map-exploring #windWidget{display:none!important}

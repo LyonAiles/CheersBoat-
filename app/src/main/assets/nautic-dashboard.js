@@ -448,7 +448,7 @@
    captureButton:controlBounds(captureTool)}));
  }
  window.nauticEvery(()=>{numberButtons();refresh();previews();},800);
- window.nauticDashboardResume=()=>{if(window.nauticQuietMode){previews();return;}refresh();previews();};
+ window.nauticDashboardResume=()=>{if(window.nauticDataUpdating)return;if(window.nauticQuietMode){previews();return;}refresh();previews();};
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.nauticDashboardResume();else{freezeHttpPreviews();previews();}});window.addEventListener('resize',previews);
  new MutationObserver(previews).observe($('dialog'),{attributes:true,attributeFilter:['open']});
  numberButtons();refresh();previews();setTimeout(previews,200);setTimeout(previews,600);

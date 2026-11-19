@@ -110,7 +110,7 @@
   selectedWorkPoint={lat:c.lat,lon:c.lng};lastQuery=0;lastWorksCompute=0;
   if(cache)cache={...cache,time:0};
   refreshWorks.disabled=true;refreshWorks.textContent='…';
-  try{await Promise.allSettled([updateWorks(true),updateSigns(true)]);}
+  try{await updateWorks(true);if(!native?.syncNavigationTile)await updateSigns(true);}
   finally{refreshWorks.disabled=false;refreshWorks.textContent='↻';}
  };
 
@@ -325,6 +325,7 @@
   return notices.relevant(trip,liveNotices,noticeDay);
  }
  function checkNavigationNotices(force=false){
+  if(window.nauticDataUpdating)return;
   checkRouteImpacts(force);
   const trips=displayed.length?displayed:[routeState];
   if(!native?.checkNavigationNotices||noticePending||(!force&&Date.now()-lastNoticeCheck<20*60*1000)||
@@ -954,8 +955,9 @@
    .filter(item=>item.distance<=radius).sort((a,b)=>a.distance-b.distance):W.nearby(data,p,radius,null,true);
   return items.filter(item=>item.category!=='notice'&&options.waterwayTypes?.[item.category||W.categoryOf(item.type)]!==false);
  }
- function query(p,r){
-  const area=`(around:${r},${p.lat},${p.lon})`,local=`(around:${Math.min(r,11500)},${p.lat},${p.lon})`,chosen=new Set(selectedSignature().split(',')),parts=[];
+ function query(p,r,all=false){
+  const area=`(around:${r},${p.lat},${p.lon})`,local=`(around:${Math.min(r,11500)},${p.lat},${p.lon})`,chosen=new Set(all?W.categories.map(([key])=>key):selectedSignature().split(',')),parts=[];
+  if(all)parts.push(`nwr[\"seamark:type\"=notice]${area};nwr[\"seamark:notice:category\"]${area};`);
   if(chosen.has('lock'))parts.push(`nwr[waterway=lock_gate]${area};way[waterway][lock=yes]${area};`);
   if(chosen.has('port'))parts.push(`nwr[leisure=marina]${area};nwr[harbour~"^(yes|marina)$"]${area};nwr[industrial=port]${area};nwr["seamark:type"=harbour]${area};`);
   if(chosen.has('halt'))parts.push(`nwr[mooring][mooring!~"^(no|private)$"]${area};`);
@@ -994,6 +996,49 @@
   }
   throw Error(errors.join(' / '));
  }
+ const tileRequests=new Map();let tileSequence=0;
+ window.nauticNavigationTileResult=raw=>{
+  let result;try{result=JSON.parse(raw);}catch(_){return;}
+  const pending=tileRequests.get(result.request);if(!pending)return;
+  tileRequests.delete(result.request);clearTimeout(pending.timer);
+  if(result.error){const error=Error(result.error);error.retryAt=result.retryAt;pending.reject(error);}else pending.resolve(result);
+ };
+ function fetchTile(tile,force){return new Promise((resolve,reject)=>{
+  const request=++tileSequence,timer=setTimeout(()=>{tileRequests.delete(request);reject(Error('mise à jour interrompue · reprise au prochain essai'));},95000);
+  tileRequests.set(request,{resolve,reject,timer});
+  try{native.syncNavigationTile(request,tile.id,query(tile,tile.radius,true).replace('[timeout:45]','[timeout:18]'),force);}
+  catch(error){clearTimeout(timer);tileRequests.delete(request);reject(error);}
+ });}
+ async function updateLocalWorks(area,force){
+  const D=window.NauticLocalData,plan=D.tiles(area.p,Math.min(area.radius,8000));
+  const pendingKey='nautic-local-data-pending';
+  let pending;try{pending=JSON.parse(native?.readSetting(pendingKey)||localStorage.getItem(pendingKey)||'null');}catch(_){}
+  if(!force&&Array.isArray(pending)&&pending.some(tile=>plan.some(current=>current.id===tile.id)))plan.splice(0,plan.length,...pending.slice(0,9));
+  const savePending=rows=>{const raw=JSON.stringify(rows);try{native?.writeSetting(pendingKey,raw);}catch(_){}try{localStorage.setItem(pendingKey,raw);}catch(_){}};
+  savePending(plan);
+  let remaining=[...plan];const collected=new Map();
+  // Render every saved lot first, even if it now needs an update.
+  const read=id=>{try{return JSON.parse(native.readNavigationTile(id)||'null');}catch(_){return null;}};
+  function install(entry){
+   if(!entry||!Array.isArray(entry.elements))return;
+   collected.set(entry.id,entry);data=W.parse([...collected.values()].flatMap(row=>row.elements));
+   lastList=visibleWorks(workArea());lastRender='';renderWorks();
+   const bounds=signArea();if(bounds&&!signButton.hidden){displaySigns({items:data.items.filter(p=>p.category==='notice')},bounds);signButton.textContent='Panneaux locaux · '+signs.length;}
+  }
+  for(const tile of plan)install(read(tile.id));
+  window.nauticSetDataUpdating?.(true);
+  try{
+   await D.sync({plan,force,read,fetch:fetchTile,
+    checkpoint:id=>{remaining=remaining.filter(tile=>tile.id!==id);savePending(remaining);},
+    progress:step=>{if(step.entry)install(step.entry);notice(`Base locale · ${step.done}/${step.total} · ${step.source} · aperçus caméra suspendus`);},
+    delay:()=>new Promise(resolve=>setTimeout(resolve,5500))});
+   cache={center:area.p,radius:Math.min(area.radius,8000),signature:selectedSignature(),time:Date.now(),elements:[...collected.values()].flatMap(row=>row.elements)};
+   notice(`Base locale actualisée · ${lastList.length} ouvrages · zone limitée à ${plan.length} lots`);
+  }catch(error){
+   workNoticeUntil=Math.max(Date.now()+120000,Number(error.retryAt)||0);
+   notice('Mise à jour en attente · '+error.message+' · lots validés conservés');
+  }finally{window.nauticSetDataUpdating?.(false);}
+ }
  async function updateWorks(force=false){
   if(busy){if(force){await worksTask;return updateWorks(true);}return;}
   if(!force&&Date.now()<workNoticeUntil)return;
@@ -1006,6 +1051,10 @@
   const now=Date.now(),usable=cache&&cache.signature===signature&&W.distance(cache.center,p)+radius<=cache.radius+1000;
   if(!force&&usable&&now-cache.time<86400000){notice(`Ouvrages · ${lastList.length} · ${radius/1000} km · cache`);return;}
   if(!force&&now-lastQuery<(selectedWorkPoint?15000:120000))return;
+  if(native?.syncNavigationTile&&window.NauticLocalData){
+   busy=true;lastQuery=now;
+   worksTask=updateLocalWorks(area,force).finally(()=>{busy=false;});return worksTask;
+  }
   busy=true;lastQuery=now;notice('Actualisation des ouvrages… · données précédentes conservées');
   worksTask=(async()=>{
    try{
@@ -1100,6 +1149,7 @@
   throw Error([...new Set(errors)].join(' / '));
  }
  function updateSigns(force=false){
+  if(window.nauticDataUpdating)return;
   const area=signArea();
   if(signButton.hidden||!area)return;
   if(isIdfView(area)){

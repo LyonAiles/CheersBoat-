@@ -496,6 +496,8 @@ function settingsDialog(){
  <h3>Tableau de bord</h3>${dashboardButtons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <h3>Navigation</h3>${field('Seuil de déplacement confirmé (m)','settingMove',state.moveThreshold,'number')}${field('Arrêt prolongé (minutes)','settingStop',state.stopMinutes,'number')}
  <h3>Carte et ouvrages fluviaux</h3>
+ <label>Base partagée de navigation (adresse HTTPS, facultative)<input type="url" id="settingNavigationBase" value="${esc(native?.readSetting('nautic-data-base-url')||'')}" placeholder="https://…/navigation"></label>
+ <p class="muted">Les lots sont conservés sur cet appareil. Sans base partagée configurée : recherche externe, une zone à la fois. Les informations VNF actuelles restent à revérifier.</p>
  <label>Moteur de carte<select class="nautic-select" id="settingMapEngine"><option value="vector" ${(state.mapEngine||'vector')==='vector'?'selected':''}>MapLibre · libellés horizontaux</option><option value="legacy" ${state.mapEngine==='legacy'?'selected':''}>Carte classique · retour arrière</option></select></label>
  <p class="muted">MapLibre utilise le fond vectoriel OpenFreeMap. Si le chargement ou WebGL échoue, retour automatique à la carte classique. Les réglages classiques sont conservés.</p>
  <label class="settingRow"><input type="checkbox" id="settingWaterwayWorks" ${state.waterwayWorks===false?'':'checked'}><span>Afficher les ouvrages fluviaux OpenStreetMap</span></label>
@@ -630,6 +632,8 @@ function settingsDialog(){
   state.waterwayWorks=get('settingWaterwayWorks').checked;
   state.waterwayRadius=Math.max(1,Math.min(100,Number(get('settingWaterwayRadius').value)||5))*1000;
   state.waterwayIconSize=Number(get('settingWaterwayIconSize').value)||120;
+  const dataBase=get('settingNavigationBase').value.trim();
+  nativeCall('writeSetting','nautic-data-base-url',/^https:\/\//i.test(dataBase)?dataBase:'');
   state.waterwayTypes={};dialog.querySelectorAll('[data-waterway-type]').forEach(e=>{state.waterwayTypes[e.dataset.waterwayType]=e.checked;});
   state.alertSounds={};dialog.querySelectorAll('[data-alert-sound]').forEach(e=>{state.alertSounds[e.dataset.alertSound]=e.value;});
   state.alertTypes={};

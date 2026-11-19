@@ -235,6 +235,38 @@ public class MainActivity extends Activity {
     }catch(org.json.JSONException ignored){}
    },"nautic-map-city").start();
   }
+  @JavascriptInterface public String readNavigationTile(String key){
+   try{org.json.JSONObject entry=NavigationStore.get(MainActivity.this).read(key);return entry==null?"":entry.toString();}
+   catch(Exception error){return "";}
+  }
+  @JavascriptInterface public void syncNavigationTile(int request,String key,String query,boolean force){
+   new Thread(()->{
+    try{
+     org.json.JSONObject result=new org.json.JSONObject().put("request",request);
+     try{
+      if(!key.matches("fr-[0-9]+-[0-9]+"))throw new java.io.IOException("zone invalide");
+      android.content.SharedPreferences syncPrefs=getSharedPreferences("nautic_settings",MODE_PRIVATE);
+      NauticSigns.retryAt=Math.max(NauticSigns.retryAt,syncPrefs.getLong("nautic-data-retry-at",0));
+      NavigationStore store=NavigationStore.get(MainActivity.this);
+      org.json.JSONObject entry=store.read(key);long now=System.currentTimeMillis();String source="locale";
+      if(force||entry==null||now-entry.optLong("updated",0)>7L*86400000){
+       String base=getSharedPreferences("nautic_settings",MODE_PRIVATE).getString("nautic-data-base-url","");
+       org.json.JSONObject shared=null;
+       try{shared=NavigationStore.shared(base,key);}catch(Exception ignored){}
+       if(shared!=null&&now-shared.optLong("updated",0)<=7L*86400000){entry=shared;source="base réseau";}
+       else{entry=new org.json.JSONObject().put("id",key).put("updated",now).put("elements",NauticSigns.lookupQuery(query));source="recherche externe";}
+       store.save(key,entry);
+      }
+      result.put("entry",entry).put("source",source);
+      syncPrefs.edit().putLong("nautic-data-retry-at",NauticSigns.retryAt).apply();
+     }catch(Exception error){
+      getSharedPreferences("nautic_settings",MODE_PRIVATE).edit().putLong("nautic-data-retry-at",NauticSigns.retryAt).apply();
+      result.put("retryAt",NauticSigns.retryAt).put("error",error.getMessage()==null?"mise à jour interrompue":error.getMessage());
+     }
+     if(!isDestroyed())js("nauticNavigationTileResult",result.toString());
+    }catch(org.json.JSONException ignored){}
+   },"nautic-local-data").start();
+  }
   @JavascriptInterface public void searchMapWorks(int request,String query){
    new Thread(()->{
     try{

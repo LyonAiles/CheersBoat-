@@ -234,6 +234,7 @@ function onPos(result){
 function startGps(){if(watchId!==null)return;if(!navigator.geolocation){$('connection').textContent='GPS non pris en charge';return}$('connection').textContent='Recherche GPS…';watchId=navigator.geolocation.watchPosition(onPos,e=>{$('connection').textContent='GPS : '+e.message}, {enableHighAccuracy:true,maximumAge:1000,timeout:20000})}
 const weatherIcon=code=>code===0?'☀️':code<=2?'🌤️':code===3?'☁️':code<=48?'🌫️':code<=67?'🌧️':code<=77?'❄️':code<=82?'🌦️':code<=86?'🌨️':'⛈️';
 async function loadWeather(){
+ if(window.nauticDataUpdating)return;
  if(!latest||windBusy)return;windBusy=true;
  try{
   const requestedLocation={lat:latest.lat,lon:latest.lon};

@@ -29,16 +29,25 @@ final class NauticSigns {
   return lookupQuery(query);
  }
 
- static JSONArray lookupQuery(String query) throws IOException {
+ static volatile long retryAt=0;
+ private static int failures=0;
+ static synchronized JSONArray lookupQuery(String query) throws IOException {
+  if(System.currentTimeMillis()<retryAt)throw new IOException("pause serveur jusqu’à "+new java.text.SimpleDateFormat("HH:mm:ss",java.util.Locale.FRANCE).format(new java.util.Date(retryAt)));
   if(query==null||query.length()>16000||!query.startsWith("[out:json]"))throw new IOException("requête invalide");
   byte[] payload=("data="+URLEncoder.encode(query,"UTF-8")).getBytes(StandardCharsets.UTF_8);
   Set<String> errors=new LinkedHashSet<>();
   for(String endpoint:ENDPOINTS){
-   try{return request(endpoint,payload);}
+   try{JSONArray result=request(endpoint,payload);failures=0;retryAt=System.currentTimeMillis()+5000;return result;}
    catch(SocketTimeoutException error){errors.add("délai réseau dépassé");}
-   catch(Exception error){errors.add(error instanceof IOException&&error.getMessage()!=null
+   catch(Exception error){
+    if(error.getMessage()!=null&&error.getMessage().startsWith("HTTP 429")){
+     failures=Math.min(5,failures+1);retryAt=Math.max(retryAt,System.currentTimeMillis()+Math.min(1800000,60000L*(1L<<failures)));
+     throw new IOException("HTTP 429 · pause serveur, reprise ultérieure");
+    }
+    errors.add(error instanceof IOException&&error.getMessage()!=null
      &&error.getMessage().startsWith("HTTP ")?error.getMessage():"connexion ou réponse invalide");}
   }
+  retryAt=System.currentTimeMillis()+60000;
   throw new IOException(android.text.TextUtils.join(" / ",errors));
  }
 
@@ -55,6 +64,12 @@ final class NauticSigns {
    connection.setFixedLengthStreamingMode(payload.length);
    try(OutputStream output=connection.getOutputStream()){output.write(payload);}
    int status=connection.getResponseCode();
+   if(status==429){
+    String retry=connection.getHeaderField("Retry-After");
+    try{retryAt=Math.max(retryAt,System.currentTimeMillis()+Long.parseLong(retry)*1000L);}catch(Exception ignored){
+     try{retryAt=Math.max(retryAt,new java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz",java.util.Locale.US).parse(retry).getTime());}catch(Exception ignoredDate){}
+    }
+   }
    if(status!=200)throw new IOException("HTTP "+status);
    try(InputStream input=connection.getInputStream();ByteArrayOutputStream body=new ByteArrayOutputStream()){
     byte[] buffer=new byte[8192];
