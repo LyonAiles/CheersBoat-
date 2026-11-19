@@ -88,7 +88,10 @@
   const s=JSON.parse(call('trematageStatus')||'{}');
   trematage.classList.toggle('trematage-active',!!s.active);trematage.setAttribute('aria-pressed',String(!!s.active));
   $('trematageIndicator').textContent=s.active?'●':'○';
-  if(Number(s.alertTime)>lastAlert){lastAlert=Number(s.alertTime);if(Date.now()-lastAlert<30000)alarmUntil=lastAlert+30000;}
+  if(Number(s.alertTime)>lastAlert){
+   lastAlert=Number(s.alertTime);
+   if(Date.now()-lastAlert<30000){alarmUntil=lastAlert+30000;showTrematageCamera(s.index);}
+  }
   activationUntil=Number(s.activationTime||0)+4000;
   trematage.classList.toggle('trematage-alert',Date.now()<alarmUntil||(s.active&&Date.now()<activationUntil));
   $('trematageState').textContent=pending?'Positionnement…':Date.now()<alarmUntil?(s.alert||'⚠'):Date.now()<resultUntil?resultText:s.active?'↶ BASE':'▶ Activer';
@@ -99,7 +102,12 @@
  trematage.oncontextmenu=e=>e.preventDefault();
  trematage.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();trematage.click();}};
  window.nauticTrematageResult=message=>{pending=false;resultText=message||'';resultUntil=Date.now()+7000;refresh();previews();};
- window.nauticTrematageAlert=()=>{alarmUntil=Date.now()+30000;refresh();};
+ window.nauticTrematageAlert=()=>{
+  alarmUntil=Date.now()+30000;
+  refresh();
+  const status=JSON.parse(call('trematageStatus')||'{}');
+  showTrematageCamera(status.index);
+ };
  const mapCamera=document.createElement('div');
  mapCamera.hidden=true;
  const leftMedallion='mapCameraPort', centerView='mapCameraPreview', rightMedallion='mapCameraStarboard';
@@ -201,6 +209,16 @@
   if(!swappedMedallion)return;
   [feeds[centerView],feeds[swappedMedallion]]=[feeds[swappedMedallion],feeds[centerView]];
   swappedMedallion=null;
+ }
+ function showTrematageCamera(index){
+  restoreMedallion();
+  const camera=Number(index);
+  feeds[centerView]={camera:[1,2,3].includes(camera)?camera:1,lens:1};
+  mapCamera.hidden=false;
+  mapCamera.classList.remove('nautic-hidden');
+  speedCard.setAttribute('aria-pressed','true');
+  refreshMapViews();
+  previews(true);
  }
  function activateMapView(id){
   if(mapCamera.hidden||mapCamera.classList.contains('nautic-hidden'))return;

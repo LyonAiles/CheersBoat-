@@ -60,11 +60,11 @@ final class DashboardRecording {
   boolean started;
  }
 
- private static File directory(MainActivity activity){
+ static File directory(android.content.Context activity){
   File dir=activity.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
   return dir==null?new File(activity.getFilesDir(),"captures"):dir;
  }
- static File[] captures(MainActivity activity){
+ static File[] captures(android.content.Context activity){
   File[] files=directory(activity).listFiles(file->file.isFile()&&file.length()>0
    &&file.getName().matches("Nautic-[0-9]+(?:-(?:fixe|mobile))?\\.(?:jpg|mp4)"));
   if(files==null)return new File[0];
@@ -72,7 +72,7 @@ final class DashboardRecording {
    .thenComparing(File::getName));
   return files;
  }
- static File findCapture(MainActivity activity,String name){
+ static File findCapture(android.content.Context activity,String name){
   for(File file:captures(activity))if(file.getName().equals(name))return file;
   return null;
  }

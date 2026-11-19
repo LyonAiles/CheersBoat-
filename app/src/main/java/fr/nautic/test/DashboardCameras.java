@@ -75,6 +75,8 @@ final class DashboardCameras {
   final String id;final FrameLayout frame;final ImageView mirror;final TextView message,banner,footer,beacon;
   boolean alarm=false,active=false;
   int displayedCamera=0,displayedLens=0,cropCamera=0;
+  Runnable cancelCenterGestures=()->{};
+  float centralZoom=1,focusX=.5f,focusY=.5f;
   Bitmap snapshot;
   Source source;
   TextView refresh;
@@ -134,20 +136,21 @@ final class DashboardCameras {
    int width=frame.getWidth(),height=frame.getHeight();
    if(width<=0||height<=0)return;
    CameraCrop crop=CameraCrop.supported(cropCamera)?crops[cropCamera]:CameraCrop.CENTER;
-   float zoom=isMedallion(id)?1.15f:1f;
+   float zoom=isMedallion(id)?1.15f:centralZoom;
+   boolean magnified=id.equals("mapCameraPreview")&&centralZoom>1;
    if(source!=null){
     float ratio=source.videoRatio/((float)width/height);
     float sx=Math.max(1,ratio)*zoom,sy=Math.max(1,1/ratio)*zoom;
     source.texture.setScaleX(sx);source.texture.setScaleY(sy);
-    source.texture.setTranslationX(crop.translateX(width*(sx-1)));
-    source.texture.setTranslationY(crop.translateY(height*(sy-1)));
+    source.texture.setTranslationX(magnified?(0.5f-focusX)*width*(sx-1):crop.translateX(width*(sx-1)));
+    source.texture.setTranslationY(magnified?(0.5f-focusY)*height*(sy-1):crop.translateY(height*(sy-1)));
    }
    if(snapshot!=null){
     float scale=Math.max((float)width/snapshot.getWidth(),(float)height/snapshot.getHeight())*zoom;
     float extraX=snapshot.getWidth()*scale-width,extraY=snapshot.getHeight()*scale-height;
     Matrix matrix=new Matrix();
     matrix.setScale(scale,scale);
-    matrix.postTranslate(-extraX/2+crop.translateX(extraX),-extraY/2+crop.translateY(extraY));
+    matrix.postTranslate(-extraX/2+(magnified?(.5f-focusX)*extraX:crop.translateX(extraX)),-extraY/2+(magnified?(.5f-focusY)*extraY:crop.translateY(extraY)));
     mirror.setImageMatrix(matrix);
    }
   }
@@ -195,31 +198,47 @@ final class DashboardCameras {
   void installTransparencyGesture(){
    frame.setOnTouchListener(new View.OnTouchListener(){
     float startX,startY,startAlpha;
-    boolean center,dragged,held;
+    boolean center,dragged,held,multi,second;
+    long lastTap;
+    float tapX,tapY;
+    final Runnable click=()->{if(frame.isShown())frame.performClick();};
     final Runnable align=()->{
-     if(!frame.isShown())return;
-     held=true;
+     if(!frame.isShown()||multi)return;
+     frame.removeCallbacks(click);lastTap=0;held=true;
      activity.dashboardClick(id,true);
     };
+    {cancelCenterGestures=()->{frame.removeCallbacks(click);frame.removeCallbacks(align);lastTap=0;held=true;multi=true;adjustingMapAlpha=false;};}
+    final ScaleGestureDetector pinch=new ScaleGestureDetector(activity,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
+     @Override public boolean onScale(ScaleGestureDetector detector){
+      centralZoom=Math.max(1f,Math.min(6f,centralZoom*detector.getScaleFactor()));
+      focusX=Math.max(0,Math.min(1,detector.getFocusX()/Math.max(1,frame.getWidth())));
+      focusY=Math.max(0,Math.min(1,detector.getFocusY()/Math.max(1,frame.getHeight())));
+      applyCrop();return true;
+     }
+    });
     @Override public boolean onTouch(View view,MotionEvent event){
+     if(event.getActionMasked()==MotionEvent.ACTION_POINTER_DOWN){
+      multi=true;view.removeCallbacks(align);view.removeCallbacks(click);lastTap=0;
+      adjustingMapAlpha=false;setMapAlpha(startAlpha);
+     }
+     pinch.onTouchEvent(event);
      switch(event.getActionMasked()){
       case MotionEvent.ACTION_DOWN:
+       second=lastTap>0&&event.getEventTime()-lastTap<=ViewConfiguration.getDoubleTapTimeout()
+        &&Math.hypot(event.getX()-tapX,event.getY()-tapY)<ViewConfiguration.get(activity).getScaledDoubleTapSlop();
+       if(second)view.removeCallbacks(click);
        center=Math.abs(event.getX()-view.getWidth()/2f)<=view.getWidth()/6f;
-       startX=event.getRawX();
-       startY=event.getRawY();
-       startAlpha=mapAlpha;
-       dragged=false;
-       held=false;
-       view.removeCallbacks(align);
-       view.postDelayed(align,600);
-       return true;
+       startX=event.getRawX();startY=event.getRawY();startAlpha=mapAlpha;
+       dragged=false;held=false;multi=false;
+       view.removeCallbacks(align);view.postDelayed(align,600);return true;
       case MotionEvent.ACTION_MOVE:
-       if(held)return true;
+       if(held||multi)return true;
        float delta=event.getRawY()-startY;
        int slop=ViewConfiguration.get(activity).getScaledTouchSlop();
-       if(Math.hypot(event.getRawX()-startX,delta)>slop)view.removeCallbacks(align);
-       if(center&&(dragged||Math.abs(delta)>slop)){
-        dragged=true;
+       if(Math.hypot(event.getRawX()-startX,delta)>slop){
+        view.removeCallbacks(align);view.removeCallbacks(click);lastTap=0;dragged=true;
+       }
+       if(center&&dragged){
         adjustingMapAlpha=true;
         setMapAlpha(Math.max(.15f,Math.min(1f,startAlpha+delta/view.getHeight())));
        }
@@ -227,10 +246,17 @@ final class DashboardCameras {
       case MotionEvent.ACTION_UP:
       case MotionEvent.ACTION_CANCEL:
        view.removeCallbacks(align);
-       if(event.getActionMasked()==MotionEvent.ACTION_UP&&!dragged&&!held)view.performClick();
-       if(dragged)activity.updateMapCameraAlpha(mapAlpha);
-       adjustingMapAlpha=false;
-       return true;
+       if(event.getActionMasked()==MotionEvent.ACTION_UP&&!dragged&&!held&&!multi){
+        if(second){
+         lastTap=0;centralZoom=centralZoom>1?1:2.5f;
+         focusX=event.getX()/Math.max(1,view.getWidth());focusY=event.getY()/Math.max(1,view.getHeight());applyCrop();
+        }else{
+         lastTap=event.getEventTime();tapX=event.getX();tapY=event.getY();
+         view.postDelayed(click,ViewConfiguration.getDoubleTapTimeout());
+        }
+       }else{view.removeCallbacks(click);lastTap=0;}
+       if(dragged&&!multi)activity.updateMapCameraAlpha(mapAlpha);
+       adjustingMapAlpha=false;return true;
       default:return true;
      }
     }
@@ -345,6 +371,7 @@ final class DashboardCameras {
     if(inMap){
      if(index<1||index>3)continue;
      if(tile.displayedCamera!=index||tile.displayedLens!=lens){
+      tile.cancelCenterGestures.run();tile.centralZoom=1;tile.focusX=.5f;tile.focusY=.5f;tile.applyCrop();
       changedFeeds.add(tile);tile.displayedCamera=index;tile.displayedLens=lens;
      }
      String number=item.optString("number","");
@@ -495,21 +522,109 @@ final class DashboardCameras {
  }
  private void showCaptures(Tile central){
   java.io.File[] files=DashboardRecording.captures(activity);
-  android.app.AlertDialog.Builder dialog=new android.app.AlertDialog.Builder(activity)
-   .setTitle("Dossier des captures").setNegativeButton("Fermer",null);
-  if(files.length==0){dialog.setMessage("Aucune photo ni vidéo enregistrée.").show();return;}
+  Set<java.io.File> selected=new LinkedHashSet<>();
+  android.util.LruCache<java.io.File,Bitmap> thumbnails=new android.util.LruCache<>(32);
   java.text.DateFormat date=java.text.DateFormat.getDateTimeInstance(
    java.text.DateFormat.SHORT,java.text.DateFormat.MEDIUM,Locale.FRANCE);
-  String[] labels=new String[files.length];
-  for(int i=0;i<files.length;i++){
-   String name=files[i].getName();
-   String type=name.endsWith(".jpg")?"Photo":"Vidéo";
-   String lens=name.contains("-fixe.")?" · Fixe":name.contains("-mobile.")?" · Mobile":"";
-   labels[i]=type+lens+" · "+date.format(new Date(files[i].lastModified()));
+  LinearLayout content=new LinearLayout(activity);
+  content.setOrientation(LinearLayout.VERTICAL);
+  ListView list=new ListView(activity);
+  if(files.length>0)content.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+  else{
+   TextView empty=new TextView(activity);
+   empty.setText("Aucune photo ni vidéo enregistrée.");
+   empty.setPadding(dp(20),dp(12),dp(20),dp(12));
+   content.addView(empty);
   }
-  dialog.setItems(labels,(opened,index)->{
-   showCaptureActions(central,files[index],labels[index]);
-  }).show();
+  TextView path=new TextView(activity);
+  path.setId(157);
+  path.setText("Ouvrir dans Fichiers Android\n"+DashboardRecording.directory(activity).getAbsolutePath());
+  path.setPaintFlags(path.getPaintFlags()|Paint.UNDERLINE_TEXT_FLAG);
+  path.setOnClickListener(view->activity.openCaptureDirectory());
+  path.setTextSize(12);
+  path.setPadding(dp(16),dp(12),dp(16),dp(8));
+  content.addView(path,new LinearLayout.LayoutParams(-1,-2));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(activity)
+   .setTitle("Dossier des captures").setView(content)
+   .setNegativeButton("Fermer",null)
+   .setNeutralButton("Récentes ↓",null)
+   .setPositiveButton("Supprimer",null).create();
+  BaseAdapter adapter=new BaseAdapter(){
+   @Override public int getCount(){return files.length;}
+   @Override public Object getItem(int position){return files[position];}
+   @Override public long getItemId(int position){return position;}
+   @Override public View getView(int position,View recycled,ViewGroup parent){
+    java.io.File file=files[position];
+    boolean photo=file.getName().endsWith(".jpg");
+    LinearLayout row=(LinearLayout)recycled;
+    if(row==null){
+     row=new LinearLayout(activity);
+     row.setGravity(Gravity.CENTER_VERTICAL);
+     row.setPadding(dp(12),dp(4),dp(12),dp(4));
+     CheckBox box=new CheckBox(activity);
+     row.addView(box,new LinearLayout.LayoutParams(dp(48),dp(48)));
+     ImageView thumbnail=new ImageView(activity);
+     thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+     row.addView(thumbnail,new LinearLayout.LayoutParams(dp(56),dp(42)));
+     TextView caption=new TextView(activity);
+     caption.setPadding(dp(12),dp(8),0,dp(8));
+     row.addView(caption,new LinearLayout.LayoutParams(0,-2,1));
+    }
+    String name=file.getName();
+    String lens=name.contains("-fixe.")?" · Fixe":name.contains("-mobile.")?" · Mobile":"";
+    String label=(photo?"Photo":"Vidéo")+lens+" · "+date.format(new Date(file.lastModified()));
+    CheckBox box=(CheckBox)row.getChildAt(0);
+    box.setOnCheckedChangeListener(null);
+    box.setVisibility(photo?View.VISIBLE:View.INVISIBLE);
+    box.setContentDescription("Sélectionner "+label);
+    box.setChecked(selected.contains(file));
+    box.setOnCheckedChangeListener((button,checked)->{
+     if(checked)selected.add(file);else selected.remove(file);
+     Button remove=dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE);
+     remove.setEnabled(!selected.isEmpty());
+     remove.setText(selected.isEmpty()?"Supprimer":"Supprimer ("+selected.size()+")");
+    });
+    ImageView thumbnail=(ImageView)row.getChildAt(1);
+    Bitmap image=photo?thumbnails.get(file):null;
+    if(photo&&image==null){
+     BitmapFactory.Options options=new BitmapFactory.Options();
+     options.inSampleSize=8;
+     image=BitmapFactory.decodeFile(file.getAbsolutePath(),options);
+     if(image!=null)thumbnails.put(file,image);
+    }
+    thumbnail.setImageBitmap(image);
+    TextView caption=(TextView)row.getChildAt(2);
+    caption.setText(label);
+    View.OnClickListener open=view->{dialog.dismiss();showCaptureActions(central,file,label);};
+    row.setOnClickListener(open);
+    return row;
+   }
+  };
+  list.setAdapter(adapter);
+  dialog.show();
+  Button remove=dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE);
+  remove.setId(156);
+  remove.setEnabled(false);
+  remove.setOnClickListener(view->new android.app.AlertDialog.Builder(activity)
+   .setTitle("Supprimer les photos sélectionnées ?")
+   .setMessage(selected.size()+" photo(s)")
+   .setNegativeButton("Annuler",null)
+   .setPositiveButton("Supprimer",(confirmation,button)->{
+    int failures=0;
+    for(java.io.File file:selected)if(!file.delete())failures++;
+    if(failures>0)Toast.makeText(activity,failures+" suppression(s) impossible(s)",Toast.LENGTH_SHORT).show();
+    dialog.dismiss();
+    showCaptures(central);
+   }).show());
+  Button sort=dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL);
+  sort.setId(155);
+  sort.setEnabled(files.length>1);
+  sort.setOnClickListener(view->{
+   Collections.reverse(Arrays.asList(files));
+   sort.setText("Récentes ↓".contentEquals(sort.getText())?"Anciennes ↑":"Récentes ↓");
+   adapter.notifyDataSetChanged();
+   list.setSelection(0);
+  });
  }
  private void showCaptureActions(Tile central,java.io.File file,String label){
   new android.app.AlertDialog.Builder(activity).setTitle(label)

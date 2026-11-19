@@ -38,7 +38,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
 public class MainActivity extends Activity {
- private static final int PICK_PHONE=201, PICK_IMAGE=202, MOVE_CAPTURE=203, GPS=100, CAMERA=101, CALLS=103;
+ private static final int PICK_PHONE=201, PICK_IMAGE=202, MOVE_CAPTURE=203, BROWSE_CAPTURES=204, GPS=100, CAMERA=101, CALLS=103;
  private String captureToMove;
  private WebView web;
  private android.widget.FrameLayout dashboardLayer;
@@ -427,6 +427,14 @@ public class MainActivity extends Activity {
   }catch(Exception e){toast("Historique des appels inaccessible");}
   js("nauticPhoneCallHistory",out.toString());
  }
+ void openCaptureDirectory(){
+  Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+   .setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"image/jpeg","video/mp4"});
+  if(android.os.Build.VERSION.SDK_INT>=26)picker.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+   CaptureDocuments.directoryUri(this));
+  try{startActivityForResult(picker,BROWSE_CAPTURES);}
+  catch(ActivityNotFoundException e){toast("Application Fichiers indisponible");}
+ }
  void chooseCaptureDestination(String name){
   Intent picker=new Intent(Intent.ACTION_CREATE_DOCUMENT)
    .addCategory(Intent.CATEGORY_OPENABLE)
@@ -464,6 +472,17 @@ public class MainActivity extends Activity {
  }
  @Override protected void onActivityResult(int request,int result,Intent data){
   super.onActivityResult(request,result,data);
+  if(request==BROWSE_CAPTURES){
+   if(result==RESULT_OK&&data!=null&&data.getData()!=null){
+    Uri uri=data.getData();
+    try{
+     Intent view=new Intent(Intent.ACTION_VIEW).setDataAndType(uri,getContentResolver().getType(uri))
+      .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+     startActivity(view);
+    }catch(ActivityNotFoundException|SecurityException e){toast("Aucune application pour ouvrir ce fichier");}
+   }
+   return;
+  }
   if(request==MOVE_CAPTURE){
    String name=captureToMove;
    captureToMove=null;
