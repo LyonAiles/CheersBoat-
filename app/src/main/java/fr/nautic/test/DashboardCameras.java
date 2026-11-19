@@ -199,7 +199,8 @@ final class DashboardCameras {
   }
   void installTransparencyGesture(){
    frame.setOnTouchListener(new View.OnTouchListener(){
-    float startX,startY,startAlpha;
+    float startX,startY,startAlpha,startFocusX,startFocusY;
+    boolean panning;
     boolean center,dragged,held,multi,second;
     long lastTap;
     float tapX,tapY;
@@ -231,6 +232,7 @@ final class DashboardCameras {
        if(second)view.removeCallbacks(click);
        center=Math.abs(event.getX()-view.getWidth()/2f)<=view.getWidth()/6f;
        startX=event.getRawX();startY=event.getRawY();startAlpha=mapAlpha;
+       startFocusX=focusX;startFocusY=focusY;panning=centralZoom>1.01f;
        dragged=false;held=false;multi=false;
        view.removeCallbacks(align);view.postDelayed(align,600);return true;
       case MotionEvent.ACTION_MOVE:
@@ -240,7 +242,15 @@ final class DashboardCameras {
        if(Math.hypot(event.getRawX()-startX,delta)>slop){
         view.removeCallbacks(align);view.removeCallbacks(click);lastTap=0;dragged=true;
        }
-       if(center&&dragged){
+       if(panning&&dragged){
+        float ratio=source!=null?source.videoRatio:snapshot!=null?(float)snapshot.getWidth()/snapshot.getHeight():(float)view.getWidth()/view.getHeight();
+        float fit=ratio/((float)view.getWidth()/view.getHeight());
+        float extraX=view.getWidth()*(Math.max(1,fit)*centralZoom-1);
+        float extraY=view.getHeight()*(Math.max(1,1/fit)*centralZoom-1);
+        focusX=Math.max(0,Math.min(1,startFocusX-(event.getRawX()-startX)/Math.max(1,extraX)));
+        focusY=Math.max(0,Math.min(1,startFocusY-delta/Math.max(1,extraY)));
+        applyCrop();
+       }else if(center&&dragged){
         adjustingMapAlpha=true;
         setMapAlpha(Math.max(.15f,Math.min(1f,startAlpha+delta/view.getHeight())));
        }
@@ -257,7 +267,7 @@ final class DashboardCameras {
          view.postDelayed(click,ViewConfiguration.getDoubleTapTimeout());
         }
        }else{view.removeCallbacks(click);lastTap=0;}
-       if(dragged&&!multi)activity.updateMapCameraAlpha(mapAlpha);
+       if(dragged&&!multi&&!panning)activity.updateMapCameraAlpha(mapAlpha);
        adjustingMapAlpha=false;return true;
       default:return true;
      }
