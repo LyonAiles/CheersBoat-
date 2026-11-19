@@ -116,8 +116,9 @@
  };
  dataCounter.onclick=()=>{
   const s=storedStats||{},date=n=>n?new Date(n).toLocaleString('fr-FR'):'aucune';
-  modal('Données enregistrées',`<p>${s.lots??'—'} lots · ${s.objects??'—'} objets OSM uniques (ouvrages, panneaux et géométrie des voies d’eau).</p>`+
+  modal('Données enregistrées',`<p>${s.lots??'—'} lots · ${s.objects??'—'} objets OSM uniques (ouvrages, panneaux et géométrie des voies d’eau).</p><p>${s.partialLots||0} lots partiels à compléter. Un lot partiel ne garantit pas la couverture de toute sa zone.</p>`+
    `<p>Volume des données : ${((s.bytes||0)/1048576).toLocaleString('fr-FR',{maximumFractionDigits:2})} Mo. Les fichiers et index de la base occupent un peu plus.</p>`+
+   (s.importError?'<p>Import local : '+esc(s.importError)+'</p>':'')+
    `<p>Lot le plus ancien : ${date(s.oldest)}<br>Lot le plus récent : ${date(s.newest)}</p>`+
    '<p>Selon disponibilité : noms, types, GPS, géométrie, téléphones, VHF, sites, adresses, dimensions déclarées, horaires et codes de panneaux.</p>'+
    '<p>Les tarifs disponibles sont conservés avec les lots. Les avis VNF sont mémorisés séparément avec leur date de vérification. La météo, les images caméra et le fond de carte ne font pas partie de ce compteur.</p>');
@@ -1337,6 +1338,7 @@
  }
  function showList(list=lastList){modal(selectedWorkPoint?'Ouvrages autour du point choisi':'Ouvrages autour du bateau', (options.waterwayTypes?.sondeurAlert === false ? '' : '<button type="button" id="waterwaySondeurAlerts">Points d’alerte du sondeur</button>')+`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));const alertsButton=$('waterwaySondeurAlerts');if(alertsButton)alertsButton.onclick=()=>{$('dialog').close();$('sondeurAlertList')?.click();};$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();
  try{cache=JSON.parse(localStorage.getItem('nautic-waterways-cache')||'null');if(cache&&Array.isArray(cache.elements)){try{workRegions=JSON.parse(localStorage.getItem('nautic-work-regions')||'[]').filter(row=>row?.center&&Array.isArray(row.elements)).slice(0,6);}catch(_){workRegions=[];}if(!workRegions.length)workRegions=[cache];data=W.parse(workRegions.flatMap(row=>row.elements));}else cache=null;}catch(_){cache=null;}
+ try{if(workRegions.length)native?.importNavigationMemory?.(JSON.stringify(workRegions));}catch(_){}
  if(routeState&&(!routeState.trip?.closedEdges||routeState.trip.restrictionVersion!==3)){
   const updated=cachedRoute(routeState.start,routeState.end);
   if(updated){Object.assign(routeState,updated);saveTrip();renderTrip();}

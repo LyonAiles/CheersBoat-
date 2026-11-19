@@ -9,5 +9,6 @@ const assert=require('assert'),D=require('../../app/src/main/assets/nautic-local
  await assert.rejects(run(),/network lost/);assert.equal(disk.size,1);assert.equal(completed.length,1);
  await run();assert.equal(disk.size,3);assert.equal(fetched,4,'resume skips successfully committed first lot');
  let calls=0;await D.sync({plan:plan.slice(0,3),read:key=>disk.get(key),fetch(){calls++},progress(){},checkpoint(){}});assert.equal(calls,0,'fresh local data require no network');
+ let partialFetch=0;await D.sync({plan:plan.slice(0,1),read:key=>({...disk.get(key),complete:false}),fetch:async tile=>{partialFetch++;return {entry:disk.get(tile.id),source:'externe'}},progress(){},checkpoint(){}});assert.equal(partialFetch,1,'a partial bootstrap lot must not suppress a full lookup');
  console.log('PASS: bounded region, unique lots, restart skips saved lots, fresh local data skip network');
 })().catch(e=>{console.error(e);process.exitCode=1});

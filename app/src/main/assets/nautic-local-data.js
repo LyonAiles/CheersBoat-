@@ -12,7 +12,7 @@
   let done=0;const entries=[];
   for(const tile of plan){
    let entry=await read(tile.id);
-   if(force||!entry||entry.id!==tile.id||!Number.isFinite(entry.updated)||!Array.isArray(entry.elements)||Date.now()-entry.updated>age){
+   if(force||!entry||entry.complete===false||entry.id!==tile.id||!Number.isFinite(entry.updated)||!Array.isArray(entry.elements)||Date.now()-entry.updated>age){
     progress({done,total:plan.length,tile,source:'recherche'});
     const result=await fetch(tile,force);entry=result.entry;
     if(!entry||entry.id!==tile.id||!Array.isArray(entry.elements)||!Number.isFinite(entry.updated))throw Error('lot invalide');
