@@ -17,6 +17,7 @@ final class DashboardCameras {
  final SharedPreferences settings;
  final CameraCrop[] crops={CameraCrop.CENTER,CameraCrop.CENTER,CameraCrop.CENTER,CameraCrop.CENTER};
  int dp(float n){return (int)(n*activity.getResources().getDisplayMetrics().density+.5f);}
+ int lastCenterReset=-1;
  int draggingCamera;
  final Map<String,Tile> tiles=new LinkedHashMap<>();
  final Map<String,Source> sources=new LinkedHashMap<>();
@@ -136,7 +137,7 @@ final class DashboardCameras {
   void applyCrop(){
    int width=frame.getWidth(),height=frame.getHeight();
    if(width<=0||height<=0)return;
-   CameraCrop crop=CameraCrop.supported(cropCamera)?crops[cropCamera]:CameraCrop.CENTER;
+   CameraCrop crop=!id.equals("mapCameraPreview")&&CameraCrop.supported(cropCamera)?crops[cropCamera]:CameraCrop.CENTER;
    float zoom=isMedallion(id)?1.15f:centralZoom;
    boolean magnified=id.equals("mapCameraPreview")&&centralZoom>1;
    if(source!=null){
@@ -353,6 +354,11 @@ final class DashboardCameras {
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
    for(int camera=1;camera<=3;camera++)if(camera!=draggingCamera){
     applyCameraCrop(camera,CameraCrop.read(settings.getString(CameraCrop.key(camera),"")));
+   }
+   int reset=data.optInt("centerReset",0);
+   if(reset!=lastCenterReset){
+    lastCenterReset=reset;Tile central=tiles.get("mapCameraPreview");
+    if(central!=null){central.cancelCenterGestures.run();central.centralZoom=1;central.focusX=.5f;central.focusY=.5f;central.applyCrop();}
    }
    if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();

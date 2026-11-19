@@ -114,7 +114,17 @@ function plugsDialog(){equipmentDialog()}
 plugsButton.onclick=plugsDialog;
 const mapWrap=get('mapWrap');
 const recenter=document.createElement('button');recenter.id='mapRecenter';recenter.textContent='⌖';recenter.title='Recentrer';mapWrap.append(recenter);
-recenter.onclick=()=>{window.nauticResumeMapFollow?.();if(map&&latest){gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};manualRotationUntil=0;userMapRotation=0;map.setView([latest.lat,latest.lon],map.getZoom());rotateMap()}};
+let recenterWide=false;
+recenter.title='54 · Recentrer : vue rapprochée / vue large';
+recenter.onclick=()=>{
+ if(!map||!latest)return;
+ const zoom=recenterWide?11:16;recenterWide=!recenterWide;
+ gpsFollowTarget={...latest};smoothCenter={lat:latest.lat,lon:latest.lon};
+ manualRotationUntil=0;userMapRotation=0;
+ map.setView([latest.lat,latest.lon],Math.min(map.getMaxZoom(),Math.max(map.getMinZoom(),zoom)),{animate:false});
+ rotateMap();window.nauticResumeMapFollow?.();
+ recenter.title='54 · '+(recenterWide?'Prochain appui : vue large':'Prochain appui : vue rapprochée');
+};
 const layers=document.createElement('button');layers.id='mapLayers';layers.textContent='▤';layers.title='Fond de carte';mapWrap.append(layers);
 const layerDefs={osm:{label:'OpenStreetMap',url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:19,attr:'© OpenStreetMap'},topo:{label:'Topographique',url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',maxZoom:17,attr:'© OpenTopoMap'},sat:{label:'Satellite',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'© Esri'},
  streets:{label:'Routière Esri',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'Tiles © Esri · HERE · Garmin · contributeurs'},

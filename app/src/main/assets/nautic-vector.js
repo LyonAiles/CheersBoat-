@@ -1110,7 +1110,24 @@
     '<small>Source : © contributeurs OpenStreetMap'+(options.objectNumbers!==false?' · Objet 583':'')+'</small>');
    return;
   }
-  modal('Ouvrage fluvial',info(p)+'<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');}
+  const number=String(p.phone||'').split(';')[0].trim();
+  const safePhone=/^[+0-9(). \-]{3,40}$/.test(number)?number:'';
+  const website=/^https?:\/\//i.test(p.website||'')?p.website:'';
+  const rates=['port','halt'].includes(p.category)?
+   '<h4>Tarifs de séjour</h4><p>Bateau : 13,40 × 4,30 m. Application du tarif à ce gabarit à confirmer auprès du gestionnaire.</p>'+
+   '<table><tbody>'+[['Nuitée','night'],['Semaine','week'],['Mois','month']].map(([label,key])=>
+    '<tr><td>'+label+'</td><td>'+esc(p.tariffs?.[key]||'Non renseigné')+'</td></tr>').join('')+'</tbody></table>'+
+   (p.charge?'<p>Tarification déclarée : '+esc(p.charge)+'</p>':'')+
+   (p.fee?'<p>Accès payant déclaré : '+esc(p.fee)+'</p>':'')+
+   '<p class="muted">Données OSM déclaratives ; période, services, électricité et eau à vérifier. Aucun prix estimé sans grille du gestionnaire.</p>':'';
+  modal('Ouvrage fluvial',info(p)+
+   '<p>GPS (WGS84) : '+Number(p.lat).toFixed(6)+', '+Number(p.lon).toFixed(6)+'</p>'+
+   (p.address?'<p>'+esc(p.address)+'</p>':'')+
+   (safePhone?'<button type="button" id="waterwayCall" data-object-number="584">☎ Appeler '+esc(safePhone)+(options.objectNumbers!==false?' · 584':'')+'</button>':'<p>Téléphone non renseigné.</p>')+
+   (website?'<p><a id="waterwayWebsite" data-object-number="585" href="'+esc(website)+'">Site du gestionnaire / tarifs'+(options.objectNumbers!==false?' · 585':'')+'</a></p>':'')+rates+
+   '<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');
+  const call=$('waterwayCall');if(call)call.onclick=()=>{if(window.NauticAndroid?.call)window.NauticAndroid.call(safePhone);else location.href='tel:'+encodeURIComponent(safePhone);};
+ }
  function showList(list=lastList){modal(selectedWorkPoint?'Ouvrages autour du point choisi':'Ouvrages autour du bateau', (options.waterwayTypes?.sondeurAlert === false ? '' : '<button type="button" id="waterwaySondeurAlerts">Points d’alerte du sondeur</button>')+`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));const alertsButton=$('waterwaySondeurAlerts');if(alertsButton)alertsButton.onclick=()=>{$('dialog').close();$('sondeurAlertList')?.click();};$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();
  try{cache=JSON.parse(localStorage.getItem('nautic-waterways-cache')||'null');if(cache&&Array.isArray(cache.elements))data=W.parse(cache.elements);else cache=null;}catch(_){cache=null;}
  if(routeState&&(!routeState.trip?.closedEdges||routeState.trip.restrictionVersion!==3)){

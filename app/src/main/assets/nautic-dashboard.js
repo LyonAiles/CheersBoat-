@@ -205,7 +205,9 @@
   feeds[centerView]={...feed,lens:3-lens};
   previews();
  }
+ let centerReset=0;
  function restoreMedallion(){
+  centerReset++;
   if(!swappedMedallion)return;
   [feeds[centerView],feeds[swappedMedallion]]=[feeds[swappedMedallion],feeds[centerView]];
   swappedMedallion=null;
@@ -441,7 +443,7 @@
     ?{x:r.left,y:r.top,w:r.width,h:r.height,label:control.textContent,number:control.dataset.objectNumber,
       pressed:control.getAttribute('aria-pressed')==='true'}:null;
   };
-  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapHd,tiles,
+  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapHd,centerReset,tiles,
    qualityButton:controlBounds(qualityTool),medallionButton:controlBounds(medallionTool),axisButton:controlBounds(axisTool),
    captureButton:controlBounds(captureTool)}));
  }

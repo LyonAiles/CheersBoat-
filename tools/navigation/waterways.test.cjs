@@ -12,3 +12,15 @@ console.log('PASS: forward/backward filtering, network distance, perimeter, brid
 
 const facilities=W.parse([{type:'node',id:10,lat:47,lon:2,tags:{leisure:'marina',name:'Port test'}},{type:'node',id:11,lat:47.1,lon:2,tags:{mooring:'yes',name:'Halte test'}},{type:'node',id:12,lat:47.2,lon:2,tags:{leisure:'slipway'}},{type:'way',id:13,center:{lat:47.3,lon:2},tags:{bridge:'yes',highway:'road'}}]);
 assert.deepEqual(facilities.items.map(x=>x.category),['port','halt','slipway','bridge']);assert.equal(W.nearby(facilities,{lat:47,lon:2},100000,null,true).length,4);assert.equal(W.nearby(facilities,{lat:47,lon:2},5000,null,true).length,1);const around=W.nearby(data,{lat:47.005,lon:2},5000,0,true);assert(around.some(x=>x.name==='Écluse 3'));console.log('PASS: ports, halts, slipways, distant bridge centres, 100 km radius and all-around selection');
+
+const contact=W.parse([{type:'node',id:900,lat:48.1,lon:2.2,tags:{leisure:'marina',name:'Port contact','contact:phone':'+33 1 23 45 67 89','contact:website':'https://example.org/tarifs','addr:city':'Paris','charge:night':'25 EUR / boat','charge:week':'140 EUR / boat',charge:'selon longueur'}}]).items[0];
+assert.equal(contact.phone,'+33 1 23 45 67 89');
+assert.equal(contact.website,'https://example.org/tarifs');
+assert.equal(contact.tariffs.night,'25 EUR / boat');
+assert.equal(contact.tariffs.week,'140 EUR / boat');
+assert.equal(contact.tariffs.month,null);
+assert.equal(contact.address,'Paris');
+assert.equal(contact.lat,48.1);
+assert.equal(facilities.items[0].phone,null);
+assert.equal(facilities.items[0].tariffs.night,null);
+console.log('PASS: contact details and declared tariffs survive parsing without inventing missing rates');
