@@ -1123,8 +1123,8 @@
   modal('Ouvrage fluvial',info(p)+
    '<p>GPS (WGS84) : '+Number(p.lat).toFixed(6)+', '+Number(p.lon).toFixed(6)+'</p>'+
    (p.address?'<p>'+esc(p.address)+'</p>':'')+
-   (safePhone?'<button type="button" id="waterwayCall" data-object-number="584">☎ Appeler '+esc(safePhone)+(options.objectNumbers!==false?' · 584':'')+'</button>':'<p>Téléphone non renseigné.</p>')+
-   (website?'<p><a id="waterwayWebsite" data-object-number="585" href="'+esc(website)+'">Site du gestionnaire / tarifs'+(options.objectNumbers!==false?' · 585':'')+'</a></p>':'')+rates+
+   (safePhone?'<button type="button" id="waterwayCall" data-object-number="584">☎ Appeler '+esc(safePhone)+'</button>':'<p>Téléphone non renseigné.</p>')+
+   (website?'<p><a id="waterwayWebsite" data-object-number="585" href="'+esc(website)+'">Site du gestionnaire / tarifs</a></p>':'')+rates+
    '<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');
   const call=$('waterwayCall');if(call)call.onclick=()=>{if(window.NauticAndroid?.call)window.NauticAndroid.call(safePhone);else location.href='tel:'+encodeURIComponent(safePhone);};
  }
