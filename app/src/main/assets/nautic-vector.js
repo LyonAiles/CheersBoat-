@@ -15,7 +15,7 @@
  }
  map?.on('moveend',viewportWorks);
  const wrap=$('mapWrap'),host=document.createElement('div');host.id='nauticVectorMap';host.style.cssText='position:absolute;inset:0;z-index:1;display:none';wrap.appendChild(host);
- const status=document.createElement('button');status.id='nauticWaterwayStatus';status.type='button';status.title='Ouvrages fluviaux · touche la carte pour rechercher ailleurs';status.style.cssText='position:absolute;z-index:740;left:8px;top:8px;max-width:65%;font-size:11px;padding:5px 8px';wrap.appendChild(status);
+ const status=document.createElement('button');status.id='nauticWaterwayStatus';status.type='button';status.title='Ouvrages fluviaux · touche la carte pour rechercher ailleurs';status.style.cssText='position:absolute;z-index:740;left:8px;bottom:88px;max-width:65%;font-size:11px;padding:5px 8px';wrap.appendChild(status);
  function notice(text){status.textContent=text;}
  function fallback(message){request++;active=false;failed=true;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}window.nauticRestoreLegacy?.();lastRender='';renderWorks();if(message)notice(message+' · retour carte classique');}
  function library(){if(window.maplibregl)return Promise.resolve();if(loading)return loading;loading=new Promise((resolve,reject)=>{const css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css';document.head.appendChild(css);const script=document.createElement('script');script.src='https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js';const timeout=setTimeout(()=>reject(Error('chargement trop long')),20000);script.onload=()=>{clearTimeout(timeout);resolve();};script.onerror=()=>{clearTimeout(timeout);reject(Error('bibliothèque indisponible'));};document.head.appendChild(script);}).finally(()=>{loading=null;});return loading;}
@@ -105,13 +105,13 @@
  refreshWorks.style.cssText='position:absolute;z-index:800;left:8px;bottom:48px;min-width:32px;min-height:32px;padding:3px 7px';
  wrap.append(refreshWorks);
  refreshWorks.onclick=async()=>{
-  if(busy||refreshWorks.disabled)return;
+  if(refreshWorks.disabled)return;
   const c=(active&&vector?vector:map)?.getCenter();if(!c)return;
   selectedWorkPoint={lat:c.lat,lon:c.lng};lastQuery=0;lastWorksCompute=0;
   if(cache)cache={...cache,time:0};
-  refreshWorks.disabled=true;
-  try{await Promise.allSettled([updateWorks(),updateSigns(true)]);}
-  finally{refreshWorks.disabled=false;}
+  refreshWorks.disabled=true;refreshWorks.textContent='…';
+  try{await Promise.allSettled([updateWorks(true),updateSigns(true)]);}
+  finally{refreshWorks.disabled=false;refreshWorks.textContent='↻';}
  };
 
  const tripKey='nautic-last-trip-v1', networkKey='nautic-trip-network-v1';
@@ -967,13 +967,61 @@
   // Only point centres cross the network for distant features; detailed geometry stays local.
   return `[out:json][timeout:45];way[waterway~"^(canal|river|fairway)$"]${chosen.has('bridge')?area:local}->.water;way[waterway~"^(canal|river|fairway)$"]${local}->.network;(${parts.join('')})->.poi;.poi out center;(.network;${chosen.has('bridge')?'way(around.network:40)[bridge][bridge!=no][highway];way(around.network:40)[bridge][bridge!=no][railway];':''});out body geom;`;
  }
- async function updateWorks(){if(options.waterwayWorks===false){status.hidden=true;lastList=[];renderWorks();return;}status.hidden=false;const area=workArea(),{p,radius}=area;if(!p){notice('Ouvrages · attente GPS');return;}
-  if(data&&(!window.nauticQuietMode||!lastList.length)&&Date.now()-lastWorksCompute>7000){lastWorksCompute=Date.now();lastList=visibleWorks(area);renderWorks();}
-  const signature=selectedSignature();if(!signature){lastList=[];renderWorks();notice('Aucun type d’ouvrage sélectionné');return;}const now=Date.now(),usable=cache&&cache.signature===signature&&W.distance(cache.center,p)+radius<=cache.radius+1000;
-  if(usable&&now-cache.time<86400000){notice(`Ouvrages · ${lastList.length} · ${radius/1000+' km'+(selectedWorkPoint?' · point choisi':'')}${now-cache.time>600000?' · cache':''}`);return;}
-  if(busy||now-lastQuery<(selectedWorkPoint?15000:120000))return;busy=true;lastQuery=now;notice('Recherche des ouvrages…');
-  try{const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),55000);let response;try{response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(query(p,radius+1500)),signal:controller.signal});}finally{clearTimeout(timeout);}if(!response.ok)throw Error('HTTP '+response.status);await window.nauticMapIdle?.();const json=await response.json();await window.nauticMapIdle?.();if(!Array.isArray(json.elements)||json.remark)throw Error('Réponse incomplète');cache={center:{lat:p.lat,lon:p.lon},radius,signature,time:Date.now(),elements:json.elements};workRegions=[cache,...workRegions.filter(row=>W.distance(row.center,cache.center)>500)].slice(0,6);data=W.parse(workRegions.flatMap(row=>row.elements));try{localStorage.setItem('nautic-work-regions',JSON.stringify(workRegions));localStorage.setItem('nautic-waterways-cache',JSON.stringify(cache));}catch(_){}lastList=visibleWorks(workArea());lastRender='';renderWorks();notice('Ouvrages · '+lastList.length);
-  }catch(e){notice(data?'Ouvrages · cache · réseau indisponible':'Ouvrages indisponibles · réessai automatique');}finally{busy=false;}}
+ let worksTask=null,workRequestSequence=0,workNoticeUntil=0;
+ const workRequests=new Map();
+ window.nauticMapWorksResult=raw=>{
+  let result;try{result=JSON.parse(raw);}catch(_){return;}
+  const pending=workRequests.get(result.request);if(!pending)return;
+  workRequests.delete(result.request);clearTimeout(pending.timer);
+  if(result.error)pending.reject(Error(result.error));else pending.resolve({elements:result.elements});
+ };
+ async function fetchWorks(queryText){
+  if(native?.searchMapWorks)return new Promise((resolve,reject)=>{
+   const request=++workRequestSequence;
+   const timer=setTimeout(()=>{workRequests.delete(request);reject(Error('délai dépassé'));},65000);
+   workRequests.set(request,{resolve,reject,timer});
+   try{native.searchMapWorks(request,queryText);}catch(error){clearTimeout(timer);workRequests.delete(request);reject(error);}
+  });
+  const errors=[];
+  for(const endpoint of ['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter']){
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+   try{
+    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(queryText),signal:controller.signal});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const result=await response.json();if(!Array.isArray(result.elements)||result.remark)throw Error('réponse incomplète');return result;
+   }catch(error){errors.push(error.name==='AbortError'?'délai dépassé':error.message);}
+   finally{clearTimeout(timer);}
+  }
+  throw Error(errors.join(' / '));
+ }
+ async function updateWorks(force=false){
+  if(busy){if(force){await worksTask;return updateWorks(true);}return;}
+  if(!force&&Date.now()<workNoticeUntil)return;
+  if(options.waterwayWorks===false){status.hidden=true;lastList=[];renderWorks();return;}
+  status.hidden=false;const area=workArea(),{p,radius}=area;
+  if(!p){notice('Ouvrages · attente GPS');return;}
+  if(data&&(force||Date.now()-lastWorksCompute>7000)){lastWorksCompute=Date.now();lastList=visibleWorks(area);lastRender='';renderWorks();}
+  const signature=selectedSignature();
+  if(!signature){lastList=[];renderWorks();notice('Aucun type d’ouvrage sélectionné');return;}
+  const now=Date.now(),usable=cache&&cache.signature===signature&&W.distance(cache.center,p)+radius<=cache.radius+1000;
+  if(!force&&usable&&now-cache.time<86400000){notice(`Ouvrages · ${lastList.length} · ${radius/1000} km · cache`);return;}
+  if(!force&&now-lastQuery<(selectedWorkPoint?15000:120000))return;
+  busy=true;lastQuery=now;notice('Actualisation des ouvrages… · données précédentes conservées');
+  worksTask=(async()=>{
+   try{
+    const json=await fetchWorks(query(p,radius+1500).replace('[timeout:45]','[timeout:18]'));
+    if(!Array.isArray(json.elements)||json.remark)throw Error('réponse incomplète');
+    cache={center:{lat:p.lat,lon:p.lon},radius,signature,time:Date.now(),elements:json.elements};
+    workRegions=[cache,...workRegions.filter(row=>W.distance(row.center,cache.center)>500)].slice(0,6);
+    data=W.parse(workRegions.flatMap(row=>row.elements));
+    try{localStorage.setItem('nautic-work-regions',JSON.stringify(workRegions));localStorage.setItem('nautic-waterways-cache',JSON.stringify(cache));}catch(_){}
+    lastList=visibleWorks(workArea());lastRender='';renderWorks();
+    notice('Ouvrages · '+lastList.length+' · actualisés à '+new Date().toLocaleTimeString('fr-FR'));
+   }catch(error){workNoticeUntil=Date.now()+20000;notice('Actualisation impossible · '+error.message+(data?' · cache conservé':''));}
+   finally{busy=false;}
+  })();
+  return worksTask;
+ }
  const signCacheKey='nautic-sign-cache-v2';
  let signCache=[],signs=[],signRequest=null,lastSignAttempt=null,signStatus='idle',signError='';
  const regionalSigns=window.NauticSignsIdf;
@@ -1153,6 +1201,7 @@
   modal('Ouvrage fluvial',info(p)+
    '<p>GPS (WGS84) : '+Number(p.lat).toFixed(6)+', '+Number(p.lon).toFixed(6)+'</p>'+
    (p.address?'<p>'+esc(p.address)+'</p>':'')+
+   (p.category==='lock'?'<p><strong>VHF : '+esc(p.vhf?'canal '+p.vhf:'canal non renseigné')+'</strong></p>':p.vhf?'<p>VHF : canal '+esc(p.vhf)+'</p>':'')+
    (safePhone?'<button type="button" id="waterwayCall" data-object-number="584">☎ Appeler '+esc(safePhone)+'</button>':'<p>Téléphone non renseigné.</p>')+
    (website?'<p><a id="waterwayWebsite" data-object-number="585" href="'+esc(website)+'">Site du gestionnaire / tarifs</a></p>':'')+rates+
    '<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');

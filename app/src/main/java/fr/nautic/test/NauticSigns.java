@@ -26,6 +26,11 @@ final class NauticSigns {
   String area="("+south+","+west+","+north+","+east+")";
   String query="[out:json][timeout:18];(nwr[\"seamark:type\"=\"notice\"]"+area
     +";nwr[\"seamark:notice:category\"]"+area+";);out center;";
+  return lookupQuery(query);
+ }
+
+ static JSONArray lookupQuery(String query) throws IOException {
+  if(query==null||query.length()>16000||!query.startsWith("[out:json]"))throw new IOException("requête invalide");
   byte[] payload=("data="+URLEncoder.encode(query,"UTF-8")).getBytes(StandardCharsets.UTF_8);
   Set<String> errors=new LinkedHashSet<>();
   for(String endpoint:ENDPOINTS){

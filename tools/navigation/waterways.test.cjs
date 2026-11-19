@@ -24,3 +24,6 @@ assert.equal(contact.lat,48.1);
 assert.equal(facilities.items[0].phone,null);
 assert.equal(facilities.items[0].tariffs.night,null);
 console.log('PASS: contact details and declared tariffs survive parsing without inventing missing rates');
+const radio=W.parse([{type:'node',id:901,lat:47,lon:2,tags:{waterway:'lock_gate',vhf:'18'}},{type:'node',id:902,lat:48,lon:2,tags:{waterway:'lock_gate'}}]);
+assert.equal(radio.items[0].vhf,'18');assert.equal(radio.items[1].vhf,null);
+console.log('PASS: lock VHF channel is preserved and missing channel remains unknown');
