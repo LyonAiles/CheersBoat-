@@ -16,6 +16,7 @@ final class DashboardCameras {
  final MainActivity activity;final FrameLayout layer;
  final SharedPreferences settings;
  final CameraCrop[] crops={CameraCrop.CENTER,CameraCrop.CENTER,CameraCrop.CENTER,CameraCrop.CENTER};
+ int dp(float n){return (int)(n*activity.getResources().getDisplayMetrics().density+.5f);}
  int draggingCamera;
  final Map<String,Tile> tiles=new LinkedHashMap<>();
  final Map<String,Source> sources=new LinkedHashMap<>();
