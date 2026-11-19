@@ -1012,8 +1012,7 @@
  async function updateLocalWorks(area,force){
   const D=window.NauticLocalData,plan=D.tiles(area.p,Math.min(area.radius,8000));
   const pendingKey='nautic-local-data-pending';
-  let pending;try{pending=JSON.parse(native?.readSetting(pendingKey)||localStorage.getItem(pendingKey)||'null');}catch(_){}
-  if(!force&&Array.isArray(pending)&&pending.some(tile=>plan.some(current=>current.id===tile.id)))plan.splice(0,plan.length,...pending.slice(0,9));
+  // Re-read the full area on resume: completed lots remain visible and are skipped by sync.
   const savePending=rows=>{const raw=JSON.stringify(rows);try{native?.writeSetting(pendingKey,raw);}catch(_){}try{localStorage.setItem(pendingKey,raw);}catch(_){}};
   savePending(plan);
   let remaining=[...plan];const collected=new Map();
