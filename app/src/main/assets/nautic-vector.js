@@ -3,7 +3,7 @@
  const $=id=>document.getElementById(id),native=window.NauticAndroid,W=window.NauticWaterways,I=window.NauticWorkIcons;
  const read=()=>{try{return JSON.parse(native?.readSetting('nautic-extensions')||localStorage.getItem('nautic-extensions')||'{}');}catch(_){return {};}};
  let options=read(),vector=null,loading=null,failed=false,active=false,request=0,cache=null,data=null,lastQuery=0,busy=false,lastList=[],lastRender='',lastCamera=null,lastWorksCompute=0;
- let selectedWorkPoint=null,workRegions=[],workMoveTimer=null;
+ let selectedWorkPoint=null,localTileEntries=new Map(),workRegions=[],workMoveTimer=null;
  function viewportWorks(){
   if(!window.nauticMapFreePan)return;
   clearTimeout(workMoveTimer);workMoveTimer=setTimeout(()=>{
@@ -104,6 +104,25 @@
  refreshWorks.textContent='↻';refreshWorks.title='586 · Actualiser les ouvrages et panneaux de la zone affichée';
  refreshWorks.style.cssText='position:absolute;z-index:800;left:8px;bottom:48px;min-width:32px;min-height:32px;padding:3px 7px';
  wrap.append(refreshWorks);
+ const dataCounter=document.createElement('button');dataCounter.id='nauticDataCounter';dataCounter.type='button';
+ dataCounter.textContent='Mémoire locale · comptage…';
+ dataCounter.style.cssText='position:absolute;z-index:740;left:8px;bottom:132px;max-width:65%;font-size:10px;padding:4px 7px';
+ wrap.append(dataCounter);let storedStats=null;
+ function updateDataCounter(){native?.navigationDataStats?.();}
+ window.nauticNavigationStats=raw=>{
+  try{storedStats=JSON.parse(raw);}catch(_){storedStats=null;}
+  dataCounter.textContent=storedStats&&Number.isFinite(storedStats.lots)?
+   `Mémoire · ${storedStats.lots} lots · ${storedStats.objects} objets · ${(storedStats.bytes/1048576).toLocaleString('fr-FR',{maximumFractionDigits:1})} Mo`:'Mémoire locale · compteur indisponible';
+ };
+ dataCounter.onclick=()=>{
+  const s=storedStats||{},date=n=>n?new Date(n).toLocaleString('fr-FR'):'aucune';
+  modal('Données enregistrées',`<p>${s.lots??'—'} lots · ${s.objects??'—'} objets OSM uniques (ouvrages, panneaux et géométrie des voies d’eau).</p>`+
+   `<p>Volume des données : ${((s.bytes||0)/1048576).toLocaleString('fr-FR',{maximumFractionDigits:2})} Mo. Les fichiers et index de la base occupent un peu plus.</p>`+
+   `<p>Lot le plus ancien : ${date(s.oldest)}<br>Lot le plus récent : ${date(s.newest)}</p>`+
+   '<p>Selon disponibilité : noms, types, GPS, géométrie, téléphones, VHF, sites, adresses, dimensions déclarées, horaires et codes de panneaux.</p>'+
+   '<p>Les tarifs disponibles sont conservés avec les lots. Les avis VNF sont mémorisés séparément avec leur date de vérification. La météo, les images caméra et le fond de carte ne font pas partie de ce compteur.</p>');
+ };
+ updateDataCounter();
  refreshWorks.onclick=async()=>{
   if(refreshWorks.disabled)return;
   const c=(active&&vector?vector:map)?.getCenter();if(!c)return;
@@ -134,7 +153,16 @@
   }catch(_){return false;}
  }
  const liveNotices={};
+ const noticeMemoryKey='nautic-vnf-notice-memory';
+ let noticeVerifiedAt=0,noticeFromMemory=false;
  let noticePending=false,lastNoticeCheck=0,noticeDay=notices.dateInFrance();
+ try{
+  const memory=JSON.parse(native?.readSetting(noticeMemoryKey)||localStorage.getItem(noticeMemoryKey)||'null');
+  if(memory&&Number.isFinite(memory.checkedAt)&&memory.checkedAt>0&&memory.checkedAt<=Date.now()){
+   Object.assign(liveNotices,notices.verifyResponse(memory.items));noticeVerifiedAt=memory.checkedAt;
+   lastNoticeCheck=memory.checkedAt;noticeFromMemory=true;
+  }
+ }catch(_){}
  const validPoint=p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&Math.abs(p.lat)<=90&&Math.abs(p.lon)<=180;
  let routeState=restoreTrip(), selection=null, tripRequest=null, lastSave=0;
  const formatKm=new Intl.NumberFormat('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1});
@@ -257,11 +285,17 @@
   };
  }
  const impactCacheKey='nautic-euris-route-impacts';
+ const impactMetaKey=impactCacheKey+'-verification';
+ let impactVerifiedAt=0,impactFromMemory=false;
  try{
   const snapshot=JSON.parse(native?.readSetting(impactCacheKey)||'null');
   if(euris&&snapshot){
    impactSnapshot=euris.merge(impactSnapshot,snapshot);
-   eurisStatus='Derniers avis EuRIS mémorisés';
+   eurisStatus='Derniers avis EuRIS mémorisés';impactFromMemory=true;
+   const meta=JSON.parse(native?.readSetting(impactMetaKey)||localStorage.getItem(impactMetaKey)||'null');
+   if(meta&&Number.isFinite(meta.checkedAt)&&meta.checkedAt<=Date.now()){
+    impactVerifiedAt=meta.checkedAt;impactCheckedAt=meta.checkedAt;checkedScopes=typeof meta.scopes==='string'?meta.scopes:'';
+   }
   }
  }catch(_){}
  if(euris)impacts=euris.compile(impactSnapshot,fairwayCatalog,calc);
@@ -292,9 +326,13 @@
    impactSnapshot=euris.merge(impactSnapshot,feed);
    impacts=euris.compile(impactSnapshot,fairwayCatalog,calc);
    native?.writeSetting(impactCacheKey,JSON.stringify(impactSnapshot));
+   impactVerifiedAt=Date.now();impactFromMemory=false;
+   const meta=JSON.stringify({checkedAt:impactVerifiedAt,scopes:Array.isArray(feed.scopes)?[...feed.scopes].sort().join(','):checkedScopes});
+   try{native?.writeSetting(impactMetaKey,meta);localStorage.setItem(impactMetaKey,meta);}catch(_){}
    eurisStatus='Avis EuRIS consultés';
   }catch(_){eurisStatus=impacts.length?'EuRIS indisponible · derniers avis mémorisés':'EuRIS indisponible';}
   renderTrip();
+  if($('dialog').open&&$('nauticRefreshNotices'))showNavigationNotices();
  };
  function cachedRoute(start,end){
   let local;
@@ -336,11 +374,17 @@
  window.nauticNavigationNotices=raw=>{
   noticePending=false;
   try{
-   const updates=notices.verifyResponse(JSON.parse(raw).items);
+   const items=JSON.parse(raw).items;
+   if(!Array.isArray(items))throw Error("réponse invalide");
+   const updates=notices.verifyResponse(items);
    Object.assign(liveNotices,updates);
+   noticeVerifiedAt=Date.now();noticeFromMemory=false;
+   const memory=JSON.stringify({checkedAt:noticeVerifiedAt,items});
+   try{native?.writeSetting(noticeMemoryKey,memory);localStorage.setItem(noticeMemoryKey,memory);}catch(_){}
    noticeStatus=Object.keys(updates).length?'Avis VNF consultés':'Aucun avis associé confirmé par EuRIS';
   }catch(_){noticeStatus='EuRIS indisponible · avis connus affichés';}
   renderTrip();
+  if($('dialog').open&&$('nauticRefreshNotices'))showNavigationNotices();
  };
  function tripData(){
   const items=displayed.length?displayed:routeState?[routeState]:[];
@@ -536,7 +580,7 @@
    (notice.active?'Fermeture en cours':'Fermeture annoncée')+' du '+noticeDate(notice.start)+' au '+
    noticeDate(notice.end)+' inclus.<br>'+
    (notice.tentative&&notice.tentative>notice.end?'Prolongation probable jusqu’au '+noticeDate(notice.tentative)+' · à confirmer.<br>':'')+
-   (notice.live?'Vérifié via EuRIS':'Avis embarqué')+'</p>').join('');
+   (notice.live?(noticeFromMemory?'Avis EuRIS mémorisé':'Vérifié via EuRIS'):'Avis embarqué')+'</p>').join('');
   const dates=[...new Map(relevant.map(item=>[item.number,item])).values()].map(item=>({
    date:item.end,title:item.title,detail:'Fin de fermeture annoncée le '+noticeDate(item.end)+' inclus'+
     (item.tentative&&item.tentative>item.end?' · prolongation probable jusqu’au '+noticeDate(item.tentative):'')
@@ -555,8 +599,10 @@
   dates.sort((a,b)=>a.date.localeCompare(b.date));
   const reopenings=dates.length?'<h3>Réouvertures annoncées</h3><ul>'+
    dates.map(item=>'<li>'+esc(item.title)+' · '+esc(item.detail)+'</li>').join('')+'</ul>':'';
+  const checkedDate=n=>n?new Date(n).toLocaleString('fr-FR'):'date inconnue';
   modal('Avis de navigation',
-   reopenings+
+   '<p>Vérification des avis VNF : '+checkedDate(noticeVerifiedAt)+'<br>Vérification EuRIS du parcours : '+checkedDate(impactVerifiedAt)+
+   '. Les informations mémorisées peuvent avoir changé.</p><p class="muted">'+esc(noticeStatus)+' · '+esc(eurisStatus)+'</p><button type="button" id="nauticRefreshNotices">↻ Rafraîchir les avis</button>'+reopenings+
    (onlineEntries?'<h3>Avis EuRIS sur le parcours</h3><ul>'+onlineEntries+'</ul>':'')+entries+
    (!onlineEntries&&!entries?'<p>Aucun avis VNF associé aux tronçons de ce trajet.</p>':'')+
    '<p>Vert · navigation indiquée sur la carte. Gris · état inconnu. Rouge · fermeture ou restriction en cours. Orange · vigilance de gabarit.</p>'+
@@ -565,6 +611,12 @@
    '<small>API/Service Notices to Skippers incorporated from EuRIS (eurisportal.eu). '+
    'Réseau adapté du jeu de données de Baart et Turpijn, <a href="https://doi.org/10.5281/zenodo.20793663">CC BY 4.0</a>. '+
    'Data provided by EuRIS (www.eurisportal.eu) and Rijkswaterstaat.</small>');
+  $('nauticRefreshNotices').disabled=impactPending||noticePending;
+  if(impactPending||noticePending)$('nauticRefreshNotices').textContent='Vérification en cours…';
+  $('nauticRefreshNotices').onclick=()=>{
+   if(window.nauticDataUpdating){$('nauticRefreshNotices').textContent='Mise à jour locale en cours · réessayer ensuite';return;}
+   checkNavigationNotices(true);$('nauticRefreshNotices').textContent=impactPending||noticePending?'Vérification en cours…':'Aucune source interrogeable pour ce trajet';$('nauticRefreshNotices').disabled=impactPending||noticePending;
+  };
  }
  function showTripBottlenecks(){
   const items=displayed.length?displayed:routeState?.trip?[routeState]:[];
@@ -1015,12 +1067,16 @@
   // Re-read the full area on resume: completed lots remain visible and are skipped by sync.
   const savePending=rows=>{const raw=JSON.stringify(rows);try{native?.writeSetting(pendingKey,raw);}catch(_){}try{localStorage.setItem(pendingKey,raw);}catch(_){}};
   savePending(plan);
-  let remaining=[...plan];const collected=new Map();
+  let remaining=[...plan];const collected=localTileEntries;
   // Render every saved lot first, even if it now needs an update.
   const read=id=>{try{return JSON.parse(native.readNavigationTile(id)||'null');}catch(_){return null;}};
   function install(entry){
    if(!entry||!Array.isArray(entry.elements))return;
-   collected.set(entry.id,entry);data=W.parse([...collected.values()].flatMap(row=>row.elements));
+   collected.delete(entry.id);collected.set(entry.id,entry);
+   while(collected.size>32)collected.delete(collected.keys().next().value);
+   data=W.parse([...collected.values()].flatMap(row=>row.elements));
+   const dates=new Map();for(const saved of collected.values())for(const e of saved.elements){const key=e.type+'/'+e.id;dates.set(key,Math.max(dates.get(key)||0,saved.updated||0));}
+   for(const item of data.items)item.updated=dates.get(item.id)||0;
    lastList=visibleWorks(workArea());lastRender='';renderWorks();
    const bounds=signArea();if(bounds&&!signButton.hidden){displaySigns({items:data.items.filter(p=>p.category==='notice')},bounds);signButton.textContent='Panneaux locaux · '+signs.length;}
   }
@@ -1028,15 +1084,17 @@
   window.nauticSetDataUpdating?.(true);
   try{
    await D.sync({plan,force,read,fetch:fetchTile,
-    checkpoint:id=>{remaining=remaining.filter(tile=>tile.id!==id);savePending(remaining);},
+    checkpoint:id=>{remaining=remaining.filter(tile=>tile.id!==id);savePending(remaining);updateDataCounter();},
     progress:step=>{if(step.entry)install(step.entry);notice(`Base locale · ${step.done}/${step.total} · ${step.source} · aperçus caméra suspendus`);},
     delay:()=>new Promise(resolve=>setTimeout(resolve,5500))});
    cache={center:area.p,radius:Math.min(area.radius,8000),signature:selectedSignature(),time:Date.now(),elements:[...collected.values()].flatMap(row=>row.elements)};
    notice(`Base locale actualisée · ${lastList.length} ouvrages · zone limitée à ${plan.length} lots`);
+   return true;
   }catch(error){
    workNoticeUntil=Math.max(Date.now()+120000,Number(error.retryAt)||0);
    notice('Mise à jour en attente · '+error.message+' · lots validés conservés');
-  }finally{window.nauticSetDataUpdating?.(false);}
+   return false;
+  }finally{updateDataCounter();window.nauticSetDataUpdating?.(false);}
  }
  async function updateWorks(force=false){
   if(busy){if(force){await worksTask;return updateWorks(true);}return;}
@@ -1226,16 +1284,36 @@
   const code=item.notice[0];
   return item.name!=='Panneau'?item.name:W.noticeDefinitions[code]||code||item.name;
  }
- function showItem(id){const p=mapWorks().find(x=>x.id===id);if(!p)return;
+ function workMemoryTools(p){return '<p class="muted">Données mémorisées · dernière collecte : '+
+  (p.updated?new Date(p.updated).toLocaleString('fr-FR'):'date non renseignée')+
+  '. Tarifs, horaires et accès à confirmer.</p><button type="button" id="nauticRefreshWork">↻ Rafraîchir cette fiche</button>';}
+ function bindWorkRefresh(p){
+  const content=$('dialogContent');content.dataset.workMemory=p.id;
+  const button=$('nauticRefreshWork');if(!button)return;
+  button.onclick=async()=>{
+   button.disabled=true;button.textContent='Actualisation de la zone…';
+   if(busy)await worksTask;
+   let updated=true;
+   if(native?.syncNavigationTile){busy=true;worksTask=updateLocalWorks({p:{lat:p.lat,lon:p.lon},radius:1000,selected:true},true).finally(()=>{busy=false;});updated=await worksTask;}
+   else{selectedWorkPoint={lat:p.lat,lon:p.lon};await updateWorks(true);}
+   if(updated===false){button.disabled=false;button.textContent='Réessayer · échec réseau, fiche conservée';return;}
+   if($('dialog').open&&content.dataset.workMemory===p.id){
+    const fresh=data?.items.find(item=>item.id===p.id)||p;
+    // Keep the selected fiche available even when it lies outside the current map filter.
+    showItem(p.id,fresh);
+   }
+  };
+ }
+ function showItem(id,override){const p=override||mapWorks().find(x=>x.id===id);if(!p)return;
   if(p.category==='notice'){
    const details=p.notice.map(mark=>'<li>'+signImage(mark)+esc(W.noticeDefinitions[mark]||('Code OSM : '+mark))+'</li>').join('');
-   modal('Panneau de navigation','<p><strong>'+esc(p.name)+'</strong></p>'+
+   modal('Panneau de navigation',workMemoryTools(p)+'<p><strong>'+esc(p.name)+'</strong></p>'+
     (details?'<ul>'+details+'</ul>':'<p>Signification non renseignée dans OpenStreetMap.</p>')+
     (p.noticeText?'<p>'+esc(p.noticeText)+'</p>':'')+
     (p.notice.some(code=>Object.hasOwn(window.NauticSignImages||{},code))?
      '<p class="muted">Illustrations de référence · <a href="https://wiki.openstreetmap.org/wiki/Seamarks/CEVNI_Notice_Marks">Catalogue CEVNI</a></p>':'')+
     '<small>Source : © contributeurs OpenStreetMap'+(options.objectNumbers!==false?' · Objet 583':'')+'</small>');
-   return;
+   bindWorkRefresh(p);return;
   }
   const number=String(p.phone||'').split(';')[0].trim();
   const safePhone=/^[+0-9(). \-]{3,40}$/.test(number)?number:'';
@@ -1247,13 +1325,14 @@
    (p.charge?'<p>Tarification déclarée : '+esc(p.charge)+'</p>':'')+
    (p.fee?'<p>Accès payant déclaré : '+esc(p.fee)+'</p>':'')+
    '<p class="muted">Données OSM déclaratives ; période, services, électricité et eau à vérifier. Aucun prix estimé sans grille du gestionnaire.</p>':'';
-  modal('Ouvrage fluvial',info(p)+
+  modal('Ouvrage fluvial',workMemoryTools(p)+info(p)+
    '<p>GPS (WGS84) : '+Number(p.lat).toFixed(6)+', '+Number(p.lon).toFixed(6)+'</p>'+
    (p.address?'<p>'+esc(p.address)+'</p>':'')+
    (p.category==='lock'?'<p><strong>VHF : '+esc(p.vhf?'canal '+p.vhf:'canal non renseigné')+'</strong></p>':p.vhf?'<p>VHF : canal '+esc(p.vhf)+'</p>':'')+
    (safePhone?'<button type="button" id="waterwayCall" data-object-number="584">☎ Appeler '+esc(safePhone)+'</button>':'<p>Téléphone non renseigné.</p>')+
    (website?'<p><a id="waterwayWebsite" data-object-number="585" href="'+esc(website)+'">Site du gestionnaire / tarifs</a></p>':'')+rates+
    '<p class="muted">Source : © contributeurs OpenStreetMap. Couverture et caractéristiques à vérifier auprès du gestionnaire. Les hauteurs ne tiennent pas compte du niveau d’eau du jour.</p>');
+  bindWorkRefresh(p);
   const call=$('waterwayCall');if(call)call.onclick=()=>{if(window.NauticAndroid?.call)window.NauticAndroid.call(safePhone);else location.href='tel:'+encodeURIComponent(safePhone);};
  }
  function showList(list=lastList){modal(selectedWorkPoint?'Ouvrages autour du point choisi':'Ouvrages autour du bateau', (options.waterwayTypes?.sondeurAlert === false ? '' : '<button type="button" id="waterwaySondeurAlerts">Points d’alerte du sondeur</button>')+`<p class="muted">Périmètre : ${(Number(options.waterwayRadius)||5000)/1000} km. Réseau d’eau calculé quand raccordé ; bifurcations à confirmer. Source : © contributeurs OpenStreetMap, cache ${cache?new Date(cache.time).toLocaleString('fr-FR'):'absent'}.</p>`+(list.length?list.slice(0,200).map(p=>`<button type="button" data-work="${esc(p.id)}" style="display:block;width:100%;margin:6px 0;text-align:left">${info(p)}</button>`).join(''):'<p>Aucun ouvrage disponible dans ce périmètre.</p>'));const alertsButton=$('waterwaySondeurAlerts');if(alertsButton)alertsButton.onclick=()=>{$('dialog').close();$('sondeurAlertList')?.click();};$('dialogContent').querySelectorAll('[data-work]').forEach(b=>b.onclick=()=>showItem(b.dataset.work));}status.onclick=()=>showList();

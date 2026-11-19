@@ -1,0 +1,17 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const notices=require('../../app/src/main/assets/nautic-notices.js');
+const source=fs.readFileSync('app/src/main/assets/nautic-vector.js','utf8');
+const items=[{countryCode:'FR',number:'2026/8405/0',state:80,limitations:['OBSTRU'],dateStart:'2026-11-16',dateEnd:'2026-12-31'}];
+const memory=new Map([['nautic-vnf-notice-memory',JSON.stringify({checkedAt:Date.now()-60000,items})]]);
+const context={notices,Date,JSON,Number,Object,window:{},localStorage:{getItem:key=>memory.get(key),setItem:(key,value)=>memory.set(key,value)},native:{readSetting:key=>memory.get(key),writeSetting:(key,value)=>memory.set(key,value)},renderTrip(){},$:()=>({open:false}),noticeStatus:''};
+vm.createContext(context);
+vm.runInContext(source.slice(source.indexOf(' const liveNotices={};'),source.indexOf(' const validPoint=')),context);
+vm.runInContext('this.memoryState=()=>({noticeVerifiedAt,noticeFromMemory,lastNoticeCheck,liveNotices});',context);
+assert(context.memoryState().noticeFromMemory);assert.equal(context.memoryState().liveNotices['2026/8405/0'].end,'2026-12-31');
+const start=source.indexOf(' window.nauticNavigationNotices=raw=>{');
+vm.runInContext(source.slice(start,source.indexOf(' function tripData()',start)),context);
+context.window.nauticNavigationNotices(JSON.stringify({items}));
+assert.equal(context.memoryState().noticeFromMemory,false);const date=context.memoryState().noticeVerifiedAt;
+assert.equal(JSON.parse(memory.get('nautic-vnf-notice-memory')).checkedAt,date);
+context.window.nauticNavigationNotices('invalid response');assert.equal(context.memoryState().noticeVerifiedAt,date);
+console.log('PASS: stored VNF data restore with date, verified responses persist, failures preserve verification date');

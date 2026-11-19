@@ -235,6 +235,12 @@ public class MainActivity extends Activity {
     }catch(org.json.JSONException ignored){}
    },"nautic-map-city").start();
   }
+  @JavascriptInterface public void navigationDataStats(){
+   new Thread(()->{
+    try{if(!isDestroyed())js("nauticNavigationStats",NavigationStore.get(MainActivity.this).stats().toString());}
+    catch(Exception error){if(!isDestroyed())js("nauticNavigationStats","{}");}
+   },"nautic-data-counter").start();
+  }
   @JavascriptInterface public String readNavigationTile(String key){
    try{org.json.JSONObject entry=NavigationStore.get(MainActivity.this).read(key);return entry==null?"":entry.toString();}
    catch(Exception error){return "";}

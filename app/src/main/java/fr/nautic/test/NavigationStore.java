@@ -13,6 +13,7 @@ import org.json.*;
 /** Static navigation tiles. Each validated replacement is committed atomically. */
 final class NavigationStore extends SQLiteOpenHelper {
  private static NavigationStore instance;
+ private JSONObject cachedStats;
  static synchronized NavigationStore get(Context context){
   if(instance==null)instance=new NavigationStore(context.getApplicationContext());return instance;
  }
@@ -27,16 +28,24 @@ final class NavigationStore extends SQLiteOpenHelper {
  synchronized void save(String key,JSONObject entry)throws JSONException{
   if(!key.matches("fr-[0-9]+-[0-9]+")||!entry.has("updated")||!(entry.opt("elements") instanceof JSONArray))throw new JSONException("lot invalide");
   JSONObject stable=new JSONObject(entry.toString());
-  JSONArray elements=stable.getJSONArray("elements");
-  for(int i=0;i<elements.length();i++){
-   JSONObject tags=elements.getJSONObject(i).optJSONObject("tags");if(tags==null)continue;
-   java.util.ArrayList<String> transientKeys=new java.util.ArrayList<>();
-   java.util.Iterator<String> keys=tags.keys();
-   while(keys.hasNext()){String name=keys.next();if(name.equals("charge")||name.startsWith("charge:")||name.equals("fee:amount"))transientKeys.add(name);}
-   for(String name:transientKeys)tags.remove(name);
-  }
   ContentValues values=new ContentValues();values.put("id",key);values.put("payload",stable.toString());
+  cachedStats=null;
   if(getWritableDatabase().insertWithOnConflict("tiles",null,values,SQLiteDatabase.CONFLICT_REPLACE)<0)throw new android.database.sqlite.SQLiteException("enregistrement local impossible");
+ }
+ synchronized JSONObject stats()throws JSONException{
+  if(cachedStats!=null)return cachedStats;
+  java.util.HashSet<String> ids=new java.util.HashSet<>();long bytes=0,oldest=Long.MAX_VALUE,newest=0;int lots=0;
+  try(Cursor cursor=getReadableDatabase().query("tiles",new String[]{"payload"},null,null,null,null,null)){
+   while(cursor.moveToNext()){
+    String raw=cursor.getString(0);JSONObject tile=new JSONObject(raw);lots++;bytes+=raw.getBytes(StandardCharsets.UTF_8).length;
+    long date=tile.optLong("updated",0);if(date>0){oldest=Math.min(oldest,date);newest=Math.max(newest,date);}
+    JSONArray elements=tile.getJSONArray("elements");
+    for(int i=0;i<elements.length();i++){JSONObject e=elements.getJSONObject(i);ids.add(e.optString("type")+"/"+e.optLong("id"));}
+   }
+  }
+  cachedStats=new JSONObject().put("lots",lots).put("objects",ids.size()).put("bytes",bytes)
+   .put("oldest",oldest==Long.MAX_VALUE?0:oldest).put("newest",newest);
+  return cachedStats;
  }
  static JSONObject shared(String base,String key)throws Exception{
   if(base==null||base.isEmpty())return null;
