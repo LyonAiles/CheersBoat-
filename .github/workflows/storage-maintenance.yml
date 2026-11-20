@@ -1,0 +1,26 @@
+name: Nautic - Entretien du stockage
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/github-storage/**
+      - .github/workflows/storage-maintenance.yml
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: nautic-storage-maintenance
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nettoyer uniquement les copies publiées et les caches anciens
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/github-storage/maintain.py --apply
