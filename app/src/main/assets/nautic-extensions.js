@@ -134,7 +134,7 @@ let chosenLayer=null;
 function setLayer(id){if(!map||!window.L)return;layoutNavigationMap();map.invalidateSize();map.eachLayer(l=>{if(l instanceof L.TileLayer)map.removeLayer(l)});let d=layerDefs[id]||layerDefs.osm;chosenLayer=L.tileLayer(d.url,{maxZoom:d.maxZoom,attribution:d.attr}).addTo(map);if(id==='sea')L.tileLayer('https://t1.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap',zIndex:5}).addTo(map);state.map=id;persist();let foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Carte '+d.label+' · suivi GPS';rotateMap()}
 window.nauticRestoreLegacy=()=>setLayer(state.map);
 function mapTransparency(value){
- const percent=Number.isFinite(value)?Math.min(80,Math.max(0,value)):40;
+ const percent=Number.isFinite(value)?Math.min(80,Math.max(0,value)):50;
  document.documentElement.style.setProperty('--nautic-ui-opacity',String(1-percent/100));
  return percent;
 }
@@ -274,7 +274,7 @@ const contactButton=document.createElement('button');contactButton.id='nauticCon
 const header=document.querySelector('#app header');
 // Derniers appels occupe l'emplacement 35, à gauche du compteur de vitesse.
 const gauges=document.querySelector('#app .gauges');
-if(gauges){const slot=document.createElement('div');slot.id='nauticCallsSlot';slot.appendChild(contactButton);gauges.insertBefore(slot,gauges.firstChild);}else header.appendChild(contactButton);
+if(get('nauticCallsSlot'))get('nauticCallsSlot').appendChild(contactButton);else if(gauges){const slot=document.createElement('div');slot.id='nauticCallsSlot';slot.appendChild(contactButton);gauges.insertBefore(slot,gauges.firstChild);}else header.appendChild(contactButton);
 function cameraDialogNative(i){
  const key='cam'+i,url=cfg[key]||'';
  openModal('Caméra '+i,`<div class="nauticCameraStage" id="cameraStage">
@@ -362,8 +362,9 @@ function updateCameras(){
  window.nauticBindCamera42?.();
 }
 updateCameras();
-const appearanceDefaults={theme:'nautic',background:'gradient',buttons:'rounded',labels:'both',scale:100,accent:'#31b9e9',panel:'#09283e',layout:'navigation',order:[]};
+const appearanceDefaults={theme:'nautic',background:'seabed',buttons:'rounded',labels:'both',scale:100,accent:'#31b9e9',panel:'#09283e',layout:'navigation',order:[]};
 state.appearance=Object.assign({},appearanceDefaults,state.appearance||{});
+if(!state.seabedDashboardV1){state.appearance.background="seabed";state.mapTransparency=50;state.seabedDashboardV1=true;persist();mapTransparency(50);}
 const movableIds=['gpsCard','boatCard','fuelCard','logCard','speedCard','headingCard','weatherCard','cam1Card','cam2Card','cam3Card'];
 const themeColors={nautic:['#31b9e9','#09283e'],day:['#176a9d','#dbeaf0'],night:['#d75a5a','#241719'],contrast:['#ffff00','#000000']};
 const appearanceCSS=document.createElement('style');

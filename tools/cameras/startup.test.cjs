@@ -1,8 +1,10 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-let now=0,x=0,ready=0,shown=0,frames=[];
-const element={getBoundingClientRect:()=>({x,y:0,width:100,height:50})};
-const context={innerWidth:400,innerHeight:800,performance:{now:()=>now},requestAnimationFrame:fn=>frames.push(fn),document:{readyState:'complete',hidden:false,getElementById:()=>element,documentElement:{classList:{remove:()=>shown++}}},window:{NauticAndroid:{dashboardReady:()=>ready++}}};
-vm.runInNewContext(fs.readFileSync('app/src/main/assets/nautic-startup.js','utf8'),context);
-function tick(ms){now=ms;const batch=frames;frames=[];batch.forEach(fn=>fn());}
-tick(0);tick(200);assert.equal(shown,0);x=10;tick(220);tick(400);assert.equal(shown,0);tick(480);assert.equal(shown,1);assert.equal(ready,0);tick(496);assert.equal(ready,1);
-console.log('PASS: layout changes delay reveal; Android notified after next frame.');
+const html=fs.readFileSync('app/src/main/assets/index.html','utf8');
+for(const id of ['gpsCard','boatCard','fuelCard','logCard','nauticCallsSlot','notesCard','trematageCard','speedCard','weatherCard','cam1Card','cam2Card','cam3Card']){
+ assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,'Exactly one static placeholder for '+id);
+}
+assert(!html.includes('visibility:hidden'));assert(!html.includes('nautic-starting'));
+let arranged=0,numbered=0,resumed=0,frame;
+vm.runInNewContext(fs.readFileSync('app/src/main/assets/nautic-startup.js','utf8'),{document:{readyState:'complete'},window:{nauticArrangeDashboard:()=>arranged++,nauticNumberDashboard:()=>numbered++,nauticDashboardResume:()=>resumed++},requestAnimationFrame:fn=>frame=fn});
+assert.equal(arranged,1);assert.equal(numbered,1);frame();assert.equal(resumed,1);
+console.log('PASS: final placeholders are unique and visible from HTML; updates resume without a startup cover.');

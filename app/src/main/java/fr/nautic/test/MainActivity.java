@@ -43,7 +43,6 @@ public class MainActivity extends Activity {
  private WebView web;
  private android.widget.FrameLayout dashboardLayer;
  private DashboardCameras dashboardCameras;
- private android.view.View startupCover;
  private final java.util.concurrent.ExecutorService dashboardCommands=java.util.concurrent.Executors.newSingleThreadExecutor();
  private final java.util.concurrent.atomic.AtomicBoolean trematageBusy=new java.util.concurrent.atomic.AtomicBoolean();
  private boolean dashboardVisible=false,mapManipulating=false;
@@ -105,11 +104,7 @@ public class MainActivity extends Activity {
   });
   android.widget.FrameLayout dashboard=new android.widget.FrameLayout(this);dashboard.addView(web,new android.widget.FrameLayout.LayoutParams(-1,-1));
   dashboardLayer=new android.widget.FrameLayout(this);dashboard.addView(dashboardLayer,new android.widget.FrameLayout.LayoutParams(-1,-1));
-  android.widget.ImageView startupImage=new android.widget.ImageView(this);startupImage.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-  startupImage.setBackgroundColor(android.graphics.Color.rgb(7,29,47));
-  try(java.io.InputStream image=getAssets().open("nautic-seabed.webp")){startupImage.setImageBitmap(android.graphics.BitmapFactory.decodeStream(image));}catch(java.io.IOException ignored){}
-  startupCover=startupImage;
-  startupCover.setClickable(true);dashboard.addView(startupCover,new android.widget.FrameLayout.LayoutParams(-1,-1));setContentView(dashboard);
+  setContentView(dashboard);
   if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)
    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},GPS);
   web.loadUrl("file:///android_asset/index.html");
@@ -322,14 +317,6 @@ public class MainActivity extends Activity {
     catch(Exception e){if(!isDestroyed())js("nauticNavigationNotices","");}
    },"nautic-vnf-notices").start();
   }
-  @JavascriptInterface public void dashboardReady(){runOnUiThread(()->{
-   if(startupCover==null||web==null||isDestroyed())return;
-   web.postVisualStateCallback(1,new WebView.VisualStateCallback(){
-    @Override public void onComplete(long requestId){
-     if(startupCover!=null){android.view.ViewParent parent=startupCover.getParent();if(parent instanceof android.view.ViewGroup)((android.view.ViewGroup)parent).removeView(startupCover);startupCover=null;}
-    }
-   });
-  });}
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
    if(mapManipulating||!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
   });}

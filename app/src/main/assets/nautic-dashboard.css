@@ -337,3 +337,8 @@ html.nautic-map-exploring #windWidget{display:none!important}
 #mapWrap :is(.leaflet-control-zoom,.maplibregl-ctrl-group){display:flex;flex-direction:column;gap:6px;background:transparent}
 
 #app.nautic-bg-seabed{background:linear-gradient(#001b2a44,#001b2a66),url(nautic-seabed.webp) center/cover no-repeat}
+
+/* Persistent seabed, with translucent objects in their final positions. */
+html,body{background:#071d2f url(nautic-seabed.webp) center/cover fixed!important}
+#app.nautic-bg-seabed{background:transparent!important}
+#app.nautic-bg-seabed :is(header,.left>.card,.gauges>.gauge,.gauges>.camCard,.right>.camCard,#mapWrap){opacity:.5}
