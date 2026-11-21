@@ -231,7 +231,7 @@
   if(time<=lastPresentedAlert)return;
   lastPresentedAlert=time;
   restoreMedallion();
-  const mobile=number===42,camera=mobile?Number(index):2;
+  const mobile=number===44,camera=mobile?Number(index):2;
   feeds[centerView]={camera:[1,2,3].includes(camera)?camera:1,lens:mobile?1:2};
   mapCamera.hidden=false;
   mapCamera.classList.remove('nautic-hidden');
