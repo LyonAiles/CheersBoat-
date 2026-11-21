@@ -30,10 +30,11 @@
  let pending42=false;
  window.nauticBindCamera42=()=>{for(const index of [1,3]){const card=$('cam'+index+'Card');if(!card)continue;card.onclick=()=>call('openDashboardCamera',index);card.oncontextmenu=e=>{e.preventDefault();call('openCameraMosaic');};card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.click();}};}if(camera42){camera42.onclick=()=>{if(pending42||!bridge)return;pending42=true;call('toggleCamera42');};camera42.oncontextmenu=e=>{e.preventDefault();if(open42)open42.call(camera42,e);};camera42.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();camera42.click();}};}};window.nauticBindCamera42();
  window.nauticCamera42Result=message=>{pending42=false;if(camera42)camera42.title=message||'';refresh();previews();};
- let pending=false,lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
+ let pending=false,pendingSince=0,lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
  let extraNumbers={};try{extraNumbers=JSON.parse(call('readSetting','nautic-control-numbers')||localStorage.getItem('nautic-control-numbers')||'{}');}catch(_){}
  const fixedNumbers={clock:10,clockDate:11,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,nativeNotesCarry:391,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapCameraPort:45,mapCameraPreview:46,mapCameraStarboard:47,mapCameraQuality:146,mapCameraAxis:148,mapCameraCaptureMenu:149,mapCameraMedallionToggle:147,nauticSignButton:583,waterwayCall:584,waterwayWebsite:585,nauticRefreshWorks:586,nauticDataCounter:587,nauticRefreshWork:588,nauticRefreshNotices:589,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,nauticDestinationStatus:58,nauticAccessibleStatus:59,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
  const reservedNumbers=new Set(Object.values(fixedNumbers));
+ const hiddenNumbers=new Set([87,586,587]);
  const controls='button,[role=button],input:not([type=hidden]),select,textarea,summary,.leaflet-bar a';
  function numberButtons(){
   let enabled=true;try{enabled=JSON.parse(call('readSetting','nautic-extensions')||localStorage.getItem('nautic-extensions')||'{}').objectNumbers!==false;}catch(_){}
@@ -56,6 +57,8 @@
     }
     number=extraNumbers[key];
    }
+   // Resolve saved identifiers even when the number badges are switched off.
+   node.classList.toggle('nautic-control-hidden',hiddenNumbers.has(number??extraNumbers[key]));
    node.dataset.objectNumber=enabled?String(number):'';
    const field=node.matches('input,select,textarea');
    if(field){
@@ -86,6 +89,7 @@
   const w=JSON.parse(call('camera42Status')||'{}');
   if(camera42){camera42.classList.toggle('trematage-active',!!w.active);camera42.setAttribute('aria-pressed',String(!!w.active));camera42.dataset.watchStatus=pending42?'Connexion…':w.active?'● Veille active':'▶ Veille';}
   const s=JSON.parse(call('trematageStatus')||'{}');
+  if(pending&&s.busy===false&&Date.now()-pendingSince>2000)pending=false;
   trematage.classList.toggle('trematage-active',!!s.active);trematage.setAttribute('aria-pressed',String(!!s.active));
   $('trematageIndicator').textContent=s.active?'●':'○';
   if(Number(s.alertTime)>lastAlert){
@@ -98,7 +102,7 @@
   trematage.setAttribute('aria-label',s.active?'Revenir à BASE':'Activer la position Trématage');
   trematage.title=(s.active?'Trématage actif':'Trématage inactif')+' · '+(s.status||'appui long pour régler');
  }catch(e){}}
- trematage.onclick=()=>{if(pending)return;if(!bridge){$('trematageState').textContent='Application Android requise';return;}pending=true;refresh();call('toggleTrematage');};
+ trematage.onclick=()=>{if(pending)return;if(!bridge){$('trematageState').textContent='Application Android requise';return;}pending=true;pendingSince=Date.now();refresh();try{if(typeof bridge.toggleTrematage!=='function')throw new Error('Commande Trématage indisponible');call('toggleTrematage');}catch(e){window.nauticTrematageResult(e.message);}};
  trematage.oncontextmenu=e=>e.preventDefault();
  trematage.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();trematage.click();}};
  window.nauticTrematageResult=message=>{pending=false;resultText=message||'';resultUntil=Date.now()+7000;refresh();previews();};

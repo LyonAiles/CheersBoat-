@@ -71,7 +71,8 @@ class OnvifCamera {
    if(code>=400)throw new IOException("ONVIF : HTTP "+code);return d;
   }finally{c.disconnect();}
  }
- void discover()throws Exception{
+ void discover()throws Exception{discover(true);}
+ void discover(boolean includeEvents)throws Exception{
   Exception last=null;
   for(int port:new int[]{2020,80})try{
    device="http://"+host+":"+port+"/onvif/device_service";
@@ -81,7 +82,7 @@ class OnvifCamera {
   }catch(Exception e){last=e;}
   if(last!=null)throw last;
   if(services.containsKey(MEDIA))profiles.addAll(elements(call(services.get(MEDIA),MEDIA,"GetProfiles",""),"Profiles"));
-  if(services.containsKey(EVENTS))try{
+  if(includeEvents&&services.containsKey(EVENTS))try{
    Document d=call(services.get(EVENTS),EVENTS,"GetEventProperties","");
    for(Element set:elements(d,"TopicSet"))collectTopics(set,"");
   }catch(Exception e){notes.add("Liste des alertes indisponible");}

@@ -75,6 +75,7 @@ final class DashboardCameras {
 
  class Tile{
   final String id;final FrameLayout frame;final ImageView mirror;final TextView message,banner,footer,beacon;
+  final TextView switching;
   boolean alarm=false,active=false;
   int displayedCamera=0,displayedLens=0,cropCamera=0;
   Runnable cancelCenterGestures=()->{};
@@ -95,6 +96,8 @@ final class DashboardCameras {
    banner=overlay(11);banner.setSingleLine(true);banner.setEllipsize(android.text.TextUtils.TruncateAt.END);frame.addView(banner,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
    footer=overlay(10);footer.setMaxLines(2);frame.addView(footer,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));footer.setVisibility(View.GONE);
    beacon=overlay(42);beacon.setText("⚠");beacon.setBackgroundColor(0xe6e00000);beacon.setVisibility(View.GONE);frame.addView(beacon,new FrameLayout.LayoutParams(dp(70),dp(66),Gravity.CENTER));
+   switching=overlay(14);switching.setText("⌛");switching.setContentDescription("Changement de caméra en cours");switching.setBackgroundColor(0x66071d2f);switching.setVisibility(View.GONE);
+   FrameLayout.LayoutParams waiting=new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.BOTTOM|Gravity.RIGHT);waiting.rightMargin=dp(8);waiting.bottomMargin=dp(8);frame.addView(switching,waiting);
    if(isMapView(id)){
     if(isMedallion(id)){
      frame.setOutlineProvider(new ViewOutlineProvider(){
@@ -304,11 +307,18 @@ final class DashboardCameras {
    player.addListener(new Player.Listener(){
     @Override public void onRenderedFirstFrame(){
      if(owner.source!=Source.this)return;
-     owner.setSnapshot(null);
-     owner.message.setText("");
+     // Keep the previous picture until the new texture has reached the UI frame.
+     owner.frame.postOnAnimation(()->{
+      if(owner.source!=Source.this)return;
+      owner.setSnapshot(null);
+      owner.message.setText("");
+      owner.switching.setVisibility(View.GONE);
+     });
     }
     @Override public void onPlayerError(PlaybackException e){
      failed=true;retryAt.put(uri,System.currentTimeMillis()+4000);
+     owner.switching.setVisibility(View.GONE);
+     for(Tile tile:mirrors)tile.switching.setVisibility(View.GONE);
      if(e.getErrorCodeName().contains("DECOD"))decoderBudget=Math.max(1,Math.min(decoderBudget,sources.size()-1));
      if(owner.snapshot==null)owner.message.setText("Relance · "+e.getErrorCodeName());
      for(Tile tile:mirrors)if(tile.snapshot==null)tile.message.setText(owner.message.getText());
@@ -346,7 +356,7 @@ final class DashboardCameras {
    if(mirrors.isEmpty())return;
    Bitmap snapshot=capture();
    if(snapshot==null)return;
-   for(Tile tile:mirrors){tile.setSnapshot(snapshot);tile.message.setText(owner.message.getText());}
+   for(Tile tile:mirrors){tile.setSnapshot(snapshot);tile.message.setText(owner.message.getText());tile.switching.setVisibility(View.GONE);}
   }
  }
  DashboardCameras(MainActivity activity,FrameLayout layer){
@@ -372,7 +382,6 @@ final class DashboardCameras {
    }
    if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();
-   Set<Tile> changedFeeds=new HashSet<>();
    for(int i=0;i<list.length();i++){
     JSONObject item=list.getJSONObject(i);String id=item.getString("id");if(!id.matches("cam[123]Body|trematagePreview|mapCameraPreview|mapCameraPort|mapCameraStarboard"))continue;
     visible.add(id);Tile tile=tiles.get(id);if(tile==null){tile=new Tile(id);tiles.put(id,tile);}
@@ -388,8 +397,9 @@ final class DashboardCameras {
     if(inMap){
      if(index<1||index>3)continue;
      if(tile.displayedCamera!=index||tile.displayedLens!=lens){
+      if(id.equals("mapCameraPreview"))tile.switching.setVisibility(View.VISIBLE);
       tile.cancelCenterGestures.run();tile.centralZoom=1;tile.focusX=.5f;tile.focusY=.5f;tile.applyCrop();
-      changedFeeds.add(tile);tile.displayedCamera=index;tile.displayedLens=lens;
+      tile.displayedCamera=index;tile.displayedLens=lens;
      }
      String number=item.optString("number","");
      tile.banner.setText(number.isEmpty()?"":number+" · "+(40+index));
@@ -445,7 +455,8 @@ final class DashboardCameras {
     if(stalled)retryAt.put(entry.getKey(),now+2000);
     if(group==null||group.get(0)!=source.owner||!selected.contains(entry.getKey())||source.failed||stalled){source.close();iterator.remove();if(stalled||source.failed)selected.remove(entry.getKey());}
    }
-   for(Tile tile:changedFeeds){tile.setSnapshot(null);}
+   // Source.close() retained the outgoing frame. A new source removes that
+   // cover only after its first rendered frame; mirrors replace it on copy().
    for(Map.Entry<String,List<Tile>> e:grouped.entrySet()){
     if(!selected.contains(e.getKey()))continue;
     Source source=sources.get(e.getKey());if(source==null){Tile owner=e.getValue().get(0);owner.message.setText(owner.snapshot==null?"◌":"");source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);}

@@ -320,7 +320,9 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void previewAlertSound(String sound){CameraAlertSounds.play(MainActivity.this,"42",sound);}
   @JavascriptInterface public String camera42Status(){return Camera42Access.status(MainActivity.this);}
   @JavascriptInterface public void toggleCamera42(){runOnUiThread(()->{try{js("nauticCamera42Result",Camera42Access.toggle(MainActivity.this));}catch(Exception e){js("nauticCamera42Result",e.getMessage());}});}
-  @JavascriptInterface public String trematageStatus(){return TrematageAccess.status(MainActivity.this);}
+  @JavascriptInterface public String trematageStatus(){try{
+   return new org.json.JSONObject(TrematageAccess.status(MainActivity.this)).put("busy",trematageBusy.get()).toString();
+  }catch(Exception e){return "{}";}}
   @JavascriptInterface public boolean hasLatestCameraVideo(){return DashboardRecording.latest(MainActivity.this)!=null;}
   @JavascriptInterface public void cameraCapture(String action){
    runOnUiThread(()->{if(dashboardVisible&&dashboardCameras!=null)dashboardCameras.captureAction(action);});
@@ -329,8 +331,8 @@ public class MainActivity extends Activity {
    if(index>=1&&index<=3)runOnUiThread(()->showCameraOrientations(index));
   }
   @JavascriptInterface public void toggleTrematage(){
-   if(!trematageBusy.compareAndSet(false,true))return;
-   dashboardCommands.execute(()->{try{String message=TrematageAccess.toggle(MainActivity.this);js("nauticTrematageResult",message);}catch(Exception e){js("nauticTrematageResult",e.getMessage());}finally{trematageBusy.set(false);}});
+   if(!trematageBusy.compareAndSet(false,true)){js("nauticTrematageResult","Une commande Trématage est déjà en cours");return;}
+   dashboardCommands.execute(()->{try{String message=TrematageAccess.toggle(MainActivity.this);js("nauticTrematageResult",message);}catch(Exception e){String message="Trématage impossible · "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage());toast(message);js("nauticTrematageResult",message);}finally{trematageBusy.set(false);}});
   }
   @JavascriptInterface public void openTrematageCamera(){runOnUiThread(()->{try{
    int index=TrematageAccess.index(MainActivity.this);String address=TrematageAccess.address(MainActivity.this,index);

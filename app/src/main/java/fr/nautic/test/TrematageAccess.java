@@ -24,7 +24,7 @@ final class TrematageAccess {
   int index=index(c);String host=Uri.parse(address(c,index)).getHost();if(host==null)throw new java.io.IOException("Configurer la caméra TC47 dans Paramètres");
   android.content.SharedPreferences credentials=c.getSharedPreferences("nautic_camera_private",Context.MODE_PRIVATE);
   OnvifCamera camera=new OnvifCamera(host,credentials.getString("username"+index,credentials.getString("username","")),credentials.getString("password"+index,credentials.getString("password","")));
-  camera.discover();String preferred=prefs(c).getString("shortcutProfile","");
+  camera.discover(false);String preferred=prefs(c).getString("shortcutProfile","");
   Element profile=TrematageProfiles.select(camera.profiles,host,preferred,prefs(c).getAll());
   if(profile==null)throw new java.io.IOException("Objectif mobile non accessible par ONVIF");
   String key=host+"|"+profile.getAttribute("token");
