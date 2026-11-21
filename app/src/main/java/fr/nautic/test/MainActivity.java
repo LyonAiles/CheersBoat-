@@ -330,9 +330,20 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void openCameraOrientations(int index){
    if(index>=1&&index<=3)runOnUiThread(()->showCameraOrientations(index));
   }
-  @JavascriptInterface public void toggleTrematage(){
+  @JavascriptInterface public void toggleTrematage(){runTrematage(false);}
+  private void runTrematage(boolean recover){
    if(!trematageBusy.compareAndSet(false,true)){js("nauticTrematageResult","Une commande Trématage est déjà en cours");return;}
-   dashboardCommands.execute(()->{try{String message=TrematageAccess.toggle(MainActivity.this);js("nauticTrematageResult",message);}catch(Exception e){String message="Trématage impossible · "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage());toast(message);js("nauticTrematageResult",message);}finally{trematageBusy.set(false);}});
+   dashboardCommands.execute(()->{
+    try{js("nauticTrematageResult",TrematageAccess.toggle(MainActivity.this,recover));}
+    catch(TrematageAccess.RecoveryRequired e){
+     js("nauticTrematageResult","Ancien état Trématage · retour BASE à confirmer");
+     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())new AlertDialog.Builder(MainActivity.this)
+       .setTitle("44 · Récupérer Trématage").setMessage(e.getMessage())
+       .setPositiveButton("620 · Retour BASE",(dialog,which)->runTrematage(true))
+       .setNegativeButton("621 · Annuler",null).show();});
+    }catch(Exception e){String message="Trématage impossible · "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage());toast(message);js("nauticTrematageResult",message);}
+    finally{trematageBusy.set(false);}
+   });
   }
   @JavascriptInterface public void openTrematageCamera(){runOnUiThread(()->{try{
    int index=TrematageAccess.index(MainActivity.this);String address=TrematageAccess.address(MainActivity.this,index);

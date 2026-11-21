@@ -46,4 +46,18 @@ public class TrematageSessionTest {
  @Test public void associatingAnExistingPositionNeverWritesToTheCamera()throws Exception{
   Camera c=new Camera();new TrematageSession(c,profile(),new Memory()).remember();assertEquals(Collections.singletonList("GetPresets"),c.commands);
  }
+ @Test public void recoveryMovesToCurrentBaseAndPreservesOldBackup()throws Exception{
+  Camera c=new Camera();Memory current=new Memory(),old=new Memory();old.armed=true;
+  new TrematageSession(c,profile(),current).recoverAtBase(old);
+  assertFalse(old.armed);assertEquals("old-return",old.backup);assertEquals("base",current.backup);
+  assertTrue(c.commands.get(c.commands.size()-1).contains("base"));
+ }
+ @Test public void recoveryFailureNeverDiscardsOldState()throws Exception{
+  for(boolean missing:new boolean[]{false,true}){
+   Camera c=new Camera();c.missingBase=missing;c.failGo=!missing;
+   Memory current=new Memory(),old=new Memory();old.armed=true;
+   try{new TrematageSession(c,profile(),current).recoverAtBase(old);fail();}catch(java.io.IOException expected){}
+   assertTrue(old.armed);assertEquals("old-return",old.backup);assertEquals("old-return",current.backup);
+  }
+ }
 }

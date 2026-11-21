@@ -37,6 +37,13 @@ final class TrematageSession {
   store.save(base,true);
   go(target);
  }}
+ void recoverAtBase(Store previous)throws Exception{synchronized(TrematageSession.class){
+  String base="";for(Element e:presets())if("BASE".equalsIgnoreCase(OnvifCamera.value(e,"Name").trim())){base=e.getAttribute("token");break;}
+  if(base.isEmpty())throw new IOException("Position BASE introuvable sur la caméra actuelle ; ancien retour conservé");
+  go(base); // Keep the old recovery state if the command fails.
+  store.save(base,false);
+  previous.save(previous.backup(),false); // Preserve the backup, retire only its active flag.
+ }}
  void deactivate()throws Exception{synchronized(TrematageSession.class){
   if(!store.armed())return;
   String base="";for(Element e:presets())if("BASE".equalsIgnoreCase(OnvifCamera.value(e,"Name").trim())){base=e.getAttribute("token");break;}

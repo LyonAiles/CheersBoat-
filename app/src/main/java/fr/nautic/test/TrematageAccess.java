@@ -20,7 +20,11 @@ final class TrematageAccess {
    public void save(String backup,boolean armed)throws Exception{if(!p.edit().putString(key+".return",backup).putBoolean(key+".active",armed).commit())throw new java.io.IOException("Sauvegarde de la position de retour impossible");}
   };
  }
- static String toggle(Context c)throws Exception{
+ static final class RecoveryRequired extends java.io.IOException{
+  RecoveryRequired(String oldHost,String newHost){super("Un ancien état Trématage est conservé pour "+oldHost+". Si la caméra actuelle ("+newHost+") est bien la même caméra mobile, demander son retour à BASE pour débloquer le bouton 44. Aucun préréglage Tapo ne sera modifié.");}
+ }
+ static String toggle(Context c)throws Exception{return toggle(c,false);}
+ static String toggle(Context c,boolean recover)throws Exception{
   int index=index(c);String host=Uri.parse(address(c,index)).getHost();if(host==null)throw new java.io.IOException("Configurer la caméra TC47 dans Paramètres");
   android.content.SharedPreferences credentials=c.getSharedPreferences("nautic_camera_private",Context.MODE_PRIVATE);
   OnvifCamera camera=new OnvifCamera(host,credentials.getString("username"+index,credentials.getString("username","")),credentials.getString("password"+index,credentials.getString("password","")));
@@ -47,7 +51,13 @@ final class TrematageAccess {
   prefs(c).edit().putString("shortcutKey",key).putString("shortcutProfile",profile.getAttribute("token")).apply();
   if(store.armed()){session.deactivate();TrematageService.stop(c,key);return "Trématage désactivé · retour BASE demandé";}
   String other=prefs(c).getString("watchKey","");
-  if(!other.isEmpty()&&!TrematageProfiles.sameCamera(other,key)&&prefs(c).getBoolean(other+".active",false))throw new java.io.IOException("Une position de retour est encore conservée pour "+other.substring(0,other.indexOf('|'))+" ; revenir depuis ses commandes");
+  if(!other.isEmpty()&&!TrematageProfiles.sameCamera(other,key)&&prefs(c).getBoolean(other+".active",false)){
+   if(!recover)throw new RecoveryRequired(other.split("\\|",2)[0],host);
+   session.recoverAtBase(store(c,other));
+   TrematageService.stop(c,other);
+   prefs(c).edit().putString("watchStatus","Ancien état récupéré · retour BASE demandé").apply();
+   return "Retour BASE demandé · vérifier l’image puis toucher 44 pour activer Trématage";
+  }
   session.activate();prefs(c).edit().putString("shortcutKey",key).putString("shortcutProfile",profile.getAttribute("token")).apply();
   TrematageFeedback.activated(c);TrematageService.start(c,host,index,key);return "Trématage activé";
  }
