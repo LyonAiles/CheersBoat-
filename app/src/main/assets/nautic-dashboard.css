@@ -323,3 +323,15 @@ input:not([type]):not([readonly]),textarea:not([readonly]),[contenteditable=true
 html.nautic-map-exploring #windWidget{display:none!important}
 /* Controls explicitly hidden from the dashboard, including dynamically created ones. */
 .nautic-control-hidden,#nauticRefreshWorks,#nauticDataCounter{display:none!important}
+
+/* Equal camera tools, with a visible gap between neighbouring controls. */
+#mapWrap :is(#mapCameraQuality,#mapCameraMedallionToggle,#mapCameraAxis,#mapCameraCaptureMenu){
+ box-sizing:border-box;width:44px;height:44px;min-width:44px;min-height:44px;padding:2px;font-size:20px;
+}
+#mapCameraQuality{left:10px;bottom:10px}
+#mapCameraAxis{left:10px;bottom:64px}
+#mapCameraMedallionToggle{right:10px;bottom:10px}
+#mapWrap #mapCameraCaptureMenu{right:10px;top:calc(var(--sondeur-toolbar-height,36px) + 10px)}
+
+#dialog .destination-menu,#dialog .saved-route-actions{gap:9px}
+#mapWrap :is(.leaflet-control-zoom,.maplibregl-ctrl-group){display:flex;flex-direction:column;gap:6px;background:transparent}

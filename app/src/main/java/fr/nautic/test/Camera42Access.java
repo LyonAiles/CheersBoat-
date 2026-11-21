@@ -20,5 +20,5 @@ final class Camera42Access {
   try{Camera42Service.start(c,host,2,host+"|watch42");}catch(Exception e){p.edit().putBoolean("active",false).apply();throw e;}
   CameraAlertSounds.play(c,"42","bell");return "Veille activée";
  }
- static String status(Context c){try{SharedPreferences p=prefs(c);return new JSONObject().put("active",p.getBoolean("active",false)).put("status",p.getString("watchStatus","")).toString();}catch(Exception e){return "{}";}}
+ static String status(Context c){try{SharedPreferences p=prefs(c);return new JSONObject().put("active",p.getBoolean("active",false)).put("status",p.getString("watchStatus","")).put("alertTime",p.getLong("lastAlertTime",0)).toString();}catch(Exception e){return "{}";}}
 }

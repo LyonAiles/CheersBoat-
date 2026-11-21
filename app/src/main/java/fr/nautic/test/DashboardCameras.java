@@ -200,6 +200,21 @@ final class DashboardCameras {
     }
    });
   }
+  void acknowledgeTap(float x,float y,boolean twice){
+   View pulse=new View(activity);
+   android.graphics.drawable.GradientDrawable outer=new android.graphics.drawable.GradientDrawable();
+   outer.setShape(android.graphics.drawable.GradientDrawable.OVAL);outer.setColor(Color.TRANSPARENT);outer.setStroke(dp(2),0xddbcefff);
+   if(twice){
+    android.graphics.drawable.GradientDrawable inner=new android.graphics.drawable.GradientDrawable();
+    inner.setShape(android.graphics.drawable.GradientDrawable.OVAL);inner.setColor(Color.TRANSPARENT);inner.setStroke(dp(2),0xddbcefff);
+    android.graphics.drawable.LayerDrawable rings=new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{outer,inner});
+    rings.setLayerInset(1,dp(9),dp(9),dp(9),dp(9));pulse.setBackground(rings);
+   }else pulse.setBackground(outer);
+   pulse.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+   FrameLayout.LayoutParams bounds=new FrameLayout.LayoutParams(dp(52),dp(52));bounds.leftMargin=Math.round(x-dp(26));bounds.topMargin=Math.round(y-dp(26));frame.addView(pulse,bounds);
+   pulse.setScaleX(.65f);pulse.setScaleY(.65f);
+   pulse.animate().scaleX(1.6f).scaleY(1.6f).alpha(0).setDuration(550).withEndAction(()->frame.removeView(pulse)).start();
+  }
   void installTransparencyGesture(){
    frame.setOnTouchListener(new View.OnTouchListener(){
     float startX,startY,startAlpha,startFocusX,startFocusY;
@@ -207,11 +222,11 @@ final class DashboardCameras {
     boolean center,dragged,held,multi,second;
     long lastTap;
     float tapX,tapY;
-    final Runnable click=()->{if(frame.isShown())frame.performClick();};
+    final Runnable click=()->{if(frame.isShown()){acknowledgeTap(tapX,tapY,false);frame.performClick();}};
     final Runnable align=()->{
      if(!frame.isShown()||multi)return;
      frame.removeCallbacks(click);lastTap=0;held=true;
-     activity.dashboardClick(id,true);
+     acknowledgeTap(tapX,tapY,false);activity.dashboardClick(id,true);
     };
     {cancelCenterGestures=()->{frame.removeCallbacks(click);frame.removeCallbacks(align);lastTap=0;held=true;multi=true;adjustingMapAlpha=false;};}
     final ScaleGestureDetector pinch=new ScaleGestureDetector(activity,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
@@ -234,6 +249,7 @@ final class DashboardCameras {
         &&Math.hypot(event.getX()-tapX,event.getY()-tapY)<ViewConfiguration.get(activity).getScaledDoubleTapSlop();
        if(second)view.removeCallbacks(click);
        center=Math.abs(event.getX()-view.getWidth()/2f)<=view.getWidth()/6f;
+       tapX=event.getX();tapY=event.getY();
        startX=event.getRawX();startY=event.getRawY();startAlpha=mapAlpha;
        startFocusX=focusX;startFocusY=focusY;panning=centralZoom>1.01f;
        dragged=false;held=false;multi=false;
@@ -263,6 +279,7 @@ final class DashboardCameras {
        view.removeCallbacks(align);
        if(event.getActionMasked()==MotionEvent.ACTION_UP&&!dragged&&!held&&!multi){
         if(second){
+         acknowledgeTap(event.getX(),event.getY(),true);
          lastTap=0;centralZoom=centralZoom>1?1:2.5f;
          focusX=event.getX()/Math.max(1,view.getWidth());focusY=event.getY()/Math.max(1,view.getHeight());applyCrop();
         }else{
@@ -735,10 +752,10 @@ final class DashboardCameras {
   }
   String label=bounds.optString("label"),number=bounds.optString("number","");
   boolean pressed=bounds.optBoolean("pressed");
-  button.setText(number.isEmpty()?label:label+" · "+number);
+  button.setText(number.isEmpty()?label:label+"\n"+number);
   button.setContentDescription(id.equals("mapCameraMedallionToggle")?
     (pressed?"Masquer les médaillons":"Afficher les médaillons"):description);
-  button.setTextSize(id.equals("mapCameraCaptureMenu")?16:id.equals("mapCameraQuality")&&number.isEmpty()?14:11);
+  button.setTextSize(number.isEmpty()?20:14);
   android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
   background.setColor(pressed?0xed1b6257:0xed092f43);
   background.setCornerRadius(8*activity.getResources().getDisplayMetrics().density);

@@ -50,7 +50,10 @@ public class MainActivity extends Activity {
  void dashboardClick(String id,boolean held){js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
  void updateMapCameraAlpha(float alpha){js("nauticMapCameraAlpha",Float.toString(alpha));}
  void refreshDashboardVideos(){js("nauticDashboardResume","");}
- void dashboardAlert(String message){js("nauticTrematageAlert",message);}
+ void dashboardAlert(int number,String message){try{
+  android.content.SharedPreferences p=number==42?Camera42Access.prefs(this):TrematageAccess.prefs(this);
+  js("nauticCameraAlert",new org.json.JSONObject().put("number",number).put("message",message).put("time",p.getLong("lastAlertTime",System.currentTimeMillis())).toString());
+ }catch(Exception ignored){}}
  private PermissionRequest pendingCamera;
  private NotesPad notesPad;
  private android.content.BroadcastReceiver trematageReceiver;

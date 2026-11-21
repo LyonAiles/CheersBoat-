@@ -30,7 +30,7 @@
  let pending42=false;
  window.nauticBindCamera42=()=>{for(const index of [1,3]){const card=$('cam'+index+'Card');if(!card)continue;card.onclick=()=>call('openDashboardCamera',index);card.oncontextmenu=e=>{e.preventDefault();call('openCameraMosaic');};card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.click();}};}if(camera42){camera42.onclick=()=>{if(pending42||!bridge)return;pending42=true;call('toggleCamera42');};camera42.oncontextmenu=e=>{e.preventDefault();if(open42)open42.call(camera42,e);};camera42.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();camera42.click();}};}};window.nauticBindCamera42();
  window.nauticCamera42Result=message=>{pending42=false;if(camera42)camera42.title=message||'';refresh();previews();};
- let pending=false,pendingSince=0,lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
+ let pending=false,pendingSince=0,lastAlert42=0,lastPresentedAlert=0,lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
  let extraNumbers={};try{extraNumbers=JSON.parse(call('readSetting','nautic-control-numbers')||localStorage.getItem('nautic-control-numbers')||'{}');}catch(_){}
  const fixedNumbers={clock:10,clockDate:11,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,nativeNotesCarry:391,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapCameraPort:45,mapCameraPreview:46,mapCameraStarboard:47,mapCameraQuality:146,mapCameraAxis:148,mapCameraCaptureMenu:149,mapCameraMedallionToggle:147,nauticSignButton:583,waterwayCall:584,waterwayWebsite:585,nauticRefreshWorks:586,nauticDataCounter:587,nauticRefreshWork:588,nauticRefreshNotices:589,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,nauticDestinationStatus:58,nauticAccessibleStatus:59,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
  const reservedNumbers=new Set(Object.values(fixedNumbers));
@@ -89,12 +89,13 @@
   const w=JSON.parse(call('camera42Status')||'{}');
   if(camera42){camera42.classList.toggle('trematage-active',!!w.active);camera42.setAttribute('aria-pressed',String(!!w.active));camera42.dataset.watchStatus=pending42?'Connexion…':w.active?'● Veille active':'▶ Veille';}
   const s=JSON.parse(call('trematageStatus')||'{}');
+  if(Number(w.alertTime)>lastAlert42){lastAlert42=Number(w.alertTime);if(Date.now()-lastAlert42<30000)showAlertCamera(42,s.index,lastAlert42);}
   if(pending&&s.busy===false&&Date.now()-pendingSince>2000)pending=false;
   trematage.classList.toggle('trematage-active',!!s.active);trematage.setAttribute('aria-pressed',String(!!s.active));
   $('trematageIndicator').textContent=s.active?'●':'○';
   if(Number(s.alertTime)>lastAlert){
    lastAlert=Number(s.alertTime);
-   if(Date.now()-lastAlert<30000){alarmUntil=lastAlert+30000;showTrematageCamera(s.index);}
+   if(Date.now()-lastAlert<30000){alarmUntil=lastAlert+30000;showAlertCamera(44,s.index,lastAlert);}
   }
   activationUntil=Number(s.activationTime||0)+4000;
   trematage.classList.toggle('trematage-alert',Date.now()<alarmUntil||(s.active&&Date.now()<activationUntil));
@@ -110,7 +111,16 @@
   alarmUntil=Date.now()+30000;
   refresh();
   const status=JSON.parse(call('trematageStatus')||'{}');
-  showTrematageCamera(status.index);
+  showAlertCamera(44,status.index,Number(status.alertTime)||Date.now());
+ };
+ window.nauticCameraAlert=payload=>{
+  try{
+   const event=JSON.parse(payload),number=Number(event.number);
+   if(number!==42&&number!==44)return;
+   const status=JSON.parse(call('trematageStatus')||'{}');
+   if(number===44)alarmUntil=Date.now()+30000;
+   refresh();showAlertCamera(number,status.index,Number(event.time)||Date.now());
+  }catch(_){}
  };
  const mapCamera=document.createElement('div');
  mapCamera.hidden=true;
@@ -154,11 +164,11 @@
  };
  const medallionTool=document.createElement('button');
  medallionTool.type='button';medallionTool.id='mapCameraMedallionToggle';
- medallionTool.textContent='Médaillons';medallionTool.hidden=true;
+ medallionTool.textContent='◉';medallionTool.setAttribute('aria-label','Afficher ou masquer les médaillons');medallionTool.hidden=true;
  medallionTool.onclick=()=>window.nauticToggleMapMedallions();
  const axisTool=document.createElement('button');
  axisTool.type='button';axisTool.id='mapCameraAxis';axisTool.hidden=true;
- axisTool.textContent='Axe';
+ axisTool.textContent='✥';
  axisTool.setAttribute('aria-label','Positions de l’objectif mobile');
  axisTool.onclick=openAxisMenu;
  const captureTool=document.createElement('button');
@@ -200,7 +210,8 @@
   medallionTool.hidden=mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
   medallionTool.setAttribute('aria-pressed',String(!$('app').classList.contains('hide-mapCameraMedallions')));
   refreshAxis();
-  qualityTool.textContent=mapHd?'HD':'SD';
+  qualityTool.textContent='▧';
+  qualityTool.title='Qualité vidéo · '+(mapHd?'HD':'SD');qualityTool.setAttribute('aria-label',qualityTool.title);
   qualityTool.setAttribute('aria-pressed',String(mapHd));
  }
  function switchMapCamera(){
@@ -216,10 +227,12 @@
   [feeds[centerView],feeds[swappedMedallion]]=[feeds[swappedMedallion],feeds[centerView]];
   swappedMedallion=null;
  }
- function showTrematageCamera(index){
+ function showAlertCamera(number,index,time){
+  if(time<=lastPresentedAlert)return;
+  lastPresentedAlert=time;
   restoreMedallion();
-  const camera=Number(index);
-  feeds[centerView]={camera:[1,2,3].includes(camera)?camera:1,lens:1};
+  const mobile=number===42,camera=mobile?Number(index):2;
+  feeds[centerView]={camera:[1,2,3].includes(camera)?camera:1,lens:mobile?1:2};
   mapCamera.hidden=false;
   mapCamera.classList.remove('nautic-hidden');
   speedCard.setAttribute('aria-pressed','true');
@@ -443,8 +456,9 @@
   }
   const controlBounds=control=>{
    const r=control.getBoundingClientRect();
+   const caption=control.cloneNode(true);caption.querySelectorAll('.nautic-object-tag').forEach(tag=>tag.remove());
    return !control.hidden&&!control.classList.contains('nautic-hidden')&&r.width>0
-    ?{x:r.left,y:r.top,w:r.width,h:r.height,label:control.textContent,number:control.dataset.objectNumber,
+    ?{x:r.left,y:r.top,w:r.width,h:r.height,label:caption.textContent,number:control.dataset.objectNumber,
       pressed:control.getAttribute('aria-pressed')==='true'}:null;
   };
   call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapHd,centerReset,tiles,
