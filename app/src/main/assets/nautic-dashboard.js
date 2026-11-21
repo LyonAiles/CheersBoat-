@@ -465,7 +465,7 @@
     ?{x:r.left,y:r.top,w:r.width,h:r.height,label:caption.textContent,number:control.dataset.objectNumber,
       pressed:control.getAttribute('aria-pressed')==='true'}:null;
   };
-  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapHd,centerReset,tiles,
+  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapHd,centerReset,tiles,uiOpacity:Number(getComputedStyle(document.documentElement).getPropertyValue('--nautic-ui-opacity'))||.60,
    qualityButton:controlBounds(qualityTool),medallionButton:controlBounds(medallionTool),axisButton:controlBounds(axisTool),
    captureButton:controlBounds(captureTool)}));
  }

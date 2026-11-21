@@ -23,7 +23,7 @@ final class DashboardCameras {
  final Map<String,Source> sources=new LinkedHashMap<>();
  final Map<String,Long> retryAt=new HashMap<>();
  int decoderBudget=4;
- float mapAlpha=1;
+ float mapAlpha=1,uiOpacity=.60f;
  TextView qualityButton,medallionButton,axisButton;
  private final DashboardRecording recording;
  private TextView captureButton;
@@ -398,6 +398,7 @@ final class DashboardCameras {
     lastCenterReset=reset;Tile central=tiles.get("mapCameraPreview");
     if(central!=null){central.cancelCenterGestures.run();central.centralZoom=1;central.focusX=.5f;central.focusY=.5f;central.applyCrop();}
    }
+   uiOpacity=(float)Math.max(.20,Math.min(1,data.optDouble("uiOpacity",.60)));
    if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();
    for(int i=0;i<list.length();i++){
@@ -758,7 +759,7 @@ final class DashboardCameras {
     (pressed?"Masquer les médaillons":"Afficher les médaillons"):description);
   button.setTextSize(number.isEmpty()?20:14);
   android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
-  background.setColor(pressed?0xed1b6257:0xed092f43);
+  background.setColor((Math.round(uiOpacity*255)<<24)|(pressed?0x1b6257:0x092f43));
   background.setCornerRadius(8*activity.getResources().getDisplayMetrics().density);
   button.setBackground(background);
   FrameLayout.LayoutParams layout=new FrameLayout.LayoutParams(

@@ -418,7 +418,8 @@ function applyAppearance(){
  document.documentElement.style.setProperty('--nautic-panel',a.panel);
  document.documentElement.style.setProperty('--nautic-radius',a.buttons==='square'?'0px':a.buttons==='round'?'30px':'12px');
  document.documentElement.style.setProperty('--nautic-scale',String((Number(a.scale)||100)/100));
- app.classList.remove('nautic-bg-flat','nautic-bg-clear','nautic-btn-flat','nautic-btn-round','nautic-btn-outline','nautic-layout-manoeuvres','nautic-layout-custom');
+ app.classList.remove('nautic-bg-seabed','nautic-bg-flat','nautic-bg-clear','nautic-btn-flat','nautic-btn-round','nautic-btn-outline','nautic-layout-manoeuvres','nautic-layout-custom');
+ if(a.background==='seabed')app.classList.add('nautic-bg-seabed');
  if(a.background==='flat')app.classList.add('nautic-bg-flat');
  if(a.background==='clear')app.classList.add('nautic-bg-clear');
  if(a.buttons==='square')app.classList.add('nautic-btn-flat');
@@ -490,7 +491,7 @@ function settingsDialog(){
  <button type="button" id="settingArrange">↔ Déplacer les panneaux</button>
  <label>Thème<select class="nautic-select" id="settingTheme"><option value="nautic">Nautic bleu</option><option value="day">Jour clair</option><option value="night">Nuit rouge</option><option value="contrast">Contraste élevé</option><option value="custom">Couleurs personnalisées</option></select></label>
  <div class="nautic-colors"><label>Couleur principale<input type="color" id="settingAccent" value="${esc(state.appearance.accent)}"></label><label>Fond des panneaux<input type="color" id="settingPanel" value="${esc(state.appearance.panel)}"></label></div>
- <label>Fond<select class="nautic-select" id="settingBackground"><option value="gradient">Dégradé</option><option value="flat">Uni</option><option value="clear">Panneaux translucides</option></select></label>
+ <label>Fond<select class="nautic-select" id="settingBackground"><option value="gradient">Dégradé</option><option value="seabed">Fond marin</option><option value="flat">Uni</option><option value="clear">Panneaux translucides</option></select></label>
  <label>Forme des boutons<select class="nautic-select" id="settingButtons"><option value="rounded">Arrondis</option><option value="square">Carrés / plats</option><option value="round">Très arrondis</option><option value="outline">Contours seuls</option></select></label>
  <label>Taille générale : <output id="settingScaleValue">${state.appearance.scale}%</output><input type="range" id="settingScale" min="80" max="130" step="5" value="${state.appearance.scale}"></label>
  <h3>Tableau de bord</h3>${dashboardButtons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}

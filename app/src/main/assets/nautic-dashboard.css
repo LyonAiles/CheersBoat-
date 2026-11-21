@@ -335,3 +335,5 @@ html.nautic-map-exploring #windWidget{display:none!important}
 
 #dialog .destination-menu,#dialog .saved-route-actions{gap:9px}
 #mapWrap :is(.leaflet-control-zoom,.maplibregl-ctrl-group){display:flex;flex-direction:column;gap:6px;background:transparent}
+
+#app.nautic-bg-seabed{background:linear-gradient(#001b2a44,#001b2a66),url(nautic-seabed.webp) center/cover no-repeat}
