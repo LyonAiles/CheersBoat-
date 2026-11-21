@@ -5,7 +5,7 @@ const source=fs.readFileSync('app/src/main/assets/nautic-dashboard.js','utf8');
 const start=source.indexOf(' function showAlertCamera(');
 const end=source.indexOf(' function activateMapView(',start);
 assert(start>=0&&end>start);
-const context={lastPresentedAlert:0,restoreMedallion(){},feeds:{},centerView:'central',mapCamera:{hidden:true,classList:{remove(){}}},speedCard:{setAttribute(){}},refreshMapViews(){},previews(){}};
+const context={lastPresentedAlert:0,swappedMedallion:null,currentLens(feed){return feed.lens;},restoreMedallion(){},feeds:{},centerView:'central',mapCamera:{hidden:true,classList:{remove(){},contains(){return false;}}},speedCard:{setAttribute(){}},refreshMapViews(){},previews(){}};
 vm.createContext(context);vm.runInContext(source.slice(start,end),context);
 context.showAlertCamera(42,1,100);
 assert.equal(context.feeds.central.camera,2);assert.equal(context.feeds.central.lens,2);
@@ -17,3 +17,15 @@ context.showAlertCamera(44,3,300);
 assert.equal(context.feeds.central.camera,3);assert.equal(context.feeds.central.lens,1);
 assert.equal(context.mapCamera.hidden,false);
 console.log('PASS: alerts 42/fixed, 44/mobile, configured mobile source and newest alert priority');
+
+// Run the actual manual switch and verify that a delayed earlier alert cannot undo it.
+const switchStart=source.indexOf(' function switchMapCamera(');
+const switchEnd=source.indexOf(' let centerReset=',switchStart);
+vm.runInContext(source.slice(switchStart,switchEnd),context);
+context.switchMapCamera();
+assert.equal(context.feeds.central.lens,2);
+context.showAlertCamera(44,3,Date.now()-1000);
+assert.equal(context.feeds.central.lens,2,'A queued pre-click alert must not undo the manual lens choice');
+context.showAlertCamera(44,3,context.lastPresentedAlert+1);
+assert.equal(context.feeds.central.lens,1,'A genuinely new alert still takes priority');
+console.log('PASS: manual change survives delayed alerts; new alerts retain priority');

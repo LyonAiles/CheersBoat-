@@ -217,6 +217,7 @@
  function switchMapCamera(){
   const feed=feeds[centerView],lens=currentLens(feed);
   if(mapCamera.hidden||mapCamera.classList.contains('nautic-hidden')||!lens)return;
+  lastPresentedAlert=Math.max(lastPresentedAlert,Date.now());
   feeds[centerView]={...feed,lens:3-lens};
   previews();
  }
@@ -230,9 +231,11 @@
  function showAlertCamera(number,index,time){
   if(time<=lastPresentedAlert)return;
   lastPresentedAlert=time;
-  restoreMedallion();
   const mobile=number===44,camera=mobile?Number(index):2;
-  feeds[centerView]={camera:[1,2,3].includes(camera)?camera:1,lens:mobile?1:2};
+  const requested={camera:[1,2,3].includes(camera)?camera:1,lens:mobile?1:2};
+  if(!swappedMedallion&&!mapCamera.hidden&&!mapCamera.classList.contains('nautic-hidden')&&feeds[centerView]?.camera===requested.camera&&currentLens(feeds[centerView])===requested.lens)return;
+  restoreMedallion();
+  feeds[centerView]=requested;
   mapCamera.hidden=false;
   mapCamera.classList.remove('nautic-hidden');
   speedCard.setAttribute('aria-pressed','true');
@@ -247,6 +250,7 @@
    return;
   }
   if($('app')?.classList.contains('hide-mapCameraMedallions'))return;
+  lastPresentedAlert=Math.max(lastPresentedAlert,Date.now());
   const previous=swappedMedallion;
   restoreMedallion();
   if(previous!==id){

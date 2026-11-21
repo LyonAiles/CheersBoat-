@@ -316,7 +316,7 @@ final class DashboardCameras {
   float videoRatio=16f/9f;
   volatile long lastFrame=0;
   final long created=System.currentTimeMillis();
-  boolean failed=false;
+  boolean failed=false,rendered=false;
   Source(String uri,Tile owner){this.uri=uri;this.owner=owner;texture=new TextureView(activity);owner.frame.addView(texture,0,new FrameLayout.LayoutParams(-1,-1));
    owner.source=this;owner.applyCrop();
    player=new ExoPlayer.Builder(activity,new DefaultRenderersFactory(activity).setEnableDecoderFallback(true)).build();player.setVolume(0);player.setVideoTextureView(texture);
@@ -324,6 +324,7 @@ final class DashboardCameras {
    player.addListener(new Player.Listener(){
     @Override public void onRenderedFirstFrame(){
      if(owner.source!=Source.this)return;
+     rendered=true;
      // Keep the previous picture until the new texture has reached the UI frame.
      owner.frame.postOnAnimation(()->{
       if(owner.source!=Source.this)return;
@@ -349,7 +350,7 @@ final class DashboardCameras {
    player.setMediaSource(new RtspMediaSource.Factory().setForceUseRtpTcp(true).createMediaSource(MediaItem.fromUri(uri)));player.prepare();player.play();
   }
   Bitmap capture(){
-   if(!texture.isAvailable()||lastFrame==0)return null;
+   if(!rendered||!texture.isAvailable()||lastFrame==0)return null;
    // View transformations only affect display. Each tile crops its own copy of the full frame.
    int width=Math.max(1,Math.round(320*Math.min(1,videoRatio)));
    int height=Math.max(1,Math.round(320*Math.min(1,1/videoRatio)));
