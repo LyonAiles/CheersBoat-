@@ -2,6 +2,8 @@ package fr.nautic.test;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
+import android.net.Uri;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -13,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 
 final class NauticUpdates {
  private static final String REPO = "LyonAiles/CheersBoat-";
+ private static final String RELEASES = "https://github.com/" + REPO + "/releases/";
 
  static void check(Activity activity) {
   new Thread(() -> {
@@ -59,10 +62,15 @@ final class NauticUpdates {
      if (activity.isFinishing() || activity.isDestroyed()) return;
      new AlertDialog.Builder(activity)
        .setTitle("Nautic " + version + " disponible")
-       .setMessage("Nautic télécharge et vérifie l’APK signé. Le fichier précédent est remplacé automatiquement. Confirme ensuite l’installation dans Android.")
+       .setMessage("Télécharge l’APK signé, puis confirme la mise à jour dans Android.")
        .setNegativeButton("Plus tard", null)
        .setPositiveButton("Télécharger", (dialog, button) -> {
-        NauticApkDownload.start(activity,version);
+        try {
+         activity.startActivity(new Intent(Intent.ACTION_VIEW,
+           Uri.parse(RELEASES + "download/nautic-" + version + "/app-release.apk")));
+        } catch (android.content.ActivityNotFoundException e) {
+         android.widget.Toast.makeText(activity, "Navigateur indisponible", android.widget.Toast.LENGTH_LONG).show();
+        }
        }).show();
     });
    } catch (Exception ignored) {
