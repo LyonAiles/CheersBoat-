@@ -64,8 +64,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="0.4.${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/Nautic-$version.apk"
           gh release create "nautic-$version" \
-            "app/build/outputs/apk/release/app-release.apk#Nautic-$version.apk" \
+            "app/build/outputs/apk/release/app-release.apk#APK compatible avec les anciennes versions" \
+            "$RUNNER_TEMP/Nautic-$version.apk" \
             --target "$GITHUB_SHA" --title "Nautic $version" \
             --notes "APK Android signé pour la mise à jour de Nautic."
 

@@ -341,10 +341,12 @@ html.nautic-map-exploring #windWidget{display:none!important}
 /* Persistent seabed, with translucent objects in their final positions. */
 html,body{background:#071d2f url(nautic-seabed.webp) center/cover fixed!important}
 #app.nautic-bg-seabed{background:transparent!important}
-#app.nautic-bg-seabed :is(header,.left>.card,.gauges>.gauge,.gauges>.camCard,.right>.camCard,#mapCameraPort,#mapCameraStarboard){opacity:.5}
+#app :is(header,.left>.card,.gauges>.gauge,.gauges>.camCard,.right>.camCard,#mapCameraPort,#mapCameraStarboard){opacity:var(--nautic-dashboard-opacity,.5)}
 
 #app.nautic-bg-seabed #mapWrap{background:transparent}
 #mapCameraPreview{opacity:1}
 
 /* Keep the chart readable while lightly revealing the seabed. */
 #app.nautic-bg-seabed :is(#map,#mapFallback){opacity:.85}
+
+body>#clock{opacity:var(--nautic-dashboard-opacity,.5)!important}

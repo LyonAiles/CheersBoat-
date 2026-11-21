@@ -41,6 +41,7 @@ final class NauticUpdates {
     }
 
     int latest = installed;
+    String latestAsset = "app-release.apk";
     for (int i = 0; i < releases.length(); i++) {
      JSONObject release = releases.getJSONObject(i);
      String tag = release.optString("tag_name");
@@ -48,26 +49,33 @@ final class NauticUpdates {
          !tag.matches("nautic-0[.]4[.][0-9]{1,9}")) continue;
      int version = Integer.parseInt(tag.substring("nautic-0.4.".length()));
      JSONArray assets = release.getJSONArray("assets");
+     String named="Nautic-0.4."+version+".apk",available=null;
      for (int j = 0; j < assets.length(); j++) {
-      if (assets.getJSONObject(j).optString("name").equals("app-release.apk")) {
-       latest = Math.max(latest, version);
-       break;
-      }
+      JSONObject asset=assets.getJSONObject(j);
+      if(!"uploaded".equals(asset.optString("state"))||asset.optLong("size",0)<=0)continue;
+      String name=asset.optString("name");
+      if(named.equals(name)){available=name;break;}
+      if("app-release.apk".equals(name))available=name;
      }
+     if(available!=null&&version>latest){latest=version;latestAsset=available;}
+
     }
     if (latest == installed) return;
 
     String version = "0.4." + latest;
+    String download=RELEASES+"download/nautic-"+version+"/"+latestAsset;
+    String releasePage=RELEASES+"tag/nautic-"+version;
     activity.runOnUiThread(() -> {
      if (activity.isFinishing() || activity.isDestroyed()) return;
      new AlertDialog.Builder(activity)
        .setTitle("Nautic " + version + " disponible")
-       .setMessage("Télécharge l’APK signé, puis confirme la mise à jour dans Android.")
+       .setMessage("Télécharge le nouvel APK nommé avec sa version, puis ouvre ce nouveau fichier pour mettre à jour Nautic. Ne désinstalle pas l’application. Si le téléchargement direct échoue, utilise la page de la version.")
        .setNegativeButton("Plus tard", null)
+       .setNeutralButton("Page de la version",(dialog,button)->open(activity,releasePage))
        .setPositiveButton("Télécharger", (dialog, button) -> {
         try {
          activity.startActivity(new Intent(Intent.ACTION_VIEW,
-           Uri.parse(RELEASES + "download/nautic-" + version + "/app-release.apk")));
+           Uri.parse(download)));
         } catch (android.content.ActivityNotFoundException e) {
          android.widget.Toast.makeText(activity, "Navigateur indisponible", android.widget.Toast.LENGTH_LONG).show();
         }
@@ -79,5 +87,9 @@ final class NauticUpdates {
     if (connection != null) connection.disconnect();
    }
   }, "nautic-update-check").start();
+ }
+ private static void open(Activity activity,String url){
+  try{activity.startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
+  catch(android.content.ActivityNotFoundException e){android.widget.Toast.makeText(activity,"Navigateur indisponible",android.widget.Toast.LENGTH_LONG).show();}
  }
 }
