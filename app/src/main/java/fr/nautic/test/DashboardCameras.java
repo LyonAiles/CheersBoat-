@@ -23,7 +23,7 @@ final class DashboardCameras {
  final Map<String,Source> sources=new LinkedHashMap<>();
  final Map<String,Long> retryAt=new HashMap<>();
  int decoderBudget=4;
- float mapAlpha=1,uiOpacity=.60f,dashboardOpacity=.5f;
+ float mapAlpha=1,uiOpacity=.60f;
  TextView qualityButton,medallionButton,axisButton;
  private final DashboardRecording recording;
  private TextView captureButton;
@@ -38,7 +38,7 @@ final class DashboardCameras {
  static boolean isMedallion(String id){return id.equals("mapCameraPort")||id.equals("mapCameraStarboard");}
  void setMapAlpha(float value){
   mapAlpha=value;
-  for(Tile tile:tiles.values())if(isMapView(tile.id))tile.frame.setAlpha(value*(tile.id.equals("mapCameraPreview")?1f:dashboardOpacity));
+  for(Tile tile:tiles.values())if(isMapView(tile.id))tile.frame.setAlpha(value*(tile.id.equals("mapCameraPreview")?1f:.5f));
  }
  boolean stopped=false,mapPaused=false,suspended=false;
  void suspend(){
@@ -398,16 +398,15 @@ final class DashboardCameras {
     lastCenterReset=reset;Tile central=tiles.get("mapCameraPreview");
     if(central!=null){central.cancelCenterGestures.run();central.centralZoom=1;central.focusX=.5f;central.focusY=.5f;central.applyCrop();}
    }
-   dashboardOpacity=(float)Math.max(.20,Math.min(1,data.optDouble("dashboardOpacity",.5)));
    uiOpacity=(float)Math.max(.20,Math.min(1,data.optDouble("uiOpacity",.60)));
    if(!adjustingMapAlpha)setMapAlpha((float)data.optDouble("mapCameraAlpha",1));
    Set<String> visible=new HashSet<>();Map<String,List<Tile>> grouped=new LinkedHashMap<>();
    for(int i=0;i<list.length();i++){
     JSONObject item=list.getJSONObject(i);String id=item.getString("id");if(!id.matches("cam[123]Body|trematagePreview|mapCameraPreview|mapCameraPort|mapCameraStarboard"))continue;
     visible.add(id);Tile tile=tiles.get(id);if(tile==null){tile=new Tile(id);tiles.put(id,tile);}
-    FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(Math.max(1,(int)(item.getDouble("w")*scale)),Math.max(1,(int)(item.getDouble("h")*scale)));lp.leftMargin=(int)(item.getDouble("x")*scale);lp.topMargin=(int)(item.getDouble("y")*scale);tile.frame.setLayoutParams(lp);tile.frame.setVisibility(View.VISIBLE);tile.frame.setAlpha(dashboardOpacity);
+    FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(Math.max(1,(int)(item.getDouble("w")*scale)),Math.max(1,(int)(item.getDouble("h")*scale)));lp.leftMargin=(int)(item.getDouble("x")*scale);lp.topMargin=(int)(item.getDouble("y")*scale);tile.frame.setLayoutParams(lp);tile.frame.setVisibility(View.VISIBLE);tile.frame.setAlpha(.5f);
     boolean inMap=isMapView(id);
-    if(inMap){tile.frame.setAlpha(mapAlpha*(id.equals("mapCameraPreview")?1f:dashboardOpacity));tile.frame.bringToFront();}
+    if(inMap){tile.frame.setAlpha(mapAlpha*(id.equals("mapCameraPreview")?1f:.5f));tile.frame.bringToFront();}
     if(!inMap)tile.decorate(item);
     boolean mobile=id.equals("trematagePreview");
     int index=inMap?item.optInt("camera",2):mobile?TrematageAccess.index(activity):CameraDisplaySource.index(activity,id.charAt(3)-'0');
