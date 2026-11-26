@@ -23,7 +23,7 @@ final class DashboardCameras {
  final Map<String,Source> sources=new LinkedHashMap<>();
  final Map<String,Long> retryAt=new HashMap<>();
  int decoderBudget=4;
- float mapAlpha=1,uiOpacity=.60f,dashboardOpacity=.5f;
+ float mapAlpha=1,uiOpacity=.60f,dashboardOpacity=.7f,dashboardTransparency=30;
  TextView qualityButton,medallionButton,axisButton;
  private final DashboardRecording recording;
  private TextView captureButton;
@@ -36,6 +36,11 @@ final class DashboardCameras {
  boolean adjustingMapAlpha;
  static boolean isMapView(String id){return id.startsWith("mapCamera");}
  static boolean isMedallion(String id){return id.equals("mapCameraPort")||id.equals("mapCameraStarboard");}
+ void setDashboardOpacity(float value,float base){
+  dashboardTransparency=Math.max(0,Math.min(80,base));
+  dashboardOpacity=Math.max(.12f,Math.min(1f,value));
+  for(Tile tile:tiles.values())tile.frame.setAlpha(isMapView(tile.id)?mapAlpha*(tile.id.equals("mapCameraPreview")?1f:dashboardOpacity):dashboardOpacity);
+ }
  void setMapAlpha(float value){
   mapAlpha=value;
   for(Tile tile:tiles.values())if(isMapView(tile.id))tile.frame.setAlpha(value*(tile.id.equals("mapCameraPreview")?1f:dashboardOpacity));
@@ -217,7 +222,8 @@ final class DashboardCameras {
   }
   void installTransparencyGesture(){
    frame.setOnTouchListener(new View.OnTouchListener(){
-    float startX,startY,startAlpha,startFocusX,startFocusY;
+    float startX,startY,startAlpha,startFocusX,startFocusY,startDashboard,currentDashboard;
+    boolean leftEdge;
     boolean panning;
     boolean center,dragged,held,multi,second;
     long lastTap;
@@ -226,7 +232,7 @@ final class DashboardCameras {
     final Runnable align=()->{
      if(!frame.isShown()||multi)return;
      frame.removeCallbacks(click);lastTap=0;held=true;
-     acknowledgeTap(tapX,tapY,false);activity.dashboardClick(id,true);
+     acknowledgeTap(tapX,tapY,false);frame.playSoundEffect(SoundEffectConstants.NAVIGATION_DOWN);activity.dashboardClick(id,true);
     };
     {cancelCenterGestures=()->{frame.removeCallbacks(click);frame.removeCallbacks(align);lastTap=0;held=true;multi=true;adjustingMapAlpha=false;};}
     final ScaleGestureDetector pinch=new ScaleGestureDetector(activity,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
@@ -239,8 +245,10 @@ final class DashboardCameras {
     });
     @Override public boolean onTouch(View view,MotionEvent event){
      if(event.getActionMasked()==MotionEvent.ACTION_POINTER_DOWN){
+      frame.playSoundEffect(SoundEffectConstants.NAVIGATION_UP);
       multi=true;view.removeCallbacks(align);view.removeCallbacks(click);lastTap=0;
       adjustingMapAlpha=false;setMapAlpha(startAlpha);
+      if(leftEdge&&dragged)activity.dashboardTransparency(startDashboard,false);
      }
      pinch.onTouchEvent(event);
      switch(event.getActionMasked()){
@@ -248,6 +256,8 @@ final class DashboardCameras {
        second=lastTap>0&&event.getEventTime()-lastTap<=ViewConfiguration.getDoubleTapTimeout()
         &&Math.hypot(event.getX()-tapX,event.getY()-tapY)<ViewConfiguration.get(activity).getScaledDoubleTapSlop();
        if(second)view.removeCallbacks(click);
+       leftEdge=event.getX()<=Math.max(dp(24),view.getWidth()*.08f);
+       startDashboard=currentDashboard=dashboardTransparency;
        center=Math.abs(event.getX()-view.getWidth()/2f)<=view.getWidth()/6f;
        tapX=event.getX();tapY=event.getY();
        startX=event.getRawX();startY=event.getRawY();startAlpha=mapAlpha;
@@ -261,7 +271,10 @@ final class DashboardCameras {
        if(Math.hypot(event.getRawX()-startX,delta)>slop){
         view.removeCallbacks(align);view.removeCallbacks(click);lastTap=0;dragged=true;
        }
-       if(panning&&dragged){
+       if(leftEdge&&dragged){
+        currentDashboard=Math.max(0,Math.min(80,startDashboard-delta*80/Math.max(1,view.getHeight())));
+        activity.dashboardTransparency(currentDashboard,false);
+       }else if(panning&&dragged){
         float ratio=source!=null?source.videoRatio:snapshot!=null?(float)snapshot.getWidth()/snapshot.getHeight():(float)view.getWidth()/view.getHeight();
         float fit=ratio/((float)view.getWidth()/view.getHeight());
         float extraX=view.getWidth()*(Math.max(1,fit)*centralZoom-1);
@@ -280,6 +293,7 @@ final class DashboardCameras {
        if(event.getActionMasked()==MotionEvent.ACTION_UP&&!dragged&&!held&&!multi){
         if(second){
          acknowledgeTap(event.getX(),event.getY(),true);
+         frame.playSoundEffect(SoundEffectConstants.NAVIGATION_UP);
          lastTap=0;centralZoom=centralZoom>1?1:2.5f;
          focusX=event.getX()/Math.max(1,view.getWidth());focusY=event.getY()/Math.max(1,view.getHeight());applyCrop();
         }else{
@@ -287,7 +301,10 @@ final class DashboardCameras {
          view.postDelayed(click,ViewConfiguration.getDoubleTapTimeout());
         }
        }else{view.removeCallbacks(click);lastTap=0;}
-       if(dragged&&!multi&&!panning)activity.updateMapCameraAlpha(mapAlpha);
+       if(leftEdge&&dragged&&!multi){
+        activity.dashboardTransparency(event.getActionMasked()==MotionEvent.ACTION_CANCEL?startDashboard:currentDashboard,true);
+        frame.playSoundEffect(SoundEffectConstants.CLICK);
+       }else if(dragged&&!multi&&!panning)activity.updateMapCameraAlpha(mapAlpha);
        adjustingMapAlpha=false;return true;
       default:return true;
      }

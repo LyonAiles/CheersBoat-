@@ -48,6 +48,15 @@ public class MainActivity extends Activity {
  private boolean dashboardVisible=false,mapManipulating=false;
  private boolean reducedWithButton=false;
  void dashboardClick(String id,boolean held){js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
+ private long lastTouchSignal;
+ @Override public boolean dispatchTouchEvent(MotionEvent event){
+  long now=android.os.SystemClock.uptimeMillis();
+  if(web!=null&&(event.getActionMasked()!=MotionEvent.ACTION_MOVE||now-lastTouchSignal>200)){
+   lastTouchSignal=now;js("nauticUserActivity",Integer.toString(event.getActionMasked()));
+  }
+  return super.dispatchTouchEvent(event);
+ }
+ void dashboardTransparency(float value,boolean save){js("nauticDashboardTransparencyGesture",value+":"+save);}
  void updateMapCameraAlpha(float alpha){js("nauticMapCameraAlpha",Float.toString(alpha));}
  void refreshDashboardVideos(){js("nauticDashboardResume","");}
  void dashboardAlert(int number,String message){try{
@@ -317,6 +326,12 @@ public class MainActivity extends Activity {
     catch(Exception e){if(!isDestroyed())js("nauticNavigationNotices","");}
    },"nautic-vnf-notices").start();
   }
+  @JavascriptInterface public void dashboardOpacity(float value,float base){runOnUiThread(()->{
+   if(dashboardCameras!=null)dashboardCameras.setDashboardOpacity(value,base);
+  });}
+  @JavascriptInterface public void commandSound(){runOnUiThread(()->{
+   if(web!=null)web.playSoundEffect(android.view.SoundEffectConstants.CLICK);
+  });}
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
    if(mapManipulating||!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
   });}
