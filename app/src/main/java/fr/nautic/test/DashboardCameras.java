@@ -23,7 +23,7 @@ final class DashboardCameras {
  final Map<String,Source> sources=new LinkedHashMap<>();
  final Map<String,Long> retryAt=new HashMap<>();
  int decoderBudget=4;
- float mapAlpha=1,uiOpacity=.60f,dashboardOpacity=.7f,dashboardTransparency=30;
+ float mapAlpha=1,uiOpacity=.60f,dashboardOpacity=.3f,dashboardTransparency=70;
  TextView qualityButton,medallionButton,axisButton;
  private final DashboardRecording recording;
  private TextView captureButton;

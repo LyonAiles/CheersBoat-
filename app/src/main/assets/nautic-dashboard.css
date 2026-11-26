@@ -341,24 +341,20 @@ html.nautic-map-exploring #windWidget{display:none!important}
 /* Persistent seabed, with translucent objects in their final positions. */
 html,body{background:#071d2f url(nautic-seabed.webp) center/cover fixed!important}
 #app.nautic-bg-seabed{background:transparent!important}
-#app :is(header,.left>.card,.gauges>.gauge,.gauges>.camCard,.right>.camCard,#mapCameraPort,#mapCameraStarboard){opacity:var(--nautic-dashboard-opacity,.7)}
+#app :is(header,.left>.card,.gauges>.gauge,.gauges>.camCard,.right>.camCard,#mapCameraPort,#mapCameraStarboard){opacity:var(--nautic-dashboard-opacity,.3)}
 
 #app.nautic-bg-seabed #mapWrap{background:transparent}
 #mapCameraPreview{opacity:1}
 
 /* Keep the chart readable while lightly revealing the seabed. */
-#app.nautic-bg-seabed :is(#map,#mapFallback){opacity:var(--nautic-chart-opacity,.85)}
+#app.nautic-bg-seabed :is(#map,#mapFallback,#nauticVectorMap){opacity:var(--nautic-chart-opacity,.45)}
 
-body>#clock{opacity:var(--nautic-dashboard-opacity,.7)!important}
+body>#clock{opacity:var(--nautic-dashboard-opacity,.3)!important}
 
 /* Only the seabed moves; controls and video remain fixed and sharp. */
 body{isolation:isolate}
 body::before{content:"";position:fixed;inset:-3%;z-index:-1;pointer-events:none;
  background:#071d2f url(nautic-seabed.webp) center/cover;
  transform:scale(1.02);will-change:transform}
-html.nautic-water-moving body::before{animation:nautic-water-drift 18s ease-in-out infinite}
-@keyframes nautic-water-drift{
- 0%,100%{transform:scale(1.02) skew(0deg,0deg)}
- 33%{transform:scale(1.035,1.015) skew(.35deg,-.2deg) translate(.3%,.2%)}
- 66%{transform:scale(1.015,1.035) skew(-.25deg,.3deg) translate(-.2%,-.3%)}
-}
+body::before{transform:var(--nautic-water-transform,scale(1.02))}
+#mapWrap .sondeur-tools{opacity:var(--nautic-dashboard-opacity,.3)}

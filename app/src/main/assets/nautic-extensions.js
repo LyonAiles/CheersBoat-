@@ -362,16 +362,17 @@ function updateCameras(){
  window.nauticBindCamera42?.();
 }
 updateCameras();
-const appearanceDefaults={theme:'nautic',dashboardTransparency:30,background:'seabed',buttons:'rounded',labels:'both',scale:100,accent:'#31b9e9',panel:'#09283e',layout:'navigation',order:[]};
+const appearanceDefaults={theme:'nautic',dashboardTransparency:70,waterTimer:true,waterAmplitude:100,waterSpeed:100,waterTransparencyAmplitude:10,chartLinked:true,background:'seabed',buttons:'rounded',labels:'both',scale:100,accent:'#31b9e9',panel:'#09283e',layout:'navigation',order:[]};
 state.appearance=Object.assign({},appearanceDefaults,state.appearance||{});
 // Each opening starts at the requested resting transparency.
-state.appearance.dashboardTransparency=30;
+state.appearance.dashboardTransparency=70;
+window.nauticWaterSettings=()=>state.appearance;
 window.nauticSetDashboardTransparency=(value,save=false)=>{
  const n=Math.round(Math.max(0,Math.min(80,Number(value)||0)));
  state.appearance.dashboardTransparency=n;
  const slider=get('settingDashboardTransparency'),label=get('settingDashboardTransparencyValue');
  if(slider)slider.value=n;if(label)label.textContent=n+' %';
- if(window.nauticWater)window.nauticWater.select(n);
+ if(window.nauticWater){window.nauticWater.configure(state.appearance);window.nauticWater.select(n);}
  else document.documentElement.style.setProperty('--nautic-dashboard-opacity',String(1-n/100));
  if(save===true||save==='true')persist();
 };
@@ -426,7 +427,7 @@ document.head.appendChild(appearanceCSS);
 function applyAppearance(){
  const a=state.appearance,app=get('app');
  if(!app)return;
- window.nauticSetDashboardTransparency(a.dashboardTransparency??30);
+ window.nauticSetDashboardTransparency(a.dashboardTransparency??70);
  document.documentElement.style.setProperty('--nautic-accent',a.accent);
  document.documentElement.style.setProperty('--nautic-panel',a.panel);
  document.documentElement.style.setProperty('--nautic-radius',a.buttons==='square'?'0px':a.buttons==='round'?'30px':'12px');
@@ -506,7 +507,12 @@ function settingsDialog(){
  <div class="nautic-colors"><label>Couleur principale<input type="color" id="settingAccent" value="${esc(state.appearance.accent)}"></label><label>Fond des panneaux<input type="color" id="settingPanel" value="${esc(state.appearance.panel)}"></label></div>
  <label>Fond<select class="nautic-select" id="settingBackground"><option value="gradient">Dégradé</option><option value="seabed">Fond marin</option><option value="flat">Uni</option><option value="clear">Panneaux translucides</option></select></label>
  <label>Forme des boutons<select class="nautic-select" id="settingButtons"><option value="rounded">Arrondis</option><option value="square">Carrés / plats</option><option value="round">Très arrondis</option><option value="outline">Contours seuls</option></select></label>
- <label>Transparence du tableau de bord : <output id="settingDashboardTransparencyValue">${state.appearance.dashboardTransparency??30} %</output><input type="range" id="settingDashboardTransparency" data-object-number="703" min="0" max="80" step="1" value="${state.appearance.dashboardTransparency??30}"></label>
+ <label>Transparence du tableau de bord : <output id="settingDashboardTransparencyValue">${state.appearance.dashboardTransparency??70} %</output><input type="range" id="settingDashboardTransparency" data-object-number="703" min="0" max="80" step="1" value="${state.appearance.dashboardTransparency??70}"></label>
+ <label><input type="checkbox" id="settingWaterTimer" ${state.appearance.waterTimer?'checked':''}> Animation après 10 secondes sans action</label>
+ <label>Amplitude du fond marin : <output id="settingWaterAmplitudeValue">${state.appearance.waterAmplitude} %</output><input type="range" id="settingWaterAmplitude" min="0" max="200" step="5" value="${state.appearance.waterAmplitude}"></label>
+ <label>Vitesse du mouvement : <output id="settingWaterSpeedValue">${state.appearance.waterSpeed} %</output><input type="range" id="settingWaterSpeed" min="25" max="300" step="5" value="${state.appearance.waterSpeed}"></label>
+ <label>Variation de transparence : <output id="settingWaterTransparencyAmplitudeValue">±${state.appearance.waterTransparencyAmplitude} % de la valeur choisie</output><input type="range" id="settingWaterTransparencyAmplitude" min="0" max="30" step="1" value="${state.appearance.waterTransparencyAmplitude}"></label>
+ <label><input type="checkbox" id="settingChartLinked" ${state.appearance.chartLinked?'checked':''}> Carte liée au 703 : 15 points d’opacité supplémentaires (désactivé : carte opaque)</label>
  <label>Taille générale : <output id="settingScaleValue">${state.appearance.scale}%</output><input type="range" id="settingScale" min="80" max="130" step="5" value="${state.appearance.scale}"></label>
  <h3>Tableau de bord</h3>${dashboardButtons.map(([id,label])=>`<label class="settingRow"><input type="checkbox" data-button="${id}" ${state.buttons[id]===false?'':'checked'}><span>${label}</span></label>`).join('')}
  <h3>Navigation</h3>${field('Seuil de déplacement confirmé (m)','settingMove',state.moveThreshold,'number')}${field('Arrêt prolongé (minutes)','settingStop',state.stopMinutes,'number')}
@@ -620,6 +626,11 @@ function settingsDialog(){
   get('settingDashboardTransparencyValue').textContent=e.target.value+' %';applyAppearance();window.nauticDashboardResume?.();
  };
  get('settingDashboardTransparency').onchange=()=>persist();
+ for(const [id,key] of [['settingWaterAmplitude','waterAmplitude'],['settingWaterSpeed','waterSpeed'],['settingWaterTransparencyAmplitude','waterTransparencyAmplitude']]){
+  get(id).oninput=e=>{state.appearance[key]=Number(e.target.value);get(id+'Value').textContent=key==='waterTransparencyAmplitude'?'±'+e.target.value+' % de la valeur choisie':e.target.value+' %';window.nauticWater?.configure(state.appearance);};
+  get(id).onchange=()=>persist();
+ }
+ for(const [id,key] of [['settingWaterTimer','waterTimer'],['settingChartLinked','chartLinked']])get(id).onchange=e=>{state.appearance[key]=e.target.checked;window.nauticWater?.configure(state.appearance);persist();};
  get('settingScale').addEventListener('input',e=>get('settingScaleValue').textContent=e.target.value+'%');
  get('settingTheme').addEventListener('change',()=>{
   const t=get('settingTheme').value,colors=themeColors[t];
