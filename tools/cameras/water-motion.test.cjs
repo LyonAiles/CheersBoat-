@@ -31,3 +31,37 @@ assert(css.includes(':is(#map,#mapFallback,#nauticVectorMap)'),'both chart rende
 assert(css.includes('#mapWrap .sondeur-tools{opacity:var(--nautic-dashboard-opacity,.3)}'));
 
 console.log('PASS: configurable timer, chart linking and startup 70%, chart offset, idle delay, relative oscillation, touch interruption and hidden-page suspension');
+
+// Native activity lifecycle must suspend even if WebView visibility stays unchanged.
+window.nauticWaterForeground('false');assert.equal(frames.size,0);assert.equal(timers.size,0);
+window.nauticWaterForeground('true');advance(10000);assert.equal(frames.size,1);
+const sounds=[];window.NauticAndroid.gestureSound=kind=>sounds.push(kind);
+const target={closest:()=>target};
+handlers.click({target,detail:1});handlers.click({target,detail:2});
+assert.deepEqual(sounds,['click','double']);
+handlers.pointerdown({target,clientX:0,clientY:0});
+handlers.pointerup({target,clientX:0,clientY:40});
+handlers.click({target,detail:1});
+assert.deepEqual(sounds,['click','double','slide'],'drag produces one sound and suppresses synthetic click');
+console.log('PASS: native background suspension, click, double click and drag feedback');
+// Exercise the complete comparative measurement with virtual time, including cancellation.
+const saved={},reports=[];let samples=0;
+context.localStorage={getItem:k=>saved[k],setItem:(k,v)=>saved[k]=v};
+document.createElement=()=>({style:{},remove(){}});document.body={appendChild(){}};
+window.NauticAndroid.timerPerformanceSample=reset=>{
+ if(reset)return '{}';
+ samples++;return JSON.stringify({wallMs:15000,cpuMs:300,frames:100,slow:2,renderMs:8});
+};
+window.NauticAndroid.timerPerformanceResult=text=>reports.push(text);
+window.nauticWater.measure();
+for(let i=0;i<3;i++){
+ advance(3000);render(now);render(now+16);advance(15000);
+}
+assert.equal(reports.length,1);
+assert.match(saved['nautic-timer-measurement'],/Sans effets \(avant\)/);
+assert.match(reports[0],/Effets actifs/);assert.match(reports[0],/Sans effets \(après\)/);
+const complete=saved['nautic-timer-measurement'];
+window.nauticWater.measure();window.nauticUserActivity('0');advance(60000);
+assert.match(reports[1],/interrompue/);
+assert.equal(saved['nautic-timer-measurement'],complete,'cancelled run preserves last complete result');
+console.log('PASS: three comparison phases, saved report and touch cancellation');

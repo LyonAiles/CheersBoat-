@@ -509,6 +509,8 @@ function settingsDialog(){
  <label>Forme des boutons<select class="nautic-select" id="settingButtons"><option value="rounded">Arrondis</option><option value="square">Carrés / plats</option><option value="round">Très arrondis</option><option value="outline">Contours seuls</option></select></label>
  <label>Transparence du tableau de bord : <output id="settingDashboardTransparencyValue">${state.appearance.dashboardTransparency??70} %</output><input type="range" id="settingDashboardTransparency" data-object-number="703" min="0" max="80" step="1" value="${state.appearance.dashboardTransparency??70}"></label>
  <label><input type="checkbox" id="settingWaterTimer" ${state.appearance.waterTimer?'checked':''}> Animation après 10 secondes sans action</label>
+ <button type="button" id="settingTimerMeasure">Mesurer le coût des effets · 54 secondes</button>
+ <button type="button" id="settingTimerResult">Dernière mesure</button>
  <label>Amplitude du fond marin : <output id="settingWaterAmplitudeValue">${state.appearance.waterAmplitude} %</output><input type="range" id="settingWaterAmplitude" min="0" max="200" step="5" value="${state.appearance.waterAmplitude}"></label>
  <label>Vitesse du mouvement : <output id="settingWaterSpeedValue">${state.appearance.waterSpeed} %</output><input type="range" id="settingWaterSpeed" min="25" max="300" step="5" value="${state.appearance.waterSpeed}"></label>
  <label>Variation de transparence : <output id="settingWaterTransparencyAmplitudeValue">±${state.appearance.waterTransparencyAmplitude} % de la valeur choisie</output><input type="range" id="settingWaterTransparencyAmplitude" min="0" max="30" step="1" value="${state.appearance.waterTransparencyAmplitude}"></label>
@@ -621,6 +623,8 @@ function settingsDialog(){
  for(const [id,value] of [['settingLayout',a.layout],['settingTheme',a.theme],['settingBackground',a.background],['settingButtons',a.buttons]])get(id).value=value;
  const markDirty=()=>{saveButton.disabled=false;saveButton.textContent='● Enregistrer';saveButton.classList.add('nautic-dirty')};
  dialog.querySelectorAll('#dialogContent input,#dialogContent select,#dialogContent textarea').forEach(el=>{el.addEventListener('input',markDirty);el.addEventListener('change',markDirty)});
+ get('settingTimerMeasure').onclick=()=>{dialog.close();setTimeout(()=>window.nauticWater.measure(),250)};
+ get('settingTimerResult').onclick=()=>window.nauticWater.lastMeasurement();
  get('settingDashboardTransparency').oninput=e=>{
   state.appearance.dashboardTransparency=Number(e.target.value);
   get('settingDashboardTransparencyValue').textContent=e.target.value+' %';applyAppearance();window.nauticDashboardResume?.();

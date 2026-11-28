@@ -232,7 +232,7 @@ final class DashboardCameras {
     final Runnable align=()->{
      if(!frame.isShown()||multi)return;
      frame.removeCallbacks(click);lastTap=0;held=true;
-     acknowledgeTap(tapX,tapY,false);frame.playSoundEffect(SoundEffectConstants.NAVIGATION_DOWN);activity.dashboardClick(id,true);
+     acknowledgeTap(tapX,tapY,false);activity.dashboardClick(id,true);
     };
     {cancelCenterGestures=()->{frame.removeCallbacks(click);frame.removeCallbacks(align);lastTap=0;held=true;multi=true;adjustingMapAlpha=false;};}
     final ScaleGestureDetector pinch=new ScaleGestureDetector(activity,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
@@ -245,7 +245,7 @@ final class DashboardCameras {
     });
     @Override public boolean onTouch(View view,MotionEvent event){
      if(event.getActionMasked()==MotionEvent.ACTION_POINTER_DOWN){
-      frame.playSoundEffect(SoundEffectConstants.NAVIGATION_UP);
+      activity.interactionSound("double");
       multi=true;view.removeCallbacks(align);view.removeCallbacks(click);lastTap=0;
       adjustingMapAlpha=false;setMapAlpha(startAlpha);
       if(leftEdge&&dragged)activity.dashboardTransparency(startDashboard,false);
@@ -293,8 +293,8 @@ final class DashboardCameras {
        if(event.getActionMasked()==MotionEvent.ACTION_UP&&!dragged&&!held&&!multi){
         if(second){
          acknowledgeTap(event.getX(),event.getY(),true);
-         frame.playSoundEffect(SoundEffectConstants.NAVIGATION_UP);
-         lastTap=0;centralZoom=centralZoom>1?1:2.5f;
+         activity.interactionSound("double");
+         lastTap=0;centralZoom=centralZoom<1.5f?1.5f:centralZoom<2f?2f:1f;
          focusX=event.getX()/Math.max(1,view.getWidth());focusY=event.getY()/Math.max(1,view.getHeight());applyCrop();
         }else{
          lastTap=event.getEventTime();tapX=event.getX();tapY=event.getY();
@@ -303,8 +303,8 @@ final class DashboardCameras {
        }else{view.removeCallbacks(click);lastTap=0;}
        if(leftEdge&&dragged&&!multi){
         activity.dashboardTransparency(event.getActionMasked()==MotionEvent.ACTION_CANCEL?startDashboard:currentDashboard,true);
-        frame.playSoundEffect(SoundEffectConstants.CLICK);
        }else if(dragged&&!multi&&!panning)activity.updateMapCameraAlpha(mapAlpha);
+       if(event.getActionMasked()==MotionEvent.ACTION_UP&&dragged&&!multi)activity.interactionSound("slide");
        adjustingMapAlpha=false;return true;
       default:return true;
      }

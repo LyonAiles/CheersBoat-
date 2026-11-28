@@ -47,7 +47,34 @@ public class MainActivity extends Activity {
  private final java.util.concurrent.atomic.AtomicBoolean trematageBusy=new java.util.concurrent.atomic.AtomicBoolean();
  private boolean dashboardVisible=false,mapManipulating=false;
  private boolean reducedWithButton=false;
- void dashboardClick(String id,boolean held){js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
+ void dashboardClick(String id,boolean held){interactionSound(held?"hold":"click");js(held?"nauticDashboardHold":"nauticDashboardClick",id);}
+ private android.media.ToneGenerator interactionTone;
+ void interactionSound(String kind){runOnUiThread(()->{
+  try{
+   if(interactionTone==null)interactionTone=new android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC,65);
+   int tone="double".equals(kind)?android.media.ToneGenerator.TONE_PROP_ACK:
+    "slide".equals(kind)?android.media.ToneGenerator.TONE_PROP_BEEP:
+    "hold".equals(kind)?android.media.ToneGenerator.TONE_PROP_PROMPT:android.media.ToneGenerator.TONE_DTMF_5;
+   interactionTone.startTone(tone,"double".equals(kind)?120:"hold".equals(kind)?90:40);
+  }catch(RuntimeException ignored){}
+ });}
+ private TimerPerformance timerPerformance;
+ private TextView batteryGauge;
+ private android.widget.ProgressBar batteryLevel;
+ private android.content.BroadcastReceiver batteryReceiver;
+ private void showBattery(Intent status){
+  if(status==null||batteryGauge==null)return;
+  int level=status.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL,-1),scale=status.getIntExtra(android.os.BatteryManager.EXTRA_SCALE,0);
+  if(level<0||scale<=0){batteryGauge.setVisibility(View.GONE);return;}
+  int percent=Math.round(100f*level/scale);
+  boolean plugged=status.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED,0)!=0;
+  batteryGauge.setVisibility(View.VISIBLE);
+  batteryLevel.setProgress(percent);
+  batteryLevel.setProgressTintList(android.content.res.ColorStateList.valueOf(percent<=15?0xffff7676:0xff65dfaa));
+  batteryGauge.setText((plugged?"⚡ ":"▰ ")+percent+" %");
+  batteryGauge.setTextColor(percent<=15?0xffff7676:0xffe6f5ff);
+  batteryGauge.setContentDescription("Batterie de l’appareil : "+percent+" pour cent"+(plugged?", branché":""));
+ }
  private long lastTouchSignal;
  @Override public boolean dispatchTouchEvent(MotionEvent event){
   long now=android.os.SystemClock.uptimeMillis();
@@ -67,7 +94,7 @@ public class MainActivity extends Activity {
  private NotesPad notesPad;
  private android.content.BroadcastReceiver trematageReceiver;
  @Override protected void onStart(){super.onStart();trematageReceiver=TrematageAlerts.attach(this);}
- @Override protected void onPause(){mapManipulating=false;dashboardVisible=false;if(dashboardCameras!=null)dashboardCameras.suspend();super.onPause();}
+ @Override protected void onPause(){mapManipulating=false;dashboardVisible=false;if(dashboardCameras!=null)dashboardCameras.suspend();js("nauticWaterForeground","false");super.onPause();}
  @Override protected void onStop(){dashboardVisible=false;if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
@@ -113,7 +140,20 @@ public class MainActivity extends Activity {
   });
   android.widget.FrameLayout dashboard=new android.widget.FrameLayout(this);dashboard.addView(web,new android.widget.FrameLayout.LayoutParams(-1,-1));
   dashboardLayer=new android.widget.FrameLayout(this);dashboard.addView(dashboardLayer,new android.widget.FrameLayout.LayoutParams(-1,-1));
+  batteryGauge=new TextView(this);batteryGauge.setTextSize(12);batteryGauge.setPadding(8,3,8,3);
+  android.widget.LinearLayout batteryBox=new android.widget.LinearLayout(this);
+  batteryBox.setGravity(Gravity.CENTER_VERTICAL);batteryBox.setPadding(6,0,0,0);batteryBox.setBackgroundColor(0xb0071d2f);
+  batteryLevel=new android.widget.ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
+  batteryLevel.setMax(100);batteryLevel.setIndeterminate(false);
+  float density=getResources().getDisplayMetrics().density;
+  batteryBox.addView(batteryLevel,new android.widget.LinearLayout.LayoutParams((int)(30*density),(int)(10*density)));
+  batteryBox.addView(batteryGauge);
+  android.widget.FrameLayout.LayoutParams batteryLayout=new android.widget.FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT);
+  dashboard.addView(batteryBox,batteryLayout);
+  batteryReceiver=new android.content.BroadcastReceiver(){@Override public void onReceive(android.content.Context context,Intent intent){showBattery(intent);}};
+  showBattery(registerReceiver(batteryReceiver,new android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)));
   setContentView(dashboard);
+  timerPerformance=new TimerPerformance(this);
   if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)
    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},GPS);
   web.loadUrl("file:///android_asset/index.html");
@@ -329,9 +369,12 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void dashboardOpacity(float value,float base){runOnUiThread(()->{
    if(dashboardCameras!=null)dashboardCameras.setDashboardOpacity(value,base);
   });}
-  @JavascriptInterface public void commandSound(){runOnUiThread(()->{
-   if(web!=null)web.playSoundEffect(android.view.SoundEffectConstants.CLICK);
+  @JavascriptInterface public String timerPerformanceSample(boolean reset){return timerPerformance==null?"{}":timerPerformance.sample(reset);}
+  @JavascriptInterface public void timerPerformanceResult(String result){runOnUiThread(()->{
+   if(!isFinishing()&&!isDestroyed())new AlertDialog.Builder(MainActivity.this).setTitle("Mesure des effets du timer").setMessage(result).setPositiveButton("Fermer",null).show();
   });}
+  @JavascriptInterface public void commandSound(){interactionSound("click");}
+  @JavascriptInterface public void gestureSound(String kind){interactionSound(kind);}
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
    if(mapManipulating||!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
   });}
@@ -491,7 +534,7 @@ public class MainActivity extends Activity {
   });}
  }
  @Override protected void onResume(){
-  super.onResume();dashboardVisible=true;
+  super.onResume();dashboardVisible=true;js("nauticWaterForeground","true");
   if(dashboardCameras!=null)dashboardCameras.resume();
   js("nauticDashboardResume","");
   if(reducedWithButton){reducedWithButton=false;NauticUpdates.check(this);}
@@ -611,5 +654,5 @@ public class MainActivity extends Activity {
     r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});else r.deny();}
  }
  @Override public void onBackPressed(){if(dashboardCameras!=null&&dashboardCameras.dismissPlayback())return;if(web!=null&&web.canGoBack())web.goBack();else super.onBackPressed();}
- @Override protected void onDestroy(){if(notesPad!=null)notesPad.destroy();dashboardCommands.shutdown();if(dashboardCameras!=null)dashboardCameras.close();if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
+ @Override protected void onDestroy(){if(batteryReceiver!=null)unregisterReceiver(batteryReceiver);if(interactionTone!=null){interactionTone.release();interactionTone=null;}if(notesPad!=null)notesPad.destroy();dashboardCommands.shutdown();if(dashboardCameras!=null)dashboardCameras.close();if(pendingCamera!=null)pendingCamera.deny();if(web!=null)web.destroy();super.onDestroy();}
 }
