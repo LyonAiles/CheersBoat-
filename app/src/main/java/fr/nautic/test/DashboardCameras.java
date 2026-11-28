@@ -33,6 +33,25 @@ final class DashboardCameras {
  private Runnable captureWait;
 
 
+ private String lastAlertTrace="",pendingAlertTrace="",pendingAlertUri="",lastWait="";
+ private void alertFrame(Source source){
+  if(pendingAlertTrace.isEmpty()||!source.uri.equals(pendingAlertUri)||!source.owner.id.equals("mapCameraPreview"))return;
+  OperationLog.add(activity,46,"IMAGE",pendingAlertTrace+" OK");activity.alertViewPresented(pendingAlertTrace);pendingAlertTrace="";pendingAlertUri="";
+ }
+ private void observeAlert(String json){
+  String trace=OperationLog.trace(json);
+  if(trace.isEmpty()){
+   if(!pendingAlertTrace.isEmpty())OperationLog.add(activity,46,"SKIP",pendingAlertTrace+" MANUAL");
+   pendingAlertTrace="";pendingAlertUri="";return;
+  }
+  if(trace.equals(lastAlertTrace))return;
+  lastAlertTrace=trace;pendingAlertTrace=trace;pendingAlertUri="";lastWait="";
+  OperationLog.add(activity,46,"NATIVE",trace);
+  layer.postDelayed(()->{if(trace.equals(pendingAlertTrace))OperationLog.add(activity,46,"WAIT",trace+" IMAGE_8S");},8000);
+ }
+ private void alertWait(String reason){
+  if(!pendingAlertTrace.isEmpty()&&!reason.equals(lastWait)){lastWait=reason;OperationLog.add(activity,46,"WAIT",pendingAlertTrace+" "+reason);}
+ }
  boolean adjustingMapAlpha;
  static boolean isMapView(String id){return id.startsWith("mapCamera");}
  static boolean isMedallion(String id){return id.equals("mapCameraPort")||id.equals("mapCameraStarboard");}
@@ -348,10 +367,12 @@ final class DashboardCameras {
       owner.setSnapshot(null);
       owner.message.setText("");
       owner.switching.setVisibility(View.GONE);
+      alertFrame(Source.this);
      });
     }
     @Override public void onPlayerError(PlaybackException e){
      failed=true;retryAt.put(uri,System.currentTimeMillis()+4000);
+     if(owner.id.equals("mapCameraPreview"))OperationLog.add(activity,46,"VIDEO_ERR",e.getErrorCodeName());
      owner.switching.setVisibility(View.GONE);
      for(Tile tile:mirrors)tile.switching.setVisibility(View.GONE);
      if(e.getErrorCodeName().contains("DECOD"))decoderBudget=Math.max(1,Math.min(decoderBudget,sources.size()-1));
@@ -404,7 +425,8 @@ final class DashboardCameras {
   for(Tile tile:tiles.values())if(tile.cropCamera==camera)tile.applyCrop();
  }
  void update(String json){
-  if(stopped||mapPaused||suspended||recording.active()||captureWait!=null)return;
+  observeAlert(json);
+  if(stopped||mapPaused||suspended||recording.active()||captureWait!=null){alertWait(stopped?"STOP":mapPaused?"MAP":suspended?"PAUSE":recording.active()?"REC":"CAPTURE");return;}
   try{
    JSONObject data=new JSONObject(json);JSONArray list=data.getJSONArray("tiles");double width=data.getDouble("width");if(width<=0)return;double scale=layer.getWidth()/width;
    for(int camera=1;camera<=3;camera++)if(camera!=draggingCamera){
@@ -445,10 +467,10 @@ final class DashboardCameras {
      tile.frame.setContentDescription("Caméra "+(40+index)+action);
     }
     String url=TrematageAccess.address(activity,index);
-    if(!url.startsWith("rtsp://")){tile.message.setText("📷");continue;}
+    if(!url.startsWith("rtsp://")){if(id.equals("mapCameraPreview"))alertWait("NO_RTSP");tile.message.setText("📷");continue;}
     Uri uri=Uri.parse(url);android.content.SharedPreferences p=activity.getSharedPreferences("nautic_camera_private",0);
     String user=p.getString("username"+index,p.getString("username","")),pass=p.getString("password"+index,p.getString("password",""));
-    if(user.isEmpty()){tile.message.setText("⚙ Identifiants caméra");continue;}
+    if(user.isEmpty()){if(id.equals("mapCameraPreview"))alertWait("AUTH_CONFIG");tile.message.setText("⚙ Identifiants caméra");continue;}
     String tapoHost=Uri.parse(TrematageAccess.address(activity,TrematageAccess.index(activity))).getHost();
     String path=uri.getPath();
     if(lens!=0)path=lens==1?"/stream6":"/stream1";
@@ -458,6 +480,10 @@ final class DashboardCameras {
      ?CameraStreamPolicy.viewingQuality(path,!data.optBoolean("mapHd",false))
      :CameraStreamPolicy.preview(path,mobile,tapo);
     String stream="rtsp://"+Uri.encode(user)+":"+Uri.encode(pass)+"@"+uri.getHost()+":"+(uri.getPort()>0?uri.getPort():554)+path;
+    if(id.equals("mapCameraPreview")){
+     JSONObject alert=data.optJSONObject("alertTrace");
+     if(alert!=null&&alert.optInt("camera")==index&&alert.optInt("lens")==lens)pendingAlertUri=stream;
+    }
     if(!grouped.containsKey(stream))grouped.put(stream,new ArrayList<>());if(id.equals("mapCameraPreview"))grouped.get(stream).add(0,tile);else grouped.get(stream).add(tile);
    }
    for(Tile t:tiles.values())if(!visible.contains(t.id))t.frame.setVisibility(View.GONE);
@@ -489,7 +515,7 @@ final class DashboardCameras {
     Map.Entry<String,Source> entry=iterator.next();List<Tile> group=grouped.get(entry.getKey());
     Source source=entry.getValue();
     boolean stalled=now-(source.lastFrame==0?source.created:source.lastFrame)>(source.lastFrame==0?14000:9000);
-    if(stalled)retryAt.put(entry.getKey(),now+2000);
+    if(stalled){retryAt.put(entry.getKey(),now+2000);if(source.owner.id.equals("mapCameraPreview"))OperationLog.add(activity,46,"VIDEO_STALL","RETRY");}
     if(group==null||group.get(0)!=source.owner||!selected.contains(entry.getKey())||source.failed||stalled){source.close();iterator.remove();if(stalled||source.failed)selected.remove(entry.getKey());}
    }
    // Source.close() retained the outgoing frame. A new source removes that
@@ -498,8 +524,9 @@ final class DashboardCameras {
     if(!selected.contains(e.getKey()))continue;
     Source source=sources.get(e.getKey());if(source==null){Tile owner=e.getValue().get(0);owner.message.setText(owner.snapshot==null?"◌":"");source=new Source(e.getKey(),owner);sources.put(e.getKey(),source);}
     source.mirrors.clear();for(Tile t:e.getValue())if(t!=source.owner)source.mirrors.add(t);source.copy();
+    if(source.rendered&&now-source.lastFrame<3000)alertFrame(source);
    }
-  }catch(Exception ignored){}
+  }catch(Exception error){OperationLog.add(activity,46,"LAYOUT_ERR",error.getClass().getSimpleName());}
  }
  private void openCaptureMenu(){
   if(captureButton==null||!captureButton.isShown()||recording.active()||captureWait!=null||playback!=null)return;

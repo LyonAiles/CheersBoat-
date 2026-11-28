@@ -1,4 +1,4 @@
-/* Optional vector map, with explicit and automatic return to the original Leaflet map. */
+/* Explicit chart selection; failures leave the background clear. */
 (()=>{
  const $=id=>document.getElementById(id),native=window.NauticAndroid,W=window.NauticWaterways,I=window.NauticWorkIcons;
  const read=()=>{try{return JSON.parse(native?.readSetting('nautic-extensions')||localStorage.getItem('nautic-extensions')||'{}');}catch(_){return {};}};
@@ -17,9 +17,9 @@
  const wrap=$('mapWrap'),host=document.createElement('div');host.id='nauticVectorMap';host.style.cssText='position:absolute;inset:0;z-index:1;display:none';wrap.appendChild(host);
  const status=document.createElement('button');status.id='nauticWaterwayStatus';status.type='button';status.title='Ouvrages fluviaux · touche la carte pour rechercher ailleurs';status.style.cssText='position:absolute;z-index:740;left:8px;bottom:88px;max-width:65%;font-size:11px;padding:5px 8px';wrap.appendChild(status);
  function notice(text){status.textContent=text;}
- function fallback(message){request++;active=false;failed=true;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}window.nauticRestoreLegacy?.();lastRender='';renderWorks();if(message)notice(message+' · retour carte classique');}
+ function fallback(message){request++;active=false;failed=true;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}window.nauticClearChart?.();lastRender='';renderWorks();if(message)notice(message+' · choisir un fond de carte');}
  function library(){if(window.maplibregl)return Promise.resolve();if(loading)return loading;loading=new Promise((resolve,reject)=>{const css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css';document.head.appendChild(css);const script=document.createElement('script');script.src='https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js';const timeout=setTimeout(()=>reject(Error('chargement trop long')),20000);script.onload=()=>{clearTimeout(timeout);resolve();};script.onerror=()=>{clearTimeout(timeout);reject(Error('bibliothèque indisponible'));};document.head.appendChild(script);}).finally(()=>{loading=null;});return loading;}
- async function start(){const generation=++request;try{await library();if(generation!==request||(options.mapEngine||'vector')!=='vector')return;host.style.display='block';
+ async function start(){const generation=++request;try{await library();if(generation!==request||navigationMapEngine(options.mapEngine)!=='vector')return;host.style.display='block';
   const c=map?.getCenter()||{lat:47.5911,lng:2.7521};lastCamera=null;vector=new maplibregl.Map({container:host,style:'https://tiles.openfreemap.org/styles/liberty',center:[c.lng,c.lat],zoom:map?.getZoom()||14,attributionControl:{compact:true},dragPan:true,pitchWithRotate:false,pitch:mapPitch,maxPitch:MAX_VECTOR_PITCH});
   vector.touchZoomRotate?.enableRotation();vector.dragRotate?.enable();
   vector.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');let loaded=false;
@@ -964,7 +964,7 @@
  if(!changed)return;lastLegacyZoom=z;lastCamera={lat:c.lat,lon:c.lon,bearing,pitch:mapPitch,h};vector.jumpTo({...(zoomChanged&&z!=null?{zoom:z}:{}),center:[c.lon,c.lat],bearing,pitch:mapPitch,padding:{top:h/3,bottom:0,left:0,right:0}});$('compass').style.transform=`rotate(${bearing}deg)`;
  }
 
- function settings(next){options=next||read();lastQuery=0;signButton.hidden=options.waterwayTypes?.notice===false;if((options.mapEngine||'vector')==='legacy'){request++;failed=false;active=false;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}window.nauticRestoreLegacy?.();}else if(!vector){failed=false;start();}if(active&&vector?.getLayer('nautic-works')){const sizes=I.expression(Number(options.waterwayIconSize)||120);vector.setLayoutProperty('nautic-works','icon-size',sizes);}lastRender='';renderWorks();}
+ function settings(next){options=next||read();lastQuery=0;signButton.hidden=options.waterwayTypes?.notice===false;const engine=navigationMapEngine(options.mapEngine);if(engine!=='vector'){request++;failed=false;active=false;host.style.display='none';$('map').style.visibility='visible';if(vector){vector.remove();vector=null;}if(engine==='legacy')window.nauticRestoreLegacy?.();else window.nauticClearChart?.();}else if(!vector){failed=false;start();}if(active&&vector?.getLayer('nautic-works')){const sizes=I.expression(Number(options.waterwayIconSize)||120);vector.setLayoutProperty('nautic-works','icon-size',sizes);}lastRender='';renderWorks();}
  window.nauticApplyNavigation=settings;
  window.nauticApplyMapPitch=()=>{
   if(!vector)return;
@@ -1434,6 +1434,6 @@
   }
  }
  window.nauticEvery(syncSondeurAlerts, 1000, true);
- window.nauticVectorStatus=()=>({active,failed,engine:options.mapEngine||'vector'});
+ window.nauticVectorStatus=()=>({active,failed,engine:navigationMapEngine(options.mapEngine)});
  settings(options);
 })();

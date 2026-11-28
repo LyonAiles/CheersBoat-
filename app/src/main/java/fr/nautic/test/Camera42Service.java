@@ -96,6 +96,7 @@ public class Camera42Service extends Service {
   if("mouvement générique".equals(e.category))message="Caméra 42 · mouvement détecté (catégorie non fournie)";
   if(e.initial)message="Caméra 42 · "+e.category+" : présence signalée par la caméra";
   p.edit().putString("lastAlert",message).putLong("lastAlertTime",now).apply();
+  OperationLog.add(this,42,"ALERT","42:"+now);
   ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(1202,notification(ALERTS,message,"Alerte caméra · vérifier la caméra 42",false));
   Camera42Access.ding(this);
   sendBroadcast(new Intent(ACTION).setPackage(getPackageName()).putExtra("message",message));

@@ -2,6 +2,7 @@
 (()=>{
  const $=id=>document.getElementById(id),bridge=window.NauticAndroid;
  const call=(name,...args)=>{if(bridge&&typeof bridge[name]==='function')return bridge[name](...args);};
+ const logOperation=(object,code,detail)=>call('logOperation',object,code,detail);
  const icon=(id,symbol,label)=>{const e=$(id);if(!e)return;e.textContent=symbol;e.title=label;e.setAttribute('aria-label',label);};
  icon('nauticExitButton','−','Réduire Nautic');icon('nauticPlugsButton','🔌','Prises');icon('nauticContactsButton','☎↶','Derniers appels');
  const exit=$('nauticExitButton');if(exit)exit.innerHTML='<svg viewBox="0 0 24 24" width="25" height="25" aria-hidden="true"><path d="M5 15h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
@@ -30,7 +31,10 @@
  let pending42=false;
  window.nauticBindCamera42=()=>{for(const index of [1,3]){const card=$('cam'+index+'Card');if(!card)continue;card.onclick=()=>call('openDashboardCamera',index);card.oncontextmenu=e=>{e.preventDefault();call('openCameraMosaic');};card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.click();}};}if(camera42){camera42.onclick=()=>{if(pending42||!bridge)return;pending42=true;call('toggleCamera42');};camera42.oncontextmenu=e=>{e.preventDefault();if(open42)open42.call(camera42,e);};camera42.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();camera42.click();}};}};window.nauticBindCamera42();
  window.nauticCamera42Result=message=>{pending42=false;if(camera42)camera42.title=message||'';refresh();previews();};
- let pending=false,pendingSince=0,lastAlert42=0,lastPresentedAlert=0,lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
+ let pending=false,pendingSince=0,lastAlert42=0,lastPresentedAlert=0,alertViewPending=false,alertTrace=null,alertWaitReason='',lastAlert=0,alarmUntil=0,activationUntil=0,resultUntil=0,resultText='';
+ window.nauticAlertViewPresented=trace=>{
+  if(alertTrace&&trace===alertTrace.number+':'+alertTrace.time){alertTrace=null;alertViewPending=false;alertWaitReason='';}
+ };
  let extraNumbers={};try{extraNumbers=JSON.parse(call('readSetting','nautic-control-numbers')||localStorage.getItem('nautic-control-numbers')||'{}');}catch(_){}
  const fixedNumbers={settingDashboardTransparency:703,settingWaterAmplitude:704,settingWaterSpeed:705,settingWaterTransparencyAmplitude:706,settingWaterTimer:707,settingChartLinked:708,clock:10,clockDate:11,nauticSettingsButton:20,nauticExitButton:21,nauticPlugsButton:22,gpsCard:31,boatCard:32,logCard:33,fuelCard:34,nauticCallsSlot:35,speedCard:36,weatherCard:37,headingCard:38,notesCard:39,nativeNotesCarry:391,mapWrap:40,cam1Card:41,cam2Card:42,cam3Card:43,trematageCard:44,mapCameraPort:45,mapCameraPreview:46,mapCameraStarboard:47,mapCameraQuality:146,mapCameraAxis:148,mapCameraCaptureMenu:149,mapCameraMedallionToggle:147,nauticSignButton:583,waterwayCall:584,waterwayWebsite:585,nauticRefreshWorks:586,nauticDataCounter:587,nauticRefreshWork:588,nauticRefreshNotices:589,mapGps:50,windWidget:51,compass:52,mapLayers:53,mapRecenter:54,fullscreenToggle:55,mapZoomIn:56,mapZoomOut:57,nauticDestinationStatus:58,nauticAccessibleStatus:59,sondeurReplay:294,sondeurToggle:297,sondeurOptions:299};
  const reservedNumbers=new Set(Object.values(fixedNumbers));
@@ -218,6 +222,7 @@
   const feed=feeds[centerView],lens=currentLens(feed);
   if(mapCamera.hidden||mapCamera.classList.contains('nautic-hidden')||!lens)return;
   lastPresentedAlert=Math.max(lastPresentedAlert,Date.now());
+  alertTrace=null;alertViewPending=false;
   feeds[centerView]={...feed,lens:3-lens};
   previews();
  }
@@ -229,11 +234,15 @@
   swappedMedallion=null;
  }
  function showAlertCamera(number,index,time){
-  if(time<=lastPresentedAlert)return;
+  const trace=number+':'+time;
+  if(time<=lastPresentedAlert){logOperation(46,'SKIP',trace+' OLD');return;}
   lastPresentedAlert=time;
+  alertViewPending=true;
   const mobile=number===44,camera=mobile?Number(index):2;
   const requested={camera:[1,2,3].includes(camera)?camera:1,lens:mobile?1:2};
-  if(!swappedMedallion&&!mapCamera.hidden&&!mapCamera.classList.contains('nautic-hidden')&&feeds[centerView]?.camera===requested.camera&&currentLens(feeds[centerView])===requested.lens)return;
+  alertTrace={number,time,camera:requested.camera,lens:requested.lens};alertWaitReason='';
+  logOperation(46,'SELECT',trace+' C'+(40+requested.camera)+' L'+requested.lens);
+  if(!swappedMedallion&&!mapCamera.hidden&&!mapCamera.classList.contains('nautic-hidden')&&feeds[centerView]?.camera===requested.camera&&currentLens(feeds[centerView])===requested.lens){refreshMapViews();previews(true);return;}
   restoreMedallion();
   feeds[centerView]=requested;
   mapCamera.hidden=false;
@@ -251,6 +260,7 @@
   }
   if($('app')?.classList.contains('hide-mapCameraMedallions'))return;
   lastPresentedAlert=Math.max(lastPresentedAlert,Date.now());
+  alertTrace=null;alertViewPending=false;
   const previous=swappedMedallion;
   restoreMedallion();
   if(previous!==id){
@@ -419,6 +429,9 @@
   const settingsOpen=sonarSettings&&!sonarSettings.hidden;
   mapCamera.style.visibility=settingsOpen?'hidden':'';
   const hidden=settingsOpen||document.hidden||document.querySelector('dialog[open]')||$('app')?.classList.contains('nautic-edit');
+  if(alertViewPending&&hidden){const reason=settingsOpen?'SONAR':document.hidden?'PAUSE':'PANEL';
+   if(reason!==alertWaitReason){alertWaitReason=reason;logOperation(46,'WAIT',alertTrace.number+':'+alertTrace.time+' '+reason);}
+  }
   qualityTool.hidden=!!hidden||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
   medallionTool.hidden=!!hidden||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden');
   refreshAxis();
@@ -426,7 +439,7 @@
   const centralUrl=cameraConfig()['cam'+feeds[centerView].camera]||'';
   const captureHidden=!!hidden||mapCamera.hidden||mapCamera.classList.contains('nautic-hidden')||!bridge?.cameraCapture;
   captureTool.hidden=captureHidden||(/^https?:/i.test(centralUrl)&&!call('hasLatestCameraVideo'));
-  if(!hidden&&window.nauticQuietMode&&force!==true)return;
+  if(!hidden&&window.nauticQuietMode&&force!==true&&!alertViewPending)return;
   const tiles=[];
   const config=cameraConfig();
   if(!hidden)for(const id of ['trematagePreview',...previewViews]){
@@ -465,12 +478,13 @@
     ?{x:r.left,y:r.top,w:r.width,h:r.height,label:caption.textContent,number:control.dataset.objectNumber,
       pressed:control.getAttribute('aria-pressed')==='true'}:null;
   };
-  call('dashboardPreviews',JSON.stringify({width:innerWidth,mapCameraAlpha,mapHd,centerReset,tiles,dashboardOpacity:Number(getComputedStyle(document.documentElement).getPropertyValue('--nautic-dashboard-opacity'))||.5,uiOpacity:Number(getComputedStyle(document.documentElement).getPropertyValue('--nautic-ui-opacity'))||.60,
+  call('dashboardPreviews',JSON.stringify({alertTrace,width:innerWidth,mapCameraAlpha,mapHd,centerReset,tiles,dashboardOpacity:Number(getComputedStyle(document.documentElement).getPropertyValue('--nautic-dashboard-opacity'))||.5,uiOpacity:Number(getComputedStyle(document.documentElement).getPropertyValue('--nautic-ui-opacity'))||.60,
    qualityButton:controlBounds(qualityTool),medallionButton:controlBounds(medallionTool),axisButton:controlBounds(axisTool),
    captureButton:controlBounds(captureTool)}));
+  if(!hidden&&alertViewPending){logOperation(46,'SEND',alertTrace.number+':'+alertTrace.time);alertViewPending=false;}
  }
  window.nauticEvery(()=>{numberButtons();refresh();previews();},800);
- window.nauticDashboardResume=()=>{if(window.nauticDataUpdating)return;if(window.nauticQuietMode){previews();return;}refresh();previews();};
+ window.nauticDashboardResume=()=>{if(window.nauticDataUpdating)return;refresh();previews(true);};
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)window.nauticDashboardResume();else{freezeHttpPreviews();previews();}});window.addEventListener('resize',previews);
  new MutationObserver(previews).observe($('dialog'),{attributes:true,attributeFilter:['open']});
  numberButtons();refresh();previews();setTimeout(previews,200);setTimeout(previews,600);

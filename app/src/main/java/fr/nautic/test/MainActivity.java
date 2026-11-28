@@ -84,6 +84,7 @@ public class MainActivity extends Activity {
   return super.dispatchTouchEvent(event);
  }
  void dashboardTransparency(float value,boolean save){js("nauticDashboardTransparencyGesture",value+":"+save);}
+ void alertViewPresented(String trace){js("nauticAlertViewPresented",trace);}
  void updateMapCameraAlpha(float alpha){js("nauticMapCameraAlpha",Float.toString(alpha));}
  void refreshDashboardVideos(){js("nauticDashboardResume","");}
  void dashboardAlert(int number,String message){try{
@@ -98,6 +99,7 @@ public class MainActivity extends Activity {
  @Override protected void onStop(){dashboardVisible=false;if(trematageReceiver!=null){unregisterReceiver(trematageReceiver);trematageReceiver=null;}super.onStop();}
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
+  OperationLog.add(this,0,"APP","OPEN");
   if(state!=null)captureToMove=state.getString("captureToMove");
   if(RemoteTwinService.prefs(this).getBoolean("enabled",false))RemoteTwinService.apply(this);
   notesPad=new NotesPad(this,()->{dashboardVisible=true;js("nauticDashboardResume","");});
@@ -373,10 +375,14 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void timerPerformanceResult(String result){runOnUiThread(()->{
    if(!isFinishing()&&!isDestroyed())new AlertDialog.Builder(MainActivity.this).setTitle("Mesure des effets du timer").setMessage(result).setPositiveButton("Fermer",null).show();
   });}
+  @JavascriptInterface public void logOperation(int object,String code,String detail){
+   if((object==42||object==44||object==46)&&code.matches("ALERT|SKIP|SELECT|WAIT|SEND"))OperationLog.add(MainActivity.this,object,code,detail);
+  }
+  @JavascriptInterface public void openOperationLog(){runOnUiThread(()->OperationLog.open(MainActivity.this));}
   @JavascriptInterface public void commandSound(){interactionSound("click");}
   @JavascriptInterface public void gestureSound(String kind){interactionSound(kind);}
   @JavascriptInterface public void dashboardPreviews(String json){runOnUiThread(()->{
-   if(mapManipulating||!dashboardVisible||(notesPad!=null&&notesPad.isShowing()))return;if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
+   if(mapManipulating||!dashboardVisible||(notesPad!=null&&notesPad.isShowing())){OperationLog.deferred(MainActivity.this,json,mapManipulating?"MAP":!dashboardVisible?"PAUSE":"NOTES");return;}if(dashboardCameras==null)dashboardCameras=new DashboardCameras(MainActivity.this,dashboardLayer);dashboardCameras.update(json);
   });}
   @JavascriptInterface public void openRemoteTwin(){runOnUiThread(()->RemoteTwinSettings.open(MainActivity.this));}
   @JavascriptInterface public void previewAlertSound(String sound){CameraAlertSounds.play(MainActivity.this,"42",sound);}
@@ -395,15 +401,16 @@ public class MainActivity extends Activity {
   @JavascriptInterface public void toggleTrematage(){runTrematage(false);}
   private void runTrematage(boolean recover){
    if(!trematageBusy.compareAndSet(false,true)){js("nauticTrematageResult","Une commande Trématage est déjà en cours");return;}
+   OperationLog.add(MainActivity.this,44,"PTZ","REQ");
    dashboardCommands.execute(()->{
-    try{js("nauticTrematageResult",TrematageAccess.toggle(MainActivity.this,recover));}
-    catch(TrematageAccess.RecoveryRequired e){
+    try{String result=TrematageAccess.toggle(MainActivity.this,recover);OperationLog.add(MainActivity.this,44,"PTZ","OK");js("nauticTrematageResult",result);}
+    catch(TrematageAccess.RecoveryRequired e){OperationLog.add(MainActivity.this,44,"PTZ","RECOVERY");
      js("nauticTrematageResult","Ancien état Trématage · retour BASE à confirmer");
      runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())new AlertDialog.Builder(MainActivity.this)
        .setTitle("44 · Récupérer Trématage").setMessage(e.getMessage())
        .setPositiveButton("620 · Retour BASE",(dialog,which)->runTrematage(true))
        .setNegativeButton("621 · Annuler",null).show();});
-    }catch(Exception e){String message="Trématage impossible · "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage());toast(message);js("nauticTrematageResult",message);}
+    }catch(Exception e){OperationLog.add(MainActivity.this,44,"PTZ","FAIL "+e.getClass().getSimpleName());String message="Trématage impossible · "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage());toast(message);js("nauticTrematageResult",message);}
     finally{trematageBusy.set(false);}
    });
   }

@@ -9,7 +9,8 @@ const readSetting=(key)=>{try{
  return old;
 }catch(e){try{return localStorage.getItem(key)||''}catch(_){return ''}}};
 const stored=(k,d)=>{try{return Object.assign({},d,JSON.parse(readSetting(k)||'{}'))}catch(e){return {...d}}};
-const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'osm',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:true});
+const state=stored('nautic-extensions',{boatPhoto:'',buttons:{},map:'',mapEngine:'none',moveThreshold:8,stopMinutes:20,boatName:'',contacts:[],testMode:true,contactPhone:'',recentCalls:[],objectNumbers:true});
+state.mapEngine=navigationMapEngine(state.mapEngine);
 mapPitch=clampMapPitch(state.mapPitch);
 // L'horloge reste affichée, indépendamment des anciens réglages de visibilité.
 state.buttons = state.buttons || {};
@@ -131,7 +132,12 @@ const layerDefs={osm:{label:'OpenStreetMap',url:'https://{s}.tile.openstreetmap.
  relief:{label:'Topographique Esri',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',maxZoom:19,attr:'Tiles © Esri · contributeurs'},
  sea:{label:'OpenSeaMap — balisage',url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:18,attr:'© OpenStreetMap'}};
 let chosenLayer=null;
-function setLayer(id){if(!map||!window.L)return;layoutNavigationMap();map.invalidateSize();map.eachLayer(l=>{if(l instanceof L.TileLayer)map.removeLayer(l)});let d=layerDefs[id]||layerDefs.osm;chosenLayer=L.tileLayer(d.url,{maxZoom:d.maxZoom,attribution:d.attr}).addTo(map);if(id==='sea')L.tileLayer('https://t1.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap',zIndex:5}).addTo(map);state.map=id;persist();let foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Carte '+d.label+' · suivi GPS';rotateMap()}
+function setLayer(id){if(!map||!window.L)return;layoutNavigationMap();map.invalidateSize();map.eachLayer(l=>{if(l instanceof L.TileLayer)map.removeLayer(l)});let d=layerDefs[id];if(!d){chosenLayer=null;return;}chosenLayer=L.tileLayer(d.url,{maxZoom:d.maxZoom,attribution:d.attr}).addTo(map);if(id==='sea')L.tileLayer('https://t1.openseamap.org/seamark/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenSeaMap',zIndex:5}).addTo(map);state.map=id;persist();let foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Carte '+d.label+' · suivi GPS';rotateMap()}
+window.nauticClearChart=()=>{
+ if(map&&window.L)map.eachLayer(layer=>{if(layer instanceof L.TileLayer)map.removeLayer(layer)});
+ chosenLayer=null;get('mapFallback').style.display='none';
+ const foot=document.querySelector('.mapFoot');if(foot)foot.textContent='Aucun fond de carte · suivi GPS';
+};
 window.nauticRestoreLegacy=()=>setLayer(state.map);
 function mapTransparency(value){
  const percent=Number.isFinite(value)?Math.min(80,Math.max(0,value)):50;
@@ -143,10 +149,11 @@ function mapDialog(){
  const pitchLimit=()=>state.mapEngine==='legacy'?MAX_CLASSIC_PITCH:MAX_VECTOR_PITCH;
  const displayedPitch=clampMapPitch(mapPitch,pitchLimit());
  const displayedTransparency=mapTransparency(state.mapTransparency);
- openModal('Choisir la carte',`<button type="button" id="chooseVectorMap">MapLibre · vectorielle · libellés horizontaux</button><div class="choiceGrid">${Object.entries(layerDefs).map(([k,v])=>`<button data-map="${k}" aria-pressed="${state.map===k}">${v.label}</button>`).join('')}</div>
+ openModal('Choisir la carte',`<button type="button" id="chooseNoMap">Aucun fond de carte</button><button type="button" id="chooseVectorMap">MapLibre · vectorielle · libellés horizontaux</button><div class="choiceGrid">${Object.entries(layerDefs).map(([k,v])=>`<button data-map="${k}" aria-pressed="${state.mapEngine==='legacy'&&state.map===k}">${v.label}</button>`).join('')}</div>
  <label>Inclinaison de la carte <output id="mapPitchValue">${displayedPitch}°</output><input type="range" id="mapPitch" min="0" max="${pitchLimit()}" step="5" value="${displayedPitch}"></label>
  <label class="nautic-map-transparency">Transparence des boutons et pop-up <output id="mapTransparencyValue">${displayedTransparency} %</output><input type="range" id="mapTransparency" min="0" max="80" step="5" value="${displayedTransparency}"></label>
  <p class="muted">Vue en perspective. OpenSeaMap ajoute le balisage disponible. Connexion Internet nécessaire.</p>`);
+ get('chooseNoMap').onclick=()=>{state.mapEngine='none';persist();window.nauticApplyNavigation?.(state);dialog.close();};
  get('chooseVectorMap').onclick=()=>{state.mapEngine='vector';persist();window.nauticApplyNavigation?.(state);dialog.close();};
  const transparency=get('mapTransparency');
  transparency.oninput=()=>{
@@ -156,7 +163,7 @@ function mapDialog(){
  transparency.onchange=()=>persist();
  const pitchInput=get('mapPitch'),pitchValue=get('mapPitchValue');
  dialog.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{
-  state.mapEngine='legacy';window.nauticApplyNavigation?.(state);setLayer(b.dataset.map);
+  state.map=b.dataset.map;state.mapEngine='legacy';persist();window.nauticApplyNavigation?.(state);
   pitchInput.max=pitchLimit();pitchInput.value=clampMapPitch(mapPitch,pitchLimit());
   pitchValue.textContent=pitchInput.value+'°';
   dialog.querySelectorAll('[data-map]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
@@ -511,6 +518,7 @@ function settingsDialog(){
  <label><input type="checkbox" id="settingWaterTimer" ${state.appearance.waterTimer?'checked':''}> Animation après 10 secondes sans action</label>
  <button type="button" id="settingTimerMeasure">Mesurer le coût des effets · 54 secondes</button>
  <button type="button" id="settingTimerResult">Dernière mesure</button>
+ <button type="button" id="settingOperationLog">Journal des opérations</button>
  <label>Amplitude du fond marin : <output id="settingWaterAmplitudeValue">${state.appearance.waterAmplitude} %</output><input type="range" id="settingWaterAmplitude" min="0" max="200" step="5" value="${state.appearance.waterAmplitude}"></label>
  <label>Vitesse du mouvement : <output id="settingWaterSpeedValue">${state.appearance.waterSpeed} %</output><input type="range" id="settingWaterSpeed" min="25" max="300" step="5" value="${state.appearance.waterSpeed}"></label>
  <label>Variation de transparence : <output id="settingWaterTransparencyAmplitudeValue">±${state.appearance.waterTransparencyAmplitude} % de la valeur choisie</output><input type="range" id="settingWaterTransparencyAmplitude" min="0" max="30" step="1" value="${state.appearance.waterTransparencyAmplitude}"></label>
@@ -521,7 +529,7 @@ function settingsDialog(){
  <h3>Carte et ouvrages fluviaux</h3>
  <label>Base partagée de navigation (adresse HTTPS, facultative)<input type="url" id="settingNavigationBase" value="${esc(native?.readSetting('nautic-data-base-url')||'')}" placeholder="https://…/navigation"></label>
  <p class="muted">Les lots sont conservés sur cet appareil. Sans base partagée configurée : recherche externe, une zone à la fois. Les informations VNF actuelles restent à revérifier.</p>
- <label>Moteur de carte<select class="nautic-select" id="settingMapEngine"><option value="vector" ${(state.mapEngine||'vector')==='vector'?'selected':''}>MapLibre · libellés horizontaux</option><option value="legacy" ${state.mapEngine==='legacy'?'selected':''}>Carte classique · retour arrière</option></select></label>
+ <label>Moteur de carte<select class="nautic-select" id="settingMapEngine"><option value="none" ${state.mapEngine==='none'?'selected':''}>Aucun fond de carte</option><option value="vector" ${state.mapEngine==='vector'?'selected':''}>MapLibre · libellés horizontaux</option><option value="legacy" ${state.mapEngine==='legacy'?'selected':''}>Carte classique · retour arrière</option></select></label>
  <p class="muted">MapLibre utilise le fond vectoriel OpenFreeMap. Si le chargement ou WebGL échoue, retour automatique à la carte classique. Les réglages classiques sont conservés.</p>
  <label class="settingRow"><input type="checkbox" id="settingWaterwayWorks" ${state.waterwayWorks===false?'':'checked'}><span>Afficher les ouvrages fluviaux OpenStreetMap</span></label>
  <label>Taille des pictogrammes : <output id="settingWorkSizeValue">${Number(state.waterwayIconSize)||120}%</output><input type="range" id="settingWaterwayIconSize" min="50" max="200" step="5" value="${Number(state.waterwayIconSize)||120}"></label>
@@ -624,6 +632,7 @@ function settingsDialog(){
  const markDirty=()=>{saveButton.disabled=false;saveButton.textContent='● Enregistrer';saveButton.classList.add('nautic-dirty')};
  dialog.querySelectorAll('#dialogContent input,#dialogContent select,#dialogContent textarea').forEach(el=>{el.addEventListener('input',markDirty);el.addEventListener('change',markDirty)});
  get('settingTimerMeasure').onclick=()=>{dialog.close();setTimeout(()=>window.nauticWater.measure(),250)};
+ get('settingOperationLog').onclick=()=>nativeCall('openOperationLog');
  get('settingTimerResult').onclick=()=>window.nauticWater.lastMeasurement();
  get('settingDashboardTransparency').oninput=e=>{
   state.appearance.dashboardTransparency=Number(e.target.value);
@@ -747,7 +756,7 @@ function applyObjectNumbers(){
 
 applyObjectNumbers();
 settingsButton.onclick=settingsDialog;applyVisibility();
-setTimeout(()=>{if(map)setLayer(state.map)},1000);
+if(state.mapEngine==='legacy')setLayer(state.map);
 })();
 
 /* Contacts : noms et numéros lisibles, sans colonnes étroites. */
